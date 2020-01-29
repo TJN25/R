@@ -1,0 +1,1581 @@
+---
+title: "Comparative RNASeq Analysis"
+author: "Thomas Nicholson"
+date: "10/3/2019"
+output: html_document
+runtime: shiny
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+suppressMessages(library(tjnFunctions))
+library(tidyverse)
+library(VennDiagram)
+library(shiny)
+library(ggplot2)
+library(viridis)
+library(RColorBrewer)
+#library(stringr)
+#library(plyr)
+library(devtools)
+#library(tidyr)
+library(shinyjs)
+library(shinyWidgets)
+library(DT)
+library(lubridate)
+library(dplyr)
+```
+
+```{r functions, include=F}
+plotKnownvsConserved <- function(dat, columns, not_zero = F){
+  dat <- dat%>%mutate(conserved = F)
+if(not_zero){
+  for(i in 1:nrow(dat)){
+    dat[i, ncol(dat)] <- ("1" %in% dat[i, columns])
+    if(dat[i, ncol(dat)] == F){
+    dat[i, ncol(dat)] <- ("0-1" %in% dat[i, columns])
+    }
+
+  }
+}else{
+  for(i in 1:nrow(dat)){
+    dat[i, ncol(dat)] <- ("1" %in% dat[i, columns])
+  }
+}
+
+
+  conservedSet <- dat%>%filter(conserved)
+  knownSet <- dat%>%filter(new_feature == F)
+
+  vennSet <- conservedSet%>%bind_rows(knownSet)%>%unique()
+
+
+
+  area1 <- nrow(subset(vennSet, conserved == T))
+  area2 <- nrow(subset(vennSet, new_feature == F))
+  cross.area <- nrow(subset(vennSet, new_feature == F & conserved == T))
+
+  grid.newpage()
+  draw.pairwise.venn(area1 = area1, area2 = area2, cross.area = cross.area, fill = c("blue", "red"),
+                     scaled = T,
+                     #cat.default.pos= "text",
+                     #cat.pos = c(-50, 50),
+                     #category = c("Conserved and Expressed", "Known")
+                     category = c("", "")
+  )
+}
+assignConservationLevel <- function(ids_lookup, main_col = 7, genera_col, species_col, any_col = c(7:ncol(ids_lookup))){
+  ids_lookup <- ids_lookup%>%mutate(type = "")
+  for(i in 1:nrow(ids_lookup)){
+    if("1" %in% ids_lookup[i, main_col]){
+      ids_lookup[i, ncol(ids_lookup)] <- "Family_1"
+    }else if("0-1" %in% ids_lookup[i, main_col]){
+      ids_lookup[i, ncol(ids_lookup)] <- "Family_0-1"
+    }else if("1" %in% ids_lookup[i, genera_col]){
+      ids_lookup[i, ncol(ids_lookup)] <- "Genera_1"
+    }else if("0-1" %in% ids_lookup[i, genera_col]){
+      ids_lookup[i, ncol(ids_lookup)] <- "Genera_0-1"
+    }else if("1" %in% ids_lookup[i, species_col]){
+      ids_lookup[i, ncol(ids_lookup)] <- "Species_1"
+    }else if("0-1" %in% ids_lookup[i, species_col]){
+      ids_lookup[i, ncol(ids_lookup)] <- "Species_0-1"
+    }else if("1" %in% ids_lookup[i, any_col]){
+      ids_lookup[i, ncol(ids_lookup)] <- "Species_1"
+    }else if("0-1" %in% ids_lookup[i, any_col]){
+      ids_lookup[i, ncol(ids_lookup)] <- "Species_0-1"
+    }
+
+  }
+  return(ids_lookup)
+}
+firstup <- function(x) {
+  substr(x, 1, 1) <- toupper(substr(x, 1, 1))
+  x
+}
+
+
+```
+
+##Overview
+![Figure . Overview of Approach](Colloquia_2019.png)
+
+![Figure . Overview of Approach](Colloquia_2019_1.png)
+
+##Methods
+
+![Figure . Overview of the pipeline](rnaseq_flowchart.png)
+![Figure . Genera Available](genera_tree.png)
+
+
+![Figure . Genomes analysed](genomes_tree.png)
+
+```{r find_available_data, echo = F, eval = F}
+
+##get all file paths
+filePaths <- list(main = "~/phd/RNASeq/", 
+                  species = c("~/phd/RNASeq/serratia/","~/phd/RNASeq/escherichia/", "~/phd/RNASeq/xanthomonas/",
+                              "~/phd/RNASeq/Salmonella/", "~/phd/RNASeq/Klebsiella/", "~/phd/RNASeq/Enterobacter/",
+                              "~/phd/RNASeq/pseudomonas/", "~/phd/RNASeq/bacillus/", "~/phd/RNASeq/Shigella/"),
+                  alignments = "~/phd/RNASeq/alignments/",
+                  sra = "~/phd/RNASeq/srna_all")
+
+##get info about species
+genomes <- list()
+mergedGff <- list()
+individualGff <- list()
+mainGff <- list()
+rfamGff <- list()
+sraGenome <- list()
+
+for(i in filePaths$species){
+  genome_folders <- list.dirs(path = i, full.names = T, recursive = F)
+  
+  
+  ##get list of genomes available
+  genomes_i <- list.files(path = genome_folders, pattern = ".fna$", recursive = F)
+  genomes$new <- str_replace_all(genomes_i, "\\.fna", "")
+  names(genomes)[names(genomes) == "new"] <- firstup(unlist(strsplit(i, "\\/"))[4])
+  
+  
+  ##list of the merged files
+  merged_files <- list.files(path = i, pattern = "_merged.gff$", recursive = F)
+  mergedGff$new <- merged_files
+  names(mergedGff)[names(mergedGff) == "new"] <- firstup(unlist(strsplit(i, "\\/"))[4])
+  
+  
+  ##list of all individual gffs generated or downloaded
+  gff_folder <- paste(genome_folders, "/gff_files/", sep = "")
+  gff_i <- list.files(path = gff_folder, pattern = ".gff$", recursive = F)
+  individualGff$new <- gff_i
+  names(individualGff)[names(individualGff) == "new"] <- firstup(unlist(strsplit(i, "\\/"))[4])
+  
+  
+  ##the main gff downloaded with the fasta file
+  gff_i <- list.files(path = gff_folder, pattern = "\\.\\d.gff$", recursive = F)
+  mainGff$new <- gff_i
+  names(mainGff)[names(mainGff) == "new"] <- firstup(unlist(strsplit(i, "\\/"))[4])
+  
+  
+  ##the gff files generated from searching rfam
+  gff_i <- list.files(path = gff_folder, pattern = "_ncRNA.gff$", recursive = F)
+  rfamGff$new <- gff_i
+  names(rfamGff)[names(rfamGff) == "new"] <- firstup(unlist(strsplit(i, "\\/"))[4])
+  
+  
+  ##list the combined calls for each individual genome
+  new_calls <- list.files(path = genome_folders, pattern = "new_calls.txt", recursive = F)
+  if(length(new_calls) == 0){
+      gff_folder <- paste(genome_folders, "/gff_files/", sep = "")
+  new_calls <- list.files(path = gff_folder, pattern = "new_calls.txt", recursive = F)
+  }
+  sraGenome$new <- new_calls
+  names(sraGenome)[names(sraGenome) == "new"] <- firstup(unlist(strsplit(i, "\\/"))[4])
+}
+##remove character(0)
+#genomes <- genomes[lapply(genomes,length)>0]
+
+
+  new_calls <- list.files(path = "~/phd/RNASeq/Klebsiella/GCA_000220485.1.data/", pattern = "new_calls.txt", recursive = F)
+
+  gff_i <- list.files(path = "~/phd/RNASeq/escherichia/GCA_000017765.1_data/", pattern = "\\.\\d.gff$", recursive = F)
+
+
+# head(genomes)
+# head(mergedGff)
+# head(individualGff)
+# head(mainGff)
+# head(rfamGff)
+# head(sraGenome)
+
+selectInput("species", label = "Select Species", choices = c("All", names(genomes)), selected = "All")
+
+
+
+
+renderDataTable({
+  summaryDat <- data.frame(Species = names(genomes), genomes = 0, RNASeq = 0, ncRNA = F, new_calls = 0)
+for(i in 1:length(genomes)){
+  summaryDat$new_calls[i] <- length(sraGenome[[i]])
+  summaryDat$genomes[i] <- length(genomes[[i]])
+  summaryDat$RNASeq[i] <- length(individualGff[[i]])
+  summaryDat$ncRNA[i] <- ifelse(length(rfamGff[[i]]) > 0, T, F)
+}
+DT::datatable(summaryDat)
+  
+  })
+
+#list.dirs(path = "~/phd/RNASeq/", full.names = TRUE, recursive = F)
+
+```
+
+
+###Download data and map reads
+
+* The genome and gff files are downloaded from ncbi using the GCA acession
+* The RNASeq data is downloaded using _fasterq-dump_ with a given accession
+* The reads are mapped using a script from Beth (updated just so that I can get it to run)
+
+A plot file is produced. This contains a number for each nucleotide that indicates read depth.
+
+###Call peaks on individual RNASeq experiments
+
+* The read depth gets set to 0 for all coding regions of the file
+    + This is done as identifying ncRNAs inside coding regions is a much more challenging problem than simply peak calling
+* For the remaining positions, the read depth is normalised and any region where the read depth is above a threshold for >50 nt is called a peak.
+    + Threshold is set to the equivalent of ~15 nt read depth before normalisation
+
+Removing CDS
+```{r removeProteinCoding, eval=F}
+removeCDSregions <- function(plotDat, gffDat, buffer = 150){
+
+  ##select the coding features from the gff file
+  gffDat <- gffDat%>%
+    filter(feature == "CDS")
+
+  ##get the nucleotide number based on the order of the read depth values
+  plotDat <- plotDat%>%
+    mutate(nucleotide = row_number())
+
+  ##Create a dataframe that will contain a list of nucleotides to be removed and the strand that they are found on
+  codingRegions <- data.frame(nucleotide = NA, strand = NA)
+
+  ##loop through all the coding features. Take the buffer (150nt) either side of the feature. 
+  ##List all of these nucleotides and add these to the dataframe.
+  for(i in 1:nrow(gffDat)){
+    codingRegions <- codingRegions%>%bind_rows(data.frame(nucleotide = c(((gffDat[i,4]) - buffer):((gffDat[i,5]) + buffer)), strand = gffDat[i,7]))
+  }
+
+  ##label all these nucleotides to be set to zero
+  codingRegions <- codingRegions%>%mutate(keep = F)
+
+  ##there is a stranded version of this that I am not using but could run
+  codingRegionsUnstranded <- codingRegions%>%select(nucleotide, keep)%>%unique()
+
+  
+  ##join the keep label to the read depth file by the nucleotide. 
+  ##Any of the nucleotides contained in coding regions will now have keep = F
+  plotDat <- plotDat%>%
+    left_join(codingRegionsUnstranded)%>%
+    mutate(keep = ifelse(is.na(keep), T, keep))
+
+  ##reset the read depth to zero for the conding regions
+  plotDat <- plotDat%>%
+    mutate(V1 = ifelse(keep == F, 0, V1))%>%
+    mutate(V2 = ifelse(keep == F, 0, V2))%>%
+    select(-keep)
+
+  return(plotDat)
+}
+
+
+
+```
+
+Peak Calling
+```{r peakCalling, eval = F}
+
+##read total set to RPM
+total <- (sum(plotDat$V1) + sum(plotDat$V2))/1000000
+
+
+##adjust the read depth based on total number of reads
+plotDatncRNA$V1 <- plotDatncRNA$V1/total
+plotDatncRNA$V2 <- plotDatncRNA$V2/total
+
+##A threshold of 0.015 works out to be the equivalent of a read depth of ~15 nt unadjusted for most RNASeq files used
+##This is done for fwd and rev strands (col.num = 1 or 2)
+
+##dat is the dataframe containing the read depth after the CDS regions have been set to zero
+rnaPeakCalling <- function(dat, col.num = 1, plot_threshold = 0.015,  binwidth = 25){
+
+  ##set up values to use throughout
+  moveby <- 1
+  feature_separation_distance <- 15
+  feature_length <- 50
+
+  dat <- dat%>%
+    mutate(nucleotide = row_number())
+  ##smooth the data using the binwidth (25) and the moveby (1)
+    TSRev <- zoo::zoo(dat$V1)
+    TSFwd <- zoo::zoo(dat$V2)
+  tmpRev <- zoo::rollapply(TSRev, width = binwidth, by = moveby, FUN = mean, align = "left")
+  tmpFwd <- zoo::rollapply(TSFwd, width = binwidth, by = moveby, FUN = mean, align = "left")
+  datRev <- as.data.frame(tmpRev)
+  datFwd <- as.data.frame(tmpFwd)
+  datRev <- datRev%>%
+    mutate(nucleotide = row_number())
+  datFwd <- datFwd%>%
+    mutate(nucleotide = row_number())
+  datRev <- datRev%>%rename(V1 = tmpRev)
+  datFwd <- datFwd%>%rename(V2 = tmpFwd)
+  dat <- datRev%>%left_join(datFwd, by = "nucleotide")%>%select(V1, V2, nucleotide)
+  
+
+  ##store original data and keep an editable version of the data
+  datTmp <- dat
+
+  ##create dataframe to store the peak calls
+  callsDat <- data.frame(start = NA, stop = NA, mean = NA)
+
+  peak <- F #no peak at this nt
+  feature_found <- F ##no feature in the plot data (This is to stop the next loop if nothing is found)
+  
+  
+  ##loop through the data table and identify regions above a threshold value
+  for(i in 1:nrow(datTmp)){
+    ##check if the value can be ignored
+    ##If there is no current peak and the nt read depth is under the threshold nothing futher is needed
+    if(peak == F){
+      if(datTmp[i, col.num] < plot_threshold){
+        next
+      }
+    }
+
+    ##get the read depth value for this nucleotide
+    read_depth_nt <- datTmp[i,col.num]
+    if(is.na(read_depth_nt)){
+      read_depth_nt <- 0
+    }
+
+    ##check the value is above the cutoff threshold
+    if(read_depth_nt >= plot_threshold){
+      
+      ##if there is not already a peak open, begin a new peak
+      if(peak == F){
+        start <- i
+        peak <- T
+        feature_found <- T
+      }
+
+      ##if the value is less than the threshold, close and write the new peak
+      }else if(read_depth_nt < plot_threshold){
+        stop <- i
+        df <- data.frame(start = start, stop = stop, mean = mean(datTmp[start:stop,col.num]))
+        
+        ##add peak to the peak calls dataframe
+        callsDat <- callsDat%>%bind_rows(df)
+        
+        peak <- F ##reset to no peak found
+    }
+
+  }
+  
+  
+  ##set up dataframe for combining small peaks that are nearby
+  callsCombined <- data.frame(start = 0, stop = 0, mean.score = 0)
+  
+  ##check atleast one peak was found
+  if(feature_found == T){
+    if(nrow(callsDat) > 1){
+      
+      
+      ##sort the features by start site so that the iterations of the loop are in the correct order for the next step
+      callsDat <- callsDat%>%filter(!is.na(start))%>%arrange(start)
+
+      peak <- F ##not currently extending a peak
+      
+      ##loop through the feature calls and combine the features that were close enough together
+      for(i in 1:nrow(callsDat)){
+
+        ##if there is no current feature open a new feature
+        if(peak == F){
+          start_val <- callsDat[i,1]
+          end_val <- callsDat[i,2]
+          mean_val <- callsDat[i,3]
+  
+          peak <- T ##checking if a pak can be extended
+        }else{
+  
+          ##This will write a feature when the loop ends if one is open
+          if(i == nrow(callsDat)){
+            if(abs(end_val - callsDat[i,1]) < feature_separation_distance + (callsDat[i,2] - callsDat[i,1])/50){
+              end_val <- callsDat[i,2]
+            }
+            if(abs(end_val - start_val) >= feature_length){
+              meanScore <- mean(dat[start_val:end_val,col.num])
+              df <- data.frame(start = start_val, stop = end_val, mean.score = meanScore) #>>>>
+              callsCombined <- callsCombined%>%bind_rows(df)
+            }
+            peak <- F
+            
+            
+          }else{
+  
+            ##check if the start of the next feature is within 15 nt of the end of the previous feature. If so, change the end site of the feature
+            if(abs(end_val - callsDat[i,1]) < feature_separation_distance){
+              end_val <- callsDat[i,2]
+            }else{
+              ##check the length of the feature is more than 50 nt and write the current feature
+              if(abs(end_val - start_val) >= feature_length){
+                meanScore <- mean(dat[start_val:end_val,col.num])
+                df <- data.frame(start = start_val, stop = end_val, mean.score = meanScore)
+                callsCombined <- callsCombined%>%bind_rows(df)
+              }
+              
+              ##start a new feature with the values that did not overlap with the current feature
+              start_val <- callsDat[i,1]
+              end_val <- callsDat[i,2]
+              mean_val <- callsDat[i,3]
+            }
+          }
+        }
+  
+      }
+  
+  
+  
+      callsCombined <- callsCombined%>%filter(!is.na(start))%>%mutate(feature.length = stop - start)
+    }
+  }
+  return(callsCombined)
+
+
+
+}
+
+
+##this gets reformatted into a gff file
+  
+  
+  
+  
+```
+
+
+###Combining GFF file
+
+At this stage each individual RNASeq file has a corresponding gff file of SRA calls. There is also the original GFF file containing ncRNAs (along with CDS). 
+Predictions of ncRNAs are made using rfam models and the output is made into a GFF file. 
+There are 2 GFF files containing _known_ ncRNAs and a number of GFF files containing predicted SRAs.
+
+```{r combineGFF, eval=F}
+##get list of GFF fies (all kept in gff_files folders for each genome)
+files <- list.files(filePath, pattern = ".gff$")
+
+##create dataframe for listing all features and which file they come from
+dat <- data.frame(sequence = as.character("0"), source = as.character("0"), feature = as.character("0"),
+                  start = as.integer("0"), end = as.integer("0"), score = as.character("0"),
+                  strand = as.character("0"), phase = as.character("0"), Atrribute = as.character("0"), file_name = as.character("start_row"), stringsAsFactors = F)
+
+##open each file and add the file name to a column to store the origin of all the features
+for(i in 1:length(files)){
+  tmp <- read.table(paste(file_path, opt$sra, files[i], sep = "/"), comment.char = "#", quote = "", sep = "\t", as.is = T)
+  colnames(tmp) <- c("sequence", "source", "feature", "start", "end", "score", "strand", "phase", "Atrribute")
+  tmp <- tmp%>%mutate(file_name = files[i])%>%mutate(score = as.character(score))
+  dat <- dat%>%bind_rows(tmp)
+}
+
+##remove features that were added to the dataframe from the main GFF file that are not wanted
+ncRNAgff <- dat%>%
+  filter(feature != "CDS", feature != "gene", feature != "pseudogene", feature != "exon", feature != "region")
+
+##sort dataframe by the start site of all the features
+ncRNAgff <- ncRNAgff%>%arrange(start)
+
+##create dataframe for recording each feature
+mergedDat <- data.frame(sequence = as.character("0"), feature = as.character("0"),
+                        start = as.integer("0"), end = as.integer("0"),
+                        strand = as.character("0"), file_names = as.character("start_row"),
+                        row_numbers = as.character("0"), prop_overlap = as.numeric(0), new_feature = F,
+                        number_of_features = as.integer("0"),
+                        score = as.character("0"),
+                        stringsAsFactors = F)
+
+
+current_feature <- F #is there a current feature being written?
+new_feature <- T #is this a known feature?
+
+##loop through the combined gff files and combine features that overlap
+for(i in 1:(nrow(ncRNAgff) - 1)){
+  ##check if the feature is already known
+  if(ncRNAgff[i,2] != "sraAlignedncRNAExpression"){ ##I have called all new predictions "sraAlignedncRNAExpression" so these are the unknown SRAs
+    new_feature <- F
+  }
+
+  ##if there is no current feature then set a new start value
+  if(current_feature == F){
+  start_val <- ncRNAgff[i,4] ##this is the start position of the feature
+  start_i <- i ##this is the row that the first feature comes from
+  end_val <- ncRNAgff[i,5]
+  }
+
+  ##set the new end value
+  if(ncRNAgff[i, 5] > end_val){
+  end_val <- ncRNAgff[i,5]
+  }
+
+  ##check if the curent end value overlaps with the next starting value and update the end value if it does
+  if(end_val > ncRNAgff[i + 1, 4] & ncRNAgff[i,7] == ncRNAgff[i+1, 7]){ ##col 7 is strand
+    end_val <- ncRNAgff[i + 1,5]
+    current_feature <- T
+  }else{
+
+    ##check if the subsequent feature was contained within the first feature
+    ##not sure this is correct or useful
+    if(ncRNAgff[start_i, 5] < end_val){
+    prop_val <- (ncRNAgff[start_i, 5] - ncRNAgff[i, 4])/(end_val - start_val)
+    }else{
+      prop_val <- 1
+    }
+
+    ##add row to dataframe and reset values
+    tmp <- data.frame(sequence = ncRNAgff[i,1],
+                      feature = ncRNAgff[i,3],
+                      start = start_val, end = end_val,
+                      strand = ncRNAgff[i,7],
+                      file_names = paste(ncRNAgff[start_i:i, 10], collapse = ","),
+                      row_numbers = paste(c(start_i:i), collapse = ","),
+                      prop_overlap = prop_val,
+                      new_feature = new_feature,
+                      number_of_features = length(start_i:i),
+                      score = as.character(ncRNAgff[i,6]),
+                      stringsAsFactors = F)
+    mergedDat <- mergedDat%>%bind_rows(tmp)
+    current_feature <- F
+    new_feature <- T
+  }
+}
+
+mergedDat <- mergedDat%>%filter(number_of_features > 0, file_names != "start_row")
+```
+
+For each genome there is now a single file containing all the SRA calls and whether they were previously found/predicted.
+
+At this point genome alignments are done using MAUVE.
+
+An order for the alignments to be carried out in is needed. This is also needed for future steps.
+
+*progressiveMauve  --output=NAME.xmfa --output-guide-tree=NAME.tree --backbone-output=NAME.backbone GENOME_1 GENOME_2*
+
+These alignements are used to adjust the start and stop sites in the merged GFF files so that different genomes can be compared. The same steps as above are then redone on these files.
+
+
+
+2 gff files of merged calls will be used in this section, with a single merged file with info about whether each SRA was found in both or no recorded. This is repeated multiple times until there is one remaining file.
+
+
+
+
+```{r combinedGFF_aligned_output_table, echo = F}
+sra_calls <- read.table("~/phd/RNASeq/Klebsiella/GCA_000220485.1.data/gff_files/SRR1820237_sra_calls.gff", header = F, sep = "\t",
+                  comment.char = "#", quote = "", as.is = T )
+#sra_calls <- sra_calls %>% select(-file_names, -number_of_features, -sequence)
+  colnames(sra_calls) <- c("sequence", "source", "feature", "start", "end", "score", "strand", "phase", "Atrribute")
+
+renderDataTable({
+  DT::datatable(sra_calls, options = list(pageLength = 10))
+})
+
+
+singledat <- read.table("~/phd/RNASeq/Klebsiella/GCA_000220485.1.data/GCA_000220485.1_new_calls.txt", header = T, sep = "\t",
+                  comment.char = "", quote = "", as.is = T )
+singledat <- singledat %>% select(-file_names, -number_of_features, -sequence)
+
+renderDataTable({
+  DT::datatable(singledat, options = list(pageLength = 10))
+})
+entericsdat <- read.table("~/phd/RNASeq/enterics-serratia_merged.gff", header = T, sep = "\t", comment.char = "", quote = "", as.is = T )
+entericsdat <- entericsdat %>% select(feature, start, end, new_feature, enterics,GCA_000438825.1.GCA_000747565.1, salmonella, escherichia,escherichia.salmonella, enterics.serratia) %>%
+  dplyr::rename(serratia = GCA_000438825.1.GCA_000747565.1) 
+
+renderDataTable({
+  DT::datatable(entericsdat, options = list(pageLength = 10))
+})
+
+
+
+
+
+```
+
+```{r combineGFF_aligned_genomes, eval = F}
+
+##functions labeled TEST as these were copies out and edited to make them work with different columns and column arrangements
+##This does the same steps as shown in combineGFF but uses some different columns and stores some extra information about where each call came from.
+mergeSRATest <- function(ncRNAgff, gff1, gff2, time.it = T, quiet = F, filenum1 = "1", filenum2 = "2", print_log = F){
+  error_message <- "Either gff1 and gff2 or ncRNAgff are needed:\n"
+  stop_val <- 0
+  log_file = ""
+  if(missing(gff1)){
+    error_message <- paste(error_message, "\tArugment gff1 missing\n", sep = "")
+    stop_val <- stop_val + 1
+  }else{
+    gff1 <- gff1%>%mutate(filenum = filenum1)
+  }
+
+  if(missing(gff2)){
+    error_message <- paste(error_message, "\tArugment gff2 missing\n", sep = "")
+    stop_val <- stop_val + 1
+  }else{
+    gff2b <- gff2%>%mutate(filenum = filenum2)
+  }
+
+
+  if(stop_val > 0){
+    if(missing(ncRNAgff)){
+      error_message <- paste(error_message, "\tArugment ncRNAgff missing\n", sep = "")
+      stop(error_message)
+    }
+  }
+  if(missing(ncRNAgff)){
+    ncRNAgff <- gff2b%>%bind_rows(gff1)%>%unique()
+  }else{
+    if(quiet == F){
+      cat("Using the ncRNAgff dataframe:\n")
+    }
+  }
+
+  ptm <- proc.time()
+
+  ncRNAgff <- ncRNAgff%>%arrange(start)%>%arrange(strand)
+
+
+  mergedDat <- data.frame(sequence = as.character("0"), feature = as.character("0"),
+                          start = as.integer("0"), end = as.integer("0"),
+                          strand = as.character("0"), file_names = as.character("start_row"),
+                          row_numbers = as.character("0"), prop_overlap = as.numeric(0), feature_match = F,
+                          number_of_features = as.integer("0"),
+                          score = as.character("0"),
+                          new_feature = F,
+                          number_of_rnaseq_files = as.integer("0"),
+                          id1 = as.character("0"),
+                          id2 = as.character("0"),
+                          set_val_1 = as.character("0"),
+                          set_val_2 = as.character("0"),
+                          stringsAsFactors = F)
+
+  ##loop through the combined gff files and combine features that overlap
+  i <- 9
+  current_feature <- F #is there a current feature being written?
+  new_feature <- F
+  for(i in 1:(nrow(ncRNAgff) - 1)){
+
+    if(quiet ==F){
+      printRemaining(i <- i, length = nrow(ncRNAgff) - 1, increment = 5)
+    }
+    ##if there is no current feature then set a new start value
+    if(current_feature == F){
+      start_val <- ncRNAgff[i,3]
+      start_i <- i
+      end_val <- ncRNAgff[i,4]
+    }
+
+
+
+    ##set the new end value
+    if(ncRNAgff[i, 4] > end_val){
+      end_val <- ncRNAgff[i,4]
+    }
+
+    ##check if the current end value overlaps with the next starting value and update the end value if it does
+    if(end_val > ncRNAgff[i + 1, 3] & ncRNAgff[i,5] == ncRNAgff[i+1, 5]){
+      end_val <- ncRNAgff[i + 1,4]
+      current_feature <- T
+    }else{
+
+      ##check if the subsequent feature was contained within the first feature
+      if(ncRNAgff[start_i, 4] < end_val){
+        prop_val <- (ncRNAgff[start_i, 4] - ncRNAgff[i, 3])/(end_val - start_val)
+      }else{
+        prop_val <- 1
+      }
+      feature_matched <- ifelse(length(unique(ncRNAgff[start_i:i, 14])) > 1, T, F)
+
+
+      if(length(start_i:i) <= 2){
+
+
+
+        idRows <- ncRNAgff[start_i:i,]
+        id1_val <- idRows[idRows[,16] == filenum1,14]
+        id2_val <- idRows[idRows[,16] == filenum2,14]
+        if(is_empty(id1_val)){
+          id1_val <- ""
+        }
+        if(is_empty(id2_val)){
+          id2_val <- ""
+        }
+
+
+
+        set_val_1 <- idRows[idRows[,16] == filenum1,15]
+        set_val_2 <- idRows[idRows[,16] == filenum2,15]
+        if(is_empty(set_val_1)){
+          set_val_1 <- "0"
+        }
+        if(is_empty(set_val_2)){
+          set_val_2 <- "0"
+        }
+
+
+
+
+        #id1_val <- "1"
+        #id2_val <- "2"
+
+
+        tmp <- data.frame(sequence = ncRNAgff[i,1],
+                          feature = ncRNAgff[i,2],
+                          start = start_val, end = end_val,
+                          strand = ncRNAgff[i,5],
+                          file_names = paste(unique(ncRNAgff[start_i:i, 16]), collapse = ","),
+                          row_numbers = paste(c(start_i:i), collapse = ","),
+                          prop_overlap = prop_val,
+                          feature_match = feature_matched,
+                          number_of_features = length(start_i:i),
+                          score = as.character(ncRNAgff[i,11]),
+                          new_feature = !(F %in% ncRNAgff[start_i:i, 12]),
+                          number_of_rnaseq_files = sum(as.integer(ncRNAgff[start_i:i, 10])),
+                          id1 = id1_val,
+                          id2 = id2_val,
+                          set_val_1 = set_val_1,
+                          set_val_2 = set_val_2,
+                          stringsAsFactors = F)
+        mergedDat <- mergedDat%>%bind_rows(tmp)
+      }else{
+        log_file <- paste(log_file, start_i, "to", i, "contains too many peaks. There should be one or two. \nThis is limited by the need for an ID for each peak.\n")
+      }
+      current_feature <- F
+      new_feature <- F
+    }
+  }
+
+  runningTime <- proc.time() - ptm
+  if(time.it){
+    if(quiet == F){
+      printRunningTime(runningTime = runningTime)
+    }
+  }
+
+  if(print_log){
+    cat(log_file)
+  }
+
+  mergedDat <- mergedDat%>%filter(number_of_features > 0, file_names != "start_row")
+  return(mergedDat)
+
+}
+reorderGFFTest <- function(ref, gff, time.it = T, quiet = F, reference.genome = F){
+  ref2 <- ref%>%arrange(start.b)
+
+  ptm <- proc.time()
+
+  if(reference.genome == F){
+    for(i in 1:nrow(gff)){
+      if(quiet == F){
+        printRemaining(i = i, length = nrow(gff), increment = 5)
+      }
+      start_val <- gff[i, 3]
+      end_val <- gff[i, 4]
+      for(j in 1:nrow(ref2)){
+        if(start_val >= ref2[j,4] && start_val <= ref2[j,5]){
+          gff[i,3] <- gff[i,3] + ref2[j, 7]
+          gff[i,4] <- gff[i,4] + ref2[j, 7]
+          gff[i, 17] <- T
+        }
+      }
+
+    }
+  }else{
+    for(i in 1:nrow(gff)){
+      if(quiet == F){
+        printRemaining(i = i, length = nrow(gff), increment = 5)
+      }
+      start_val <- gff[i, 3]
+      end_val <- gff[i, 4]
+      for(j in 1:nrow(ref2)){
+        if(start_val >= ref2[j,1] && start_val <= ref2[j,2]){
+          gff[i, 17] <- T
+        }
+      }
+
+    }
+  }
+
+  runningTime <- proc.time() - ptm
+  if(time.it){
+    if(quiet == F){
+      printRunningTime(runningTime = runningTime)
+    }
+  }
+  gff <- gff%>%filter(changed == T)
+  return(gff)
+}
+##takes each individual start and stop site, finds it in the alignment file and then changes it based on the corresponding position of the other genome. If it is not found in one of the genomes it is removed.
+alignAndCombineTest <- function(reference, gff1, gff2, time.it = T, quiet = F, filenum1 = "1", filenum2 = "2", seqA = 1, seqB = 2){
+
+  referenceEsch1Serr1 <- read.table(reference, header = T, as.is = T)
+  referenceEsch1Serr1Built <- buildReferenceLookup(reference = referenceEsch1Serr1,
+                                                   as.numeric(seqA), seqB = as.numeric(seqB),
+                                                   collapse.alignment = T,
+                                                   quiet = quiet)
+
+  esch1 <- gff1
+  serr1 <- gff2
+
+  esch1 <- esch1%>%mutate(changed = F)#%>%
+    #dplyr:: mutate(id = paste(filenum1, row_number(), sep = "_"))
+  serr1 <- serr1%>%mutate(changed = F)#%>%
+    #dplyr::mutate(id = paste(filenum2, row_number(), sep = "_"))
+
+
+
+  serr1b <- reorderGFFTest(ref = referenceEsch1Serr1Built, gff = serr1, time.it = time.it, quiet = quiet)
+  esch1 <- reorderGFFTest(ref = referenceEsch1Serr1Built, gff = esch1, reference.genome = T, time.it = time.it, quiet = quiet)
+
+  serr1b <- serr1b%>%mutate(filenum = filenum2)
+  esch1 <- esch1%>%mutate(filenum = filenum1)
+  ncRNAgff <- esch1%>%bind_rows(serr1b)
+  return(ncRNAgff)
+
+}
+
+
+
+
+
+
+
+
+##If the data is from the initial combined calls data
+if(initial_data == T){
+  ncRNAgff <- alignAndCombine(reference = opt$alignment,
+                                      gff1 = opt$gff1,
+                                      gff2 = opt$gff2,
+                                      filenum1 = opt$id1,
+                                      filenum2 = opt$id2,
+                                      seqA = opt$s,
+                                      seqB = opt$t)
+
+mergedData <- mergeSRA(ncRNAgff = ncRNAgff,
+                       filenum1 = opt$id1,
+                       filenum2 = opt$id2,
+                        print_log = F)
+
+mergedData <- mergedData%>%mutate(change = ifelse(start < end, F, T))%>%
+  mutate(start.tmp = end)%>%
+  mutate(end.tmp = start)%>%
+  mutate(start = ifelse(change == T, start.tmp, start))%>%
+  mutate(end = ifelse(change == T, end.tmp, end))%>%
+  select(-start.tmp, -end.tmp, -change)
+
+col_count <- ncol(mergedData)
+
+mergedData <- mergedData%>%mutate(tmp1 = set_val)
+colnames(mergedData)[col_count + 1] <- mergedData[1,col_count]
+
+}else{
+  gff1Dat <- read.table(opt$gff1, sep = "\t", header = T, as.is = T)
+  gff2Dat <- read.table(opt$gff2, sep = "\t", header = T, as.is = T)
+  
+  ##store the data about what has been previously merged and where it was found
+  gff1SetValues <- gff1Dat[,c(14, 17:(ncol(gff1Dat)))]
+  gff1SetValues <- gff1SetValues%>%dplyr::rename(id1 = id)
+  
+  ##get the data about start, stop, strand, genome etc.
+  gff1Working <- gff1Dat[,1:16]
+
+  
+  ##repeat for the other gff file
+  gff2SetValues <- gff2Dat[,c(14, 17:(ncol(gff2Dat)))]
+  gff2SetValues <- gff2SetValues%>%dplyr::rename(id2 = id)
+  gff2Working <- gff2Dat[,1:16]
+
+  ##store info about each file
+  filenum1 <- gff1Working[1,16]
+  filenum2 <- gff2Working[1,16]
+
+
+  ##if there needs to be an alignment done then run this
+  ##then combine the two files 
+  if(align == T){
+   ncRNAgff <- alignAndCombineTest(reference = opt$alignment,
+                               gff1 = gff1Working,
+                               gff2 = gff2Working,
+                               filenum1 = filenum1,
+                               filenum2 = filenum2,
+                               seqA = 1,
+                               seqB = 2)
+
+   ncRNAgff <- ncRNAgff%>%select(-changed, -filenum)%>%unique()
+
+  }else{
+    ncRNAgff <- gff1Working%>%bind_rows(gff2Working)
+}
+
+  ##combine the calls 
+  mergedData <- mergeSRATest(ncRNAgff = ncRNAgff,
+                         filenum1 = filenum1,
+                         filenum2 = filenum2,
+                         print_log = F)
+
+
+  ##reverse the order of the start and end if needed
+  mergedData <- mergedData%>%mutate(change = ifelse(start < end, F, T))%>%
+    mutate(start.tmp = end)%>%
+    mutate(end.tmp = start)%>%
+    mutate(start = ifelse(change == T, start.tmp, start))%>%
+    mutate(end = ifelse(change == T, end.tmp, end))%>%
+    select(-start.tmp, -end.tmp, -change)
+
+  ##join the extra info stored at the start back onto the dataframe
+  mergedData <- mergedData%>%
+    full_join(gff1SetValues, by = "id1")%>%
+    full_join(gff2SetValues, by = "id2")
+
+  mergedData <- mergedData%>%filter(!is.na(sequence))
+
+  ##create a file id for each feature which indicates which files contributed to the feature
+  file_id1 <- unlist(strsplit(filenum1, "-"))
+  file_id2 <- unlist(strsplit(filenum2, "-"))
+  file_id <- paste(unique(c(file_id1, file_id2)), collapse = "-")
+
+  ##add info about the where each feature was found for the current merge
+  tmp <- mergedData%>%
+    mutate(id = NA)%>%
+    mutate(set_val = NA)%>%
+    mutate(file_id = file_id)
+  tmp[is.na(tmp)] <- 0
+
+  for(i in 1:nrow(tmp)){
+    ##get a unique list of ids for each feature
+    id1_list <- unlist(strsplit(tmp[i,14], "-"))
+    id2_list <- unlist(strsplit(tmp[i,15], "-"))
+    id_list <- unique(c(id1_list, id2_list))
+  
+    ##add this to the dataframe
+    tmp[i, ncol(tmp) - 2] <- paste(id_list, collapse = "-")
+  
+    ##get the set (0 ,1, 0-1) from each previous file
+    set_val_1 <- unlist(strsplit(tmp[i,16], "-"))
+    set_val_2 <- unlist(strsplit(tmp[i,17], "-"))
+    
+    ##store the intersect if it exists, else take the union
+    if(length(intersect(set_val_1, set_val_2)) > 0){
+      set_val <- intersect(set_val_1, set_val_2)
+    }else{
+      set_val <- union(set_val_1, set_val_2)
+    }
+    tmp[i, ncol(tmp) - 1] <- paste(set_val, collapse = "-")
+  
+  }
+  ##reorder some columns and remove tmp columns that are no longer needed e.g. id1 id2 filnum1 filenum2
+  mergedData <- tmp[,c(1:13, (ncol(tmp) - 2):(ncol(tmp)), 18:(ncol(tmp) - 3) )]
+  mergedData <- mergedData%>%mutate(V1 = set_val)
+  
+  ##rename the set based on the name of the merged file
+  colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
+
+}
+
+write.table(x = mergedData, file = paste(filePath, "/", opt$out_name, "_merged.gff", sep = ""), row.names = F, col.names = T, quote = F, sep = "\t")
+
+
+
+```
+
+
+###Combining GFF files V2 
+
+```{r combineGFFV2}
+
+escherichiaMerged <- read.table("~/phd/RNASeq/combined_gff_files/escherichia_merged.gff", sep = "\t", header = T, fill = T)
+escherichiaCalls <- read.table("~/phd/RNASeq/escherichia/escherichia_calls", header = T, sep = "\t", fill = T)
+
+sum(escherichiaMerged$number_of_features)
+
+nrow(escherichiaCalls)
+
+totalIDs <- str_count(escherichiaMerged$id, "-")
+totalIDs <- data.frame(totalIDs = totalIDs)
+totalIDs <- totalIDs %>% mutate(totalIDs = totalIDs + 1)
+placeholderIDs <- str_count(escherichiaMerged$id, "\\.[:digit:]_0")
+placeholderIDs <- data.frame(placeholderIDs = placeholderIDs)
+
+
+escherichiaMerged <- escherichiaMerged %>% bind_cols(totalIDs, placeholderIDs) %>% 
+  mutate(number_of_ids = totalIDs -placeholderIDs)
+
+escherichiaMerged <- escherichiaMerged %>% filter((end - start) > 0)
+
+
+
+sum(escherichiaMerged$number_of_ids)
+nrow(escherichiaCalls)
+
+counter <- 1
+rowNumbers <- rep(NA, nrow(escherichiaMerged))
+for(i in 1:nrow(escherichiaMerged)){
+  tmp <- unlist(strsplit(as.character(escherichiaMerged$row_numbers[i]), ","))
+  
+  
+  rowNumbers[counter:(counter + length(tmp) - 1)] <- tmp
+  
+  counter = counter + length(tmp)
+}
+
+rowNumbers <- data.frame(row_numbers = rowNumbers)
+rowNumbers <- rowNumbers %>% mutate(row_numbers = as.numeric(row_numbers))
+rowNumbers %>% nrow()
+rowNumbers %>% nrow() %>% unique()
+
+counter <- 1
+ids <- rep(NA, nrow(escherichiaCalls))
+for(i in 1:nrow(escherichiaMerged)){
+  tmp <- unlist(strsplit(as.character(escherichiaMerged$id[i]), "-"))
+  
+  
+  ids[counter:(counter + length(tmp) - 1)] <- tmp
+  
+  counter = counter + length(tmp)
+}
+
+
+ids <- data.frame(id = ids)
+ids <- ids %>% mutate(id = as.character(id))
+
+
+
+i <- 2
+for(i in 1:nrow(ids)){
+  number <- unlist(strsplit(as.character(ids$id[i]), "_"))
+  if(length(number)  < 3){
+    ids$id[i] <- "F"
+  }else{
+    number <- number[3]
+    if(number == "0"){
+      ids$id[i] <- "F"
+    }
+  }
+}
+
+
+ids <- ids %>% filter(id != "F")
+
+ids %>% filter(id != "F")  %>% nrow()
+
+ids %>% filter(id != "F") %>% unique() %>% nrow()
+
+idCounts <-ids %>% group_by(id) %>% summarise(counts = n())
+  
+  
+
+smallMerged <- escherichiaMerged %>% mutate(idNew = paste(start, end, strand))
+
+smallMerged <- smallMerged %>% group_by(idNew) %>% arrange(-number_of_ids) %>% top_n(n = 1)
+
+sum(smallMerged$number_of_ids)
+nrow(escherichiaCalls)
+
+
+esch1 <- read.table("~/phd/RNASeq/escherichia/GCA_000017745_data/GCA_000017745.1_new_calls.txt", header = T, sep = "\t", fill = T)
+esch2 <- read.table("~/phd/RNASeq/escherichia/GCA_000017765.1_data/GCA_000017765.1_new_calls.txt", header = T, sep = "\t", fill = T)
+esch3 <- read.table("~/phd/RNASeq/escherichia/GCA_000017985.1.data/GCA_000017985.1_new_calls.txt", header = T, sep = "\t", fill = T)
+esch4 <- read.table("~/phd/RNASeq/escherichia/GCA_900186905.1.data/GCA_900186905.1_new_calls.txt", header = T, sep = "\t", fill = T)
+esch5 <- read.table("~/phd/RNASeq/escherichia/GCA_002843685.1.data/GCA_002843685.1_new_calls.txt", header = T, sep = "\t", fill = T)
+esch6 <- read.table("~/phd/RNASeq/escherichia/GCA_001559675.1.data/GCA_001559675.1_new_calls.txt", header = T, sep = "\t", fill = T)
+esch12 <- read.table("~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_000017765.1_merged.gff", header = T, sep = "\t", fill = T)
+
+sum(esch12$number_of_features)
+
+nrow(esch1) + nrow(esch2)
+
+nrow(esch1) + nrow(esch2) + nrow(esch3) + nrow(esch4) + nrow(esch5) + nrow(esch6) 
+
+
+esch12_esch1_IDS <- esch12 %>% select(id, number_of_features) %>% 
+  separate(id,into = c("id1", "id2"), remove = F, sep = "-") %>% 
+  separate(id1, into = c("gca", "genome", "number"), remove = F, sep = "_") %>% 
+  mutate(number = as.numeric(number)) %>% arrange(number) %>% 
+  filter(number > 0)
+
+esch1 <- esch1 %>% mutate(feature_length = end - start)
+esch2 <- esch2 %>% mutate(feature_length = end - start)
+
+esch1 %>% filter(feature_length >= 50, feature_length <= 500) %>% nrow() + esch2 %>% filter(feature_length >= 50, feature_length <= 500) %>% nrow()
+
+tmp <-esch12%>% mutate(feature_length = end - start) %>% 
+  filter(feature_length >= 50, feature_length <= 500)
+
+sum(tmp$number_of_features)
+
+```
+
+###UpsetR Plots
+```{r UpSet_Plot, echo = F}
+inputPanel(
+    fluidRow(
+    column(8,
+  selectInput("plot_by", label = "Plot by:",
+              choices = c("Genomes", "Genera", "Species", "Files"), selected = "Genera"),
+  
+  checkboxInput("all_or_one", "SRA found in all genomes", value = T)
+    )
+    )
+)
+
+renderPlot({
+  ##read in data
+dat <- read.table("~/phd/RNASeq/enterics-serratia_merged.gff", header = T, sep = "\t",
+                  comment.char = "", quote = "", as.is = T )
+  if(input$plot_by == "Genera"){
+  genera <- dat%>%select(GCA_000438825.1.GCA_000747565.1, GCA_001874505.1.GCA_002303275.1, salmonella,
+                       escherichia, klebsiella)
+genera[genera == "1-1"] <- 1
+
+##set any value that is not 0 to 1
+if(input$all_or_one){
+  genera[genera != 1] <- 0
+
+}else{
+genera[genera != 0] <- 1
+}
+colnames(genera)[1:2] <- c("serratia", "enterobacter")
+
+##set the values as numeric
+for(i in 1:ncol(genera)){
+  genera[,i] <- as.numeric(as.character(genera[,i]))
+}
+
+
+
+##make an upsetR plot using all genera values
+UpSetR::upset(genera, sets = colnames(genera), mb.ratio = c(0.55, 0.45), order.by = "freq")
+}else if(input$plot_by == "Genomes"){
+
+##get list of genomes and individual sra ids
+dat_files <- unlist(strsplit(dat$file_id[1], "-"))
+dat_ids <- dat$id
+
+##remove the .[0-9] as this complicates future steps
+dat_files <- str_replace_all(dat_files, "\\.[0-9]", "")
+
+
+##create matrix listing all sra ids in rows and the genomes for columns
+ids <- matrix(nrow = length(dat_ids), ncol = (length(dat_files)+ 1))
+colnames(ids) <- c("id", dat_files)
+ids[,1] <- dat_ids
+idsCols <- colnames(ids)
+
+##get list of genomes for each id. Do not include the genome if the id is _0 as this indicates it was missing
+dat_ids <- str_replace_all(dat_ids, "\\.[1-9]_[1-9]{1,}", "")
+id_list <- strsplit(dat_ids, "-")
+
+##match the genomes in the ids to the genome list and record a 1 when present
+for(i in 1:length(id_list)){
+  cols <- match(id_list[[i]], idsCols)
+  ids[i,cols] <- 1
+}
+
+##Record 0 when not present
+ids[is.na(ids)] <- 0
+ids <- as.data.frame(ids)
+
+##set the values as numeric (as.data.frame messed this up)
+for(i in 2:ncol(ids)){
+  ids[,i] <- as.numeric(as.character(ids[,i]))
+}
+##make an upsetR plot using all columns
+UpSetR::upset(ids, sets = colnames(ids)[2:ncol(ids)], mb.ratio = c(0.55, 0.45), order.by = 'freq',
+              keep.order = T)
+
+
+}else{
+  return(ggplot())
+}
+  
+  
+  
+})
+```
+
+
+###Phyogenetic Distance
+The 'Value of the set' legend comes from the fitch algorithm. It is indicating whether the SRA showed up in all (or most) of the genomes or only some:
+
+* __'1'__ comes from cases where each sets containing 1 meant the 1 kpt being kept, while enough (all or the most) did not contain 0.
+* __'0-1'__ comes from cases where one sets contains a 1 and the other contained a zero.
+    + It is important to note that athough this is the origin of the __'0-1'__ set, two __'0-1'__ sets will also give __'0-1'__ and this could still indicate conservation.
+
+ 
+ 
+```{r Phyogenetic_Distance, echo = F, cache=F, autodep=T}
+
+##read data
+dat <- read.table("~/phd/RNASeq/enterics-serratia_merged.gff", header = T, sep = "\t",
+                  comment.char = "", quote = "", as.is = T )
+
+##Make the sets consistent
+dat[dat == "1-1"] <- "1"
+dat[dat == "1-0"] <- "0-1"
+
+
+
+##select groups of data based on the taxonomic levels contained
+
+##strain
+dat_1 <- dat%>%select(escherichia)
+
+
+
+##species
+dat_2 <- dat%>%select(klebsiella,
+                      GCA_000438825.1.GCA_000747565.1,
+                      GCA_001874505.1.GCA_002303275.1,
+                      salmonella)
+
+##genera
+dat_3 <- dat%>%select(escherichia.salmonella, enterobacter.klebsiella)
+
+##family
+dat_4 <- dat%>%select(enterics)
+
+##family
+dat_5 <- dat%>%select(enterics.serratia)
+
+##take all values from each matrix and max a single list
+dat_1 <- data.frame(set_val = as.vector(as.matrix(dat_1[,])))
+dat_2 <- data.frame(set_val = as.vector(as.matrix(dat_2[,])))
+dat_3 <- data.frame(set_val = as.vector(as.matrix(dat_3[,])))
+dat_4 <- data.frame(set_val = as.vector(as.matrix(dat_4[,])))
+dat_5 <- data.frame(set_val = as.vector(as.matrix(dat_5[,])))
+
+# dat_1 <- dat_1%>%group_by(set_val)%>%summarise(count = n())%>%mutate(group = 1)
+# dat_2 <- dat_2%>%group_by(set_val)%>%summarise(count = n())%>%mutate(group = 2)
+# dat_3 <- dat_3%>%group_by(set_val)%>%summarise(count = n())%>%mutate(group = 3)
+# dat_4 <- dat_4%>%group_by(set_val)%>%summarise(count = n())%>%mutate(group = 4)
+# dat_5 <- dat_5%>%group_by(set_val)%>%summarise(count = n())%>%mutate(group = 5)
+
+##name the group in each dataset
+dat_1 <- dat_1%>%mutate(group = "Strain")
+dat_2 <- dat_2%>%mutate(group = "Species")
+dat_3 <- dat_3%>%mutate(group = "Genera")
+dat_4 <- dat_4%>%mutate(group = "Family")
+dat_5 <- dat_5%>%mutate(group = "Family_outgroup")
+
+##merge all data
+dat_all <- dat_1%>%
+  bind_rows(dat_2)%>%
+  bind_rows(dat_3)%>%
+  bind_rows(dat_4)%>%
+  bind_rows(dat_5)%>%
+  mutate(is_1 = ifelse(set_val == "1", 1, 0))%>%
+  mutate(not_0 = ifelse(set_val != "0" && set != "1", 1, 0))
+
+
+
+inputPanel(
+  fluidRow(
+    column(8,
+  selectInput("plot_by_set", label = "Show sets:",
+              choices = c("All", "1", "0-1"), selected = "All"),
+  
+  checkboxInput("stacked_or_beside", "Stack bars", value = T)
+    )
+  )
+)
+renderPlot({
+  ##check the type of data to plot (set of 0-1, 1, or both)
+  
+  if(input$plot_by_set == "All"){
+    
+    position <- ifelse(input$stacked_or_beside, "stack", "dodge")
+    
+ggplot() +
+  geom_bar(data = dat_all%>%filter(set_val != "0"), aes(x = group, y = ..count.., group = set_val, fill = set_val), position = position)+
+      labs(fill = "Value of the set") +
+      ylab(label = "Number of SRAs") +
+      xlab(label = "Taxonomic Relationship for the conserved SRAs") +
+        theme(axis.text.x = element_text(angle = 90),
+              panel.background = element_rect(fill = "white", colour = "grey50"))  +
+        scale_fill_viridis(discrete = T, option = "D")  
+  }else if(input$plot_by_set == "1"){
+        
+
+ggplot() +
+  geom_bar(data = dat_all%>%filter(set_val == "1"), aes(x = group, y = ..count..))+
+      ylab(label = "Number of SRAs") +
+      xlab(label = "Taxonomic Relationship for the conserved SRAs") +
+        theme(axis.text.x = element_text(angle = 90),
+              panel.background = element_rect(fill = "white", colour = "grey50"))  +
+        scale_fill_viridis(discrete = T, option = "D")  
+  }else if(input$plot_by_set == "0-1"){
+    ggplot() +
+  geom_bar(data = dat_all%>%filter(set_val == "0-1"), aes(x = group, y = ..count..))+
+      ylab(label = "Number of SRAs") +
+      xlab(label = "Taxonomic Relationship for the conserved SRAs") +
+        theme(axis.text.x = element_text(angle = 90),
+              panel.background = element_rect(fill = "white", colour = "grey50"))  +
+        scale_fill_viridis(discrete = T, option = "D")  
+  }else{
+    ggplot() 
+  }
+})
+
+
+#
+
+```
+
+
+Species and strain are merged into one set and labelled species
+```{r}
+## taxonomic levels vs prop conserved####
+
+##read data
+dat <- read.table("~/phd/RNASeq/enterics-serratia_merged.gff", header = T, sep = "\t",
+                  comment.char = "", quote = "", as.is = T )
+##make sets consistent
+dat[dat == "1-1"] <- "1"
+dat[dat == "1-0"] <- "0-1"
+
+##get list of genomes
+dat_files <- unlist(strsplit(dat$file_id[1], "-"))
+head(dat_files)
+
+dat_ids <- dat$id
+head(dat_ids)
+
+##get list of ids. 
+id_list <- strsplit(dat_ids, "-")
+head(id_list)
+list_length <- length(unlist(id_list))
+print(list_length)
+
+
+##set up dataframe for information about the genome and row of each ID.
+ids_lookup <- as.data.frame(matrix(ncol =3, nrow = list_length))
+colnames(ids_lookup) <- c("id", "row", "genome")
+row_num <- 1
+for(i in 1:length(id_list)){
+  uid <- id_list[[i]]
+  for(j in 1:length(uid)){
+    uid_j <- unlist(strsplit(uid[j], "_"))
+    x <- paste(uid_j[1:2], collapse = "_")
+    y <- uid_j[3]
+    if(y != "0"){
+      ids_lookup[row_num,] <- c(dat_ids[i], row = y, genome = x)
+      row_num <- row_num + 1
+        }
+
+  }
+    row_num <- row_num + 1
+
+}
+
+##remove rows without data
+ids_lookup <- ids_lookup[!is.na(ids_lookup[,1]),]
+
+##select subset of data from dat
+datSmall <- dat[,c(8, 10, 12, 14, 15, 17:ncol(dat))]
+head(datSmall)
+
+##join the main data to the individual ID with genome and row info
+ids_lookup <- ids_lookup%>%filter(row != "0")%>%left_join(datSmall, by = "id")
+head(ids_lookup)
+
+##classify each sRNA by the highest level of conservation found
+main_col <- 7
+genera_col <- c(14, 19, 20, 22)
+species_col <- c(13:15, 18:22)
+any_col <- c(7:ncol(ids_lookup))
+
+
+##assign the conservation level to the data
+ids_lookup <- assignConservationLevel(ids_lookup = ids_lookup, main_col = main_col, genera_col = genera_col,
+                                      species_col = species_col, any_col = any_col)
+head(ids_lookup)
+
+
+id_count <- ids_lookup%>%select(id, type)%>%unique()%>%group_by(type)%>%dplyr::summarise(count = n())
+print(id_count)
+
+print(ids_lookup%>%group_by(type, new_feature)%>%
+  dplyr::summarise(count = n())%>%ungroup() %>% group_by(type) %>% 
+  dplyr::mutate(test = sum(count)))
+
+id_prop <- ids_lookup%>%group_by(type, new_feature)%>%
+  dplyr::summarise(count = n())%>%ungroup() %>% group_by(type)%>%
+  dplyr::mutate(prop = count /sum(count))%>%
+  arrange(prop)%>%arrange(new_feature)%>%ungroup()
+
+id_prop$type <- factor(id_prop$type, levels = unique(id_prop$type))
+
+print(id_prop)
+
+ggplot() +
+  geom_col(data = id_prop, aes(x = type, y = prop, fill = new_feature))
+
+
+#
+
+```
+
+
+
+#####Code to make the plots
+Take the output from merging the aligned gff predictions and show (using an UpsetR plot) the frequency of combinations of genomes.
+```{r UpSetR_setup}
+##read in data
+dat <- read.table("~/phd/RNASeq/enterics-serratia_merged.gff", header = T, sep = "\t",
+                  comment.char = "", quote = "", as.is = T )
+
+
+#For genomes
+##get list of genomes and individual sra ids
+dat_files <- unlist(strsplit(dat$file_id[1], "-"))
+head(dat_files)
+
+dat_ids <- dat$id
+head(dat_ids)
+
+##remove the .[0-9] as this complicates future steps
+dat_files <- str_replace_all(dat_files, "\\.[0-9]", "")
+
+
+##create matrix listing all sra ids in rows and the genomes for columns
+ids <- matrix(nrow = length(dat_ids), ncol = (length(dat_files)+ 1))
+colnames(ids) <- c("id", dat_files)
+ids[,1] <- dat_ids
+ids[1:5, 1:5]
+idsCols <- colnames(ids)
+
+##get list of genomes for each id. Do not include the genome if the id is _0 as this indicates it was missing
+dat_ids <- str_replace_all(dat_ids, "\\.[1-9]_[1-9]{1,}", "")
+head(dat_ids)
+
+id_list <- strsplit(dat_ids, "-")
+head(id_list)
+
+##match the genomes in the ids to the genome list and record a 1 when present
+for(i in 1:length(id_list)){
+  cols <- match(id_list[[i]], idsCols)
+  ids[i,cols] <- 1
+}
+
+##Record 0 when not present
+ids[is.na(ids)] <- 0
+ids <- as.data.frame(ids)
+
+##set the values as numeric (as.data.frame messed this up)
+for(i in 2:ncol(ids)){
+  ids[,i] <- as.numeric(as.character(ids[,i]))
+}
+ids[1:5, 1:5]
+
+
+#For genera
+##select the genera level column from the dat dataframe
+genera <- dat%>%select(GCA_000438825.1.GCA_000747565.1, GCA_001874505.1.GCA_002303275.1, salmonella,
+                       escherichia, klebsiella)
+#genera[genera == "1-1"] <- 1
+
+##set any value that is not 0 to 1
+genera[genera != 0] <- 1
+
+colnames(genera)[1:2] <- c("serratia", "enterobacter")
+
+##set the values as numeric
+for(i in 1:ncol(genera)){
+  genera[,i] <- as.numeric(as.character(genera[,i]))
+}
+
+
+
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+```{r sraShinyApp, echo=FALSE, include=F}
+
+shinyAppFile(appFile = "/Users/thomasnicholson/Desktop/sra_data_shiny/app.R", options = list(
+    width = "100%", height = 550
+  ))
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#Example work
+This R Markdown document is made interactive using Shiny. Unlike the more traditional workflow of creating static reports, you can now create documents that allow your readers to change the assumptions underlying your analysis and see the results immediately. 
+
+To learn more, see [Interactive Documents](http://rmarkdown.rstudio.com/authoring_shiny.html).
+
+## Inputs and Outputs
+
+You can embed Shiny inputs and outputs in your document. Outputs are automatically updated whenever inputs change.  This demonstrates how a standard R plot can be made interactive by wrapping it in the Shiny `renderPlot` function. The `selectInput` and `sliderInput` functions create the input widgets used to drive the plot.
+
+```{r eruptions, echo=FALSE,include=F}
+inputPanel(
+  selectInput("n_breaks", label = "Number of bins:",
+              choices = c(10, 20, 35, 50), selected = 20),
+  
+  sliderInput("bw_adjust", label = "Bandwidth adjustment:",
+              min = 0.2, max = 2, value = 1, step = 0.2)
+)
+
+renderPlot({
+  hist(faithful$eruptions, probability = TRUE, breaks = as.numeric(input$n_breaks),
+       xlab = "Duration (minutes)", main = "Geyser eruption duration")
+  
+  dens <- density(faithful$eruptions, adjust = input$bw_adjust)
+  lines(dens, col = "blue")
+})
+```
+
+## Embedded Application
+
+It's also possible to embed an entire Shiny application within an R Markdown document using the `shinyAppDir` function. This example embeds a Shiny application located in another directory:
+
+```{r tabsets, echo=FALSE, include=F}
+shinyAppDir(
+  system.file("examples/06_tabsets", package = "shiny"),
+  options = list(
+    width = "100%", height = 550
+  )
+)
+```
+
+Note the use of the `height` parameter to determine how much vertical space the embedded application should occupy.
+
+You can also use the `shinyApp` function to define an application inline rather then in an external directory.
+
+In all of R code chunks above the `echo = FALSE` attribute is used. This is to prevent the R code within the chunk from rendering in the document alongside the Shiny components.
+
+
+
+compare_ncRNA.R -r esch_1-2-3-4-5_merged.gff -g GCA_000017745.1-GCA_001559675.1_merged.gff -x esch_1-2-3-5 -y esch_1-6  -o escherchia
