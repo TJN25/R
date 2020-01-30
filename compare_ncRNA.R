@@ -308,7 +308,6 @@ reorderGFFTest <- function(ref, gff, time.it = T, quiet = F, reference.genome = 
   return(gff)
 }
 
-
 alignAndCombineTest <- function(reference, gff1, gff2, time.it = T, quiet = F, filenum1 = "1", filenum2 = "2", seqA = 1, seqB = 2){
 
   referenceEsch1Serr1 <- read.table(reference, header = T, as.is = T)
@@ -454,12 +453,12 @@ suppressMessages(library(comparativeSRA))
 test_setup <- F
 if(test_setup == T){
   if(initial_data == F){
-opt$gff1 <- "~/phd/RNASeq/combined_gff_files/esch_1-2-3_merged.gff"
-opt$gff2 <- "~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_900186905.1_merged.gff"
+opt$gff1 <- "~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_000017765.1_merged.gff"
+opt$gff2 <- "~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_000017985.1_merged.gff"
 opt$alignment <- "~/phd/RNASeq/escherichia/escherichia.backbone"
 opt$id1 <- "GCA_000017745.1-GCA_000017765.1"
 opt$id2 <- "GCA_000017745.1-GCA_000017985.1"
-opt$out_name <- "escherichia_1-2_TEST"
+opt$out_name <- "esch_1-2-3"
 }else{
 opt$gff1 <- "~/phd/RNASeq/escherichia/GCA_000017745_data/GCA_000017745.1_new_calls.txt"
 opt$gff2 <- "~/phd/RNASeq/escherichia/GCA_000017765.1_data/GCA_000017765.1_new_calls.txt"
@@ -564,7 +563,9 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
    # opt$gff2 <- "~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_001559675.1_merged.gff"
    # align <- F
 
-
+ 
+  
+  
   gff1Dat <- read.table(opt$gff1, sep = "\t", header = T, as.is = T)
   gff2Dat <- read.table(opt$gff2, sep = "\t", header = T, as.is = T)
 
@@ -575,7 +576,15 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
 
   filenum1 <- gff1Working$file_id[1]
   filenum2 <- gff2Working$file_id[1]
-
+  
+  print(opt$gff1)
+  print(opt$gff2)  
+  print(filenum1)
+  print(filenum2)
+  print(filePath)
+  print(opt$out_name)
+  print(align)
+  print(initial_data)
 
 
   if(align == T){
@@ -593,13 +602,14 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
     ncRNAgff <- gff1Working%>%bind_rows(gff2Working)
     ncRNAgff[is.na(ncRNAgff)] <- 0
 }
-
+print(nrow(ncRNAgff))
   mergedData <- mergeSRA(ncRNAgff = ncRNAgff,
                          filenum1 = filenum1,
                          filenum2 = filenum2,
                          align = align, 
                          initial_data = F)
-
+  print(nrow(mergedData))
+  
 
   mergedData <- mergedData%>%mutate(change = ifelse(start < end, F, T))%>%
     mutate(start.tmp = end)%>%

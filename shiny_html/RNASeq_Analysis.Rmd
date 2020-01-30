@@ -976,7 +976,7 @@ write.table(x = mergedData, file = paste(filePath, "/", opt$out_name, "_merged.g
 
 ###Combining GFF files V2 
 
-```{r combineGFFV2}
+```{r escherichia_merging_analysis}
 
 escherichiaMerged <- read.table("~/phd/RNASeq/combined_gff_files/escherichia_merged.gff", sep = "\t", header = T, fill = T)
 escherichiaCalls <- read.table("~/phd/RNASeq/escherichia/escherichia_calls", header = T, sep = "\t", fill = T)
@@ -1057,6 +1057,8 @@ ids %>% filter(id != "F") %>% unique() %>% nrow()
 
 idCounts <-ids %>% group_by(id) %>% summarise(counts = n())
   
+
+idMatches <- idCounts %>% full_join(escherichiaCalls)
   
 
 smallMerged <- escherichiaMerged %>% mutate(idNew = paste(start, end, strand))
@@ -1075,7 +1077,8 @@ esch5 <- read.table("~/phd/RNASeq/escherichia/GCA_002843685.1.data/GCA_002843685
 esch6 <- read.table("~/phd/RNASeq/escherichia/GCA_001559675.1.data/GCA_001559675.1_new_calls.txt", header = T, sep = "\t", fill = T)
 esch12 <- read.table("~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_000017765.1_merged.gff", header = T, sep = "\t", fill = T)
 esch13 <- read.table("~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_000017985.1_merged.gff", header = T, sep = "\t", fill = T)
-esch123 <- read.table("~/phd/RNASeq/combined_gff_files/esch_1-2-3_merged.gff", header = T, sep = "\t", fill = T)
+esch123 <- read.table("~/phd/RNASeq/combined_gff_files/esch_1-2-3_merged.gff", header = T, sep = "\t", comment.char = "", quote = "")
+file.mtime("~/phd/RNASeq/combined_gff_files/esch_1-2-3_merged.gff")
 
 sum(esch12$number_of_features)
 
@@ -1101,6 +1104,135 @@ tmp <-esch12%>% mutate(feature_length = end - start) %>%
 sum(tmp$number_of_features)
 
 ```
+
+
+
+```{r escherichia-shigella_merging_analysis}
+
+escherichiaMerged <- read.table("~/phd/RNASeq/combined_gff_files/escherichia-shigella_merged.gff", sep = "\t", header = T, fill = T)
+escherichiaCalls <- read.table("~/phd/RNASeq/combined_gff_files/escherichia-shigella_calls", header = T, sep = "\t", fill = T)
+
+sum(escherichiaMerged$number_of_features)
+
+nrow(escherichiaCalls)
+
+totalIDs <- str_count(escherichiaMerged$id, "-")
+totalIDs <- data.frame(totalIDs = totalIDs)
+totalIDs <- totalIDs %>% mutate(totalIDs = totalIDs + 1)
+placeholderIDs <- str_count(escherichiaMerged$id, "\\.[:digit:]_0")
+placeholderIDs <- data.frame(placeholderIDs = placeholderIDs)
+
+
+escherichiaMerged <- escherichiaMerged %>% bind_cols(totalIDs, placeholderIDs) %>% 
+  mutate(number_of_ids = totalIDs -placeholderIDs)
+
+escherichiaMerged <- escherichiaMerged %>% filter((end - start) > 0)
+
+
+
+sum(escherichiaMerged$number_of_ids)
+nrow(escherichiaCalls)
+
+counter <- 1
+rowNumbers <- rep(NA, nrow(escherichiaMerged))
+for(i in 1:nrow(escherichiaMerged)){
+  tmp <- unlist(strsplit(as.character(escherichiaMerged$row_numbers[i]), ","))
+  
+  
+  rowNumbers[counter:(counter + length(tmp) - 1)] <- tmp
+  
+  counter = counter + length(tmp)
+}
+
+rowNumbers <- data.frame(row_numbers = rowNumbers)
+rowNumbers <- rowNumbers %>% mutate(row_numbers = as.numeric(row_numbers))
+rowNumbers %>% nrow()
+rowNumbers %>% nrow() %>% unique()
+
+counter <- 1
+ids <- rep(NA, nrow(escherichiaCalls))
+for(i in 1:nrow(escherichiaMerged)){
+  tmp <- unlist(strsplit(as.character(escherichiaMerged$id[i]), "-"))
+  
+  
+  ids[counter:(counter + length(tmp) - 1)] <- tmp
+  
+  counter = counter + length(tmp)
+}
+
+
+ids <- data.frame(id = ids)
+ids <- ids %>% mutate(id = as.character(id))
+
+
+
+i <- 2
+for(i in 1:nrow(ids)){
+  number <- unlist(strsplit(as.character(ids$id[i]), "_"))
+  if(length(number)  < 3){
+    ids$id[i] <- "F"
+  }else{
+    number <- number[3]
+    if(number == "0"){
+      ids$id[i] <- "F"
+    }
+  }
+}
+
+
+ids <- ids %>% filter(id != "F")
+
+ids %>% filter(id != "F")  %>% nrow()
+
+ids %>% filter(id != "F") %>% unique() %>% nrow()
+
+idCounts <-ids %>% group_by(id) %>% summarise(counts = n())
+  
+
+idMatches <- idCounts %>% full_join(escherichiaCalls)
+  
+
+smallMerged <- escherichiaMerged %>% mutate(idNew = paste(start, end, strand))
+
+smallMerged <- smallMerged %>% group_by(idNew) %>% arrange(-number_of_ids) %>% top_n(n = 1)
+
+sum(smallMerged$number_of_ids)
+nrow(escherichiaCalls)
+
+
+esch1 <- read.table("~/phd/RNASeq/Shigella/GCA_000007405.1.data/GCA_000007405.1_new_calls.txt", header = T, sep = "\t", fill = T)
+esch2 <- read.table("~/phd/RNASeq/Shigella/GCA_000283715.1.data/GCA_000283715.1_new_calls.txt", header = T, sep = "\t", fill = T)
+esch3 <- read.table("~/phd/RNASeq/Shigella/GCA_000497505.1.data/GCA_000497505.1_new_calls.txt", header = T, sep = "\t", fill = T)
+
+esch12 <- read.table("~/phd/RNASeq/combined_gff_files/GCA_000007405.1-GCA_000283715.1_merged.gff", header = T, sep = "\t", fill = T)
+esch13 <- read.table("~/phd/RNASeq/combined_gff_files/GCA_000007405.1-GCA_000497505.1_merged.gff", header = T, sep = "\t", fill = T)
+esch123 <- read.table("~/phd/RNASeq/combined_gff_files/shigella_merged.gff", header = T, sep = "\t", fill = T)
+
+sum(esch12$number_of_features)
+
+nrow(esch1) + nrow(esch2)
+
+nrow(esch1) + nrow(esch2) + nrow(esch3) + nrow(esch4) + nrow(esch5) + nrow(esch6) 
+
+
+esch12_esch1_IDS <- esch12 %>% select(id, number_of_features) %>% 
+  separate(id,into = c("id1", "id2"), remove = F, sep = "-") %>% 
+  separate(id1, into = c("gca", "genome", "number"), remove = F, sep = "_") %>% 
+  mutate(number = as.numeric(number)) %>% arrange(number) %>% 
+  filter(number > 0)
+
+esch1 <- esch1 %>% mutate(feature_length = end - start)
+esch2 <- esch2 %>% mutate(feature_length = end - start)
+
+esch1 %>% filter(feature_length >= 50, feature_length <= 500) %>% nrow() + esch2 %>% filter(feature_length >= 50, feature_length <= 500) %>% nrow()
+
+tmp <-esch12%>% mutate(feature_length = end - start) %>% 
+  filter(feature_length >= 50, feature_length <= 500)
+
+sum(tmp$number_of_features)
+
+```
+
 
 ###UpsetR Plots
 ```{r UpSet_Plot, echo = F}
