@@ -118,7 +118,7 @@ mergedDat <- data.frame(sequence = as.character("0"), feature = as.character("0"
                         start = as.integer("0"), end = as.integer("0"),
                         strand = as.character("0"), file_names = as.character("start_row"),
                         row_numbers = as.character("0"), prop_overlap = as.numeric(0), new_feature = F,
-                        number_of_features = as.integer("0"),
+                        number_of_rnaseq_files = as.integer("0"),
                         score = as.character("0"),
                         stringsAsFactors = F)
 
@@ -168,7 +168,7 @@ for(i in 1:(nrow(ncRNAgff) - 1)){
                       row_numbers = paste(c(start_i:i), collapse = ","),
                       prop_overlap = prop_val,
                       new_feature = new_feature,
-                      number_of_features = length(start_i:i),
+                      number_of_rnaseq_files = length(start_i:i),
                       score = as.character(ncRNAgff[i,6]),
                       stringsAsFactors = F)
     mergedDat <- mergedDat%>%bind_rows(tmp)
@@ -181,7 +181,7 @@ for(i in 1:(nrow(ncRNAgff) - 1)){
 
 
 
-mergedDat <- mergedDat%>%filter(number_of_features > 0, file_names != "start_row")
+mergedDat <- mergedDat%>%filter(number_of_rnaseq_files > 0, file_names != "start_row")
 
 if(!is.null(opt$random_data)){
   mergedDat <- mergedDat %>% filter(file_names != opt$gff)
@@ -194,8 +194,8 @@ write.table(x = mergedDat, file = paste(file_path, "/", opt$out_name, "_new_call
 
 
 # ggplot() +
-#   geom_histogram(data = mergedDat%>%filter(new_feature == T), aes(x = number_of_features, y = ..density..), alpha = 0, binwidth = 1, colour = "Red") +
-#   geom_histogram(data = mergedDat%>%filter(new_feature == F), aes(x = number_of_features, y = ..density..), alpha = 0, binwidth = 1, colour = "Blue")
+#   geom_histogram(data = mergedDat%>%filter(new_feature == T), aes(x = number_of_rnaseq_files, y = ..density..), alpha = 0, binwidth = 1, colour = "Red") +
+#   geom_histogram(data = mergedDat%>%filter(new_feature == F), aes(x = number_of_rnaseq_files, y = ..density..), alpha = 0, binwidth = 1, colour = "Blue")
 #
 #
 # ggplot() +

@@ -1074,6 +1074,8 @@ esch4 <- read.table("~/phd/RNASeq/escherichia/GCA_900186905.1.data/GCA_900186905
 esch5 <- read.table("~/phd/RNASeq/escherichia/GCA_002843685.1.data/GCA_002843685.1_new_calls.txt", header = T, sep = "\t", fill = T)
 esch6 <- read.table("~/phd/RNASeq/escherichia/GCA_001559675.1.data/GCA_001559675.1_new_calls.txt", header = T, sep = "\t", fill = T)
 esch12 <- read.table("~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_000017765.1_merged.gff", header = T, sep = "\t", fill = T)
+esch13 <- read.table("~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_000017985.1_merged.gff", header = T, sep = "\t", fill = T)
+esch123 <- read.table("~/phd/RNASeq/combined_gff_files/esch_1-2-3_merged.gff", header = T, sep = "\t", fill = T)
 
 sum(esch12$number_of_features)
 

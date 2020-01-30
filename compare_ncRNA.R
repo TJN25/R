@@ -2,6 +2,9 @@
 
 ##Seems to all be working
 
+# functions ---------------------------------------------------------------
+
+
 mergeSRATest <- function(ncRNAgff, gff1, gff2, time.it = T, quiet = F, filenum1 = "1", filenum2 = "2", print_log = F, align = T){
   error_message <- "Either gff1 and gff2 or ncRNAgff are needed:\n"
   stop_val <- 0
@@ -380,8 +383,7 @@ spec = matrix(c(
   'id1', 'x', 2, "character",
   'id2', 'y', 2, "character",
   'seq1', 's', 2, "character",
-  'seq2', 't', 2, "character",
-  'clean', 'c', 0, "logical"
+  'seq2', 't', 2, "character"
 ), byrow=TRUE, ncol=4)
 
 
@@ -403,7 +405,6 @@ if ( !is.null(opt$help) ) {
   cat("  -t <seq2 column> The column number for seq 2\n")
   cat("  -o <output file name> The name of the output file. Do not inclue the gff file extension. The default is the same as the sra input\n")
   cat("  -i <initial data> the input data is the output from combine_gff_files.R\n")
-  cat("  -c <clean final data> take teh final file and clean it up.R\n")
   cat("  \n")
   q(status=1)
 }
@@ -443,20 +444,27 @@ if ( is.null(opt$alignment) ) {
   align <- T
 }
 
-suppressMessages(library(tidyverse))
-suppressMessages(library(tjnFunctions))
+# packages ----------------------------------------------------------------
 
-##TEST SETUP ####
+
+suppressMessages(library(tidyverse))
+suppressMessages(library(comparativeSRA))
+
+# Test setup --------------------------------------------------------------
 test_setup <- F
 if(test_setup == T){
-opt$gff1 <- "~/phd/RNASeq/combined_gff_files/esch_1-2-3-4-5-6_merged.gff"
-opt$gff2 <- "~/phd/RNASeq/escherichia/GCA_000017765.1_data/GCA_000017765.1_new_calls.txt"
+opt$gff1 <- "~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_000017765.1_merged.gff"
+opt$gff2 <- "~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_000017985.1_merged.gff"
 opt$alignment <- "~/phd/RNASeq/escherichia/escherichia.backbone"
 opt$id1 <- "GCA_000017745.1"
 opt$id2 <- "GCA_000017765.1"
 opt$out_name <- "escherichia_1-2_TEST"
 }
-#####
+
+
+
+# Defining variables ------------------------------------------------------
+
 
 
 if ( is.null(opt$file_path ) ) { opt$file_path = "." }
@@ -469,80 +477,7 @@ if ( is.null(opt$t ) ) { opt$t= "2" }
 filePath <- opt$file_path
 
 # Main section ------------------------------------------------------------
-if(clean_data == T){
-
-  gff1Dat <- read.table(opt$gff1, sep = "\t", header = T, as.is = T)
-
-  gff1SetValues <- gff1Dat[,c(14, 17:(ncol(gff1Dat)))]
-  gff1SetValues <- gff1SetValues%>%dplyr::rename(id1 = id)
-  gff1Working <- gff1Dat[,1:16]
-
-
-  filenum1 <- gff1Working[1,16]
-  filenum2 <- gff1Working[1,16]
-
-  align <-F
-  mergedData <- mergeSRATest(ncRNAgff = gff1Dat,
-                             filenum1 = filenum1,
-                             filenum2 = filenum2,
-                             print_log = F,
-                             align = F)
-
-
-  mergedData <- mergedData%>%mutate(change = ifelse(start < end, F, T))%>%
-    mutate(start.tmp = end)%>%
-    mutate(end.tmp = start)%>%
-    mutate(start = ifelse(change == T, start.tmp, start))%>%
-    mutate(end = ifelse(change == T, end.tmp, end))%>%
-    select(-start.tmp, -end.tmp, -change)
-
-  mergedData <- mergedData%>%
-    full_join(gff1SetValues, by = "id1")
-
-  mergedData <- mergedData%>%filter(!is.na(sequence))
-  mergedData[is.na(mergedData)] <- 0
-
-  file_id1 <- unlist(strsplit(filenum1, "-"))
-  file_id2 <- unlist(strsplit(filenum2, "-"))
-  file_id <- paste(unique(c(file_id1, file_id2)), collapse = "-")
-
-
-  tmp <- mergedData%>%
-    mutate(id = NA)%>%
-    mutate(set_val = NA)%>%
-    mutate(file_id = file_id)
-  tmp[is.na(tmp)] <- 0
-
-  i <- 4
-  for(i in 1:nrow(tmp)){
-    id1_list <- unlist(strsplit(tmp[i,14], "-"))
-    id2_list <- unlist(strsplit(tmp[i,15], "-"))
-    id_list <- unique(c(id1_list, id2_list))
-
-    tmp[i, ncol(tmp) - 2] <- paste(id_list, collapse = "-")
-
-
-    set_val_1 <- unlist(strsplit(tmp[i,16], "-"))
-    set_val_2 <- unlist(strsplit(tmp[i,17], "-"))
-
-
-
-
-    if(length(intersect(set_val_1, set_val_2)) > 0){
-      set_val <- intersect(set_val_1, set_val_2)
-    }else{
-      set_val <- union(set_val_1, set_val_2)
-    }
-    tmp[i, ncol(tmp) - 1] <- paste(set_val, collapse = "-")
-
-
-
-  }
-
-  mergedData <- tmp[,c(1:13, (ncol(tmp) - 2):(ncol(tmp)), 18:(ncol(tmp) - 3) )]
-  mergedData <- mergedData%>%mutate(V1 = set_val)
-  colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
-}else if(initial_data == T){
+if(initial_data == T){
   cat("Analysing initial calls (from *_new_calls.gff)\n")
   ncRNAgff <- alignAndCombine(reference = opt$alignment,
                                       gff1 = opt$gff1,
@@ -555,7 +490,14 @@ if(clean_data == T){
 mergedData <- mergeSRA(ncRNAgff = ncRNAgff,
                        filenum1 = opt$id1,
                        filenum2 = opt$id2,
-                        print_log = F)
+                       initial_data = initial_data, 
+                       align = T)
+mergedData <- mergedData %>% 
+  mutate(set_val = paste(unique(c(set_val_1, set_val_2)), collapse = "-"))%>% 
+  mutate(id = paste(unique(c(id1, id2)), collapse = "-")) 
+
+mergedData <- mergedData[,c(1:13, 20,19, 18)]
+
 
 mergedData <- mergedData%>%mutate(change = ifelse(start < end, F, T))%>%
   mutate(start.tmp = end)%>%
@@ -596,25 +538,29 @@ colnames(mergedData)[col_count + 1] <- mergedData[1,col_count]
   #add the columns back onto the data
 
 
-   opt$gff1 <- "~/phd/RNASeq/combined_gff_files/esch_1-2-3-4-5_merged.gff"
-   opt$gff2 <- "~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_001559675.1_merged.gff"
-   align <- F
+   # opt$gff1 <- "~/phd/RNASeq/combined_gff_files/esch_1-2-3-4-5_merged.gff"
+   # opt$gff2 <- "~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_001559675.1_merged.gff"
+   # align <- F
 
 
   gff1Dat <- read.table(opt$gff1, sep = "\t", header = T, as.is = T)
   gff2Dat <- read.table(opt$gff2, sep = "\t", header = T, as.is = T)
 
-  gff1SetValues <- gff1Dat[,c(14, 17:(ncol(gff1Dat)))]
-  gff1SetValues <- gff1SetValues%>%dplyr::rename(id1 = id)
-  gff1Working <- gff1Dat[,1:16]
+##Taking a different approach to all of this to account for the changes to the ID section
+  # gff1SetValues <- gff1Dat[,c(14, 17:(ncol(gff1Dat)))]
+  # gff1SetValues <- gff1SetValues%>%dplyr::rename(id1 = id)
+  # gff1Working <- gff1Dat[,1:16]
+  # 
+  # gff2SetValues <- gff2Dat[,c(14, 17:(ncol(gff2Dat)))]
+  # gff2SetValues <- gff2SetValues%>%dplyr::rename(id2 = id)
+  # gff2Working <- gff2Dat[,1:16]
 
-  gff2SetValues <- gff2Dat[,c(14, 17:(ncol(gff2Dat)))]
-  gff2SetValues <- gff2SetValues%>%dplyr::rename(id2 = id)
-  gff2Working <- gff2Dat[,1:16]
+  gff1Working <- gff1Dat
+  gff2Working <- gff2Dat
+  
 
-
-  filenum1 <- gff1Working[1,16]
-  filenum2 <- gff2Working[1,16]
+  filenum1 <- gff1Working$file_id[1]
+  filenum2 <- gff2Working$file_id[1]
 
 
 
@@ -631,13 +577,14 @@ colnames(mergedData)[col_count + 1] <- mergedData[1,col_count]
 
   }else{
     ncRNAgff <- gff1Working%>%bind_rows(gff2Working)
+    ncRNAgff[is.na(ncRNAgff)] <- 0
 }
 
-  mergedData <- mergeSRATest(ncRNAgff = ncRNAgff,
+  mergedData <- mergeSRA(ncRNAgff = ncRNAgff,
                          filenum1 = filenum1,
                          filenum2 = filenum2,
-                         print_log = F,
-                         align = align)
+                         align = align, 
+                         initial_data = F)
 
 
   mergedData <- mergedData%>%mutate(change = ifelse(start < end, F, T))%>%
@@ -647,9 +594,7 @@ colnames(mergedData)[col_count + 1] <- mergedData[1,col_count]
     mutate(end = ifelse(change == T, end.tmp, end))%>%
     select(-start.tmp, -end.tmp, -change)
 
-  mergedData <- mergedData%>%
-    full_join(gff1SetValues, by = "id1")%>%
-    full_join(gff2SetValues, by = "id2")
+
 
   mergedData <- mergedData%>%filter(!is.na(sequence))
   mergedData[is.na(mergedData)] <- 0
@@ -667,15 +612,15 @@ colnames(mergedData)[col_count + 1] <- mergedData[1,col_count]
 
   i <- 4
 for(i in 1:nrow(tmp)){
-  id1_list <- unlist(strsplit(tmp[i,14], "-"))
-  id2_list <- unlist(strsplit(tmp[i,15], "-"))
+  id1_list <- unlist(strsplit(tmp$id1[i], "-"))
+  id2_list <- unlist(strsplit(tmp$id2[i], "-"))
   id_list <- unique(c(id1_list, id2_list))
 
-  tmp[i, ncol(tmp) - 2] <- paste(id_list, collapse = "-")
+  tmp$id[i] <- paste(id_list, collapse = "-")
 
 
-  set_val_1 <- unlist(strsplit(tmp[i,16], "-"))
-  set_val_2 <- unlist(strsplit(tmp[i,17], "-"))
+  set_val_1 <- unlist(strsplit(tmp$set_val_1[i], "-"))
+  set_val_2 <- unlist(strsplit(tmp$set_val_2[i], "-"))
 
 
 
@@ -685,13 +630,13 @@ for(i in 1:nrow(tmp)){
   }else{
     set_val <- union(set_val_1, set_val_2)
   }
-  tmp[i, ncol(tmp) - 1] <- paste(set_val, collapse = "-")
+  tmp$set_val[i] <- paste(set_val, collapse = "-")
 
 
 
 }
 
-  mergedData <- tmp[,c(1:13, (ncol(tmp) - 2):(ncol(tmp)), 18:(ncol(tmp) - 3) )]
+  mergedData <- tmp[,c(1:13, (ncol(tmp) - 1):(ncol(tmp)), 18:(ncol(tmp) - 2) )]
   mergedData <- mergedData%>%mutate(V1 = set_val)
   colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
 
