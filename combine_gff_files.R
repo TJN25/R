@@ -187,6 +187,7 @@ if(!is.null(opt$random_data)){
   mergedDat <- mergedDat %>% filter(file_names != opt$gff)
 }
 
+mergedDat <- mergedDat %>% mutate(id =  paste(opt$out_name, row_number(), sep = "_"))
 
 cat(paste("Writing the output to ", file_path, "/", opt$out_name, "_new_calls.txt\n", sep = ""))
 write.table(x = mergedDat, file = paste(file_path, "/", opt$out_name, "_new_calls.txt", sep = ""), row.names = F, col.names = T, quote = F, sep = "\t")

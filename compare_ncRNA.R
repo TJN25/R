@@ -453,12 +453,21 @@ suppressMessages(library(comparativeSRA))
 # Test setup --------------------------------------------------------------
 test_setup <- F
 if(test_setup == T){
-opt$gff1 <- "~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_000017765.1_merged.gff"
-opt$gff2 <- "~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_000017985.1_merged.gff"
+  if(initial_data == F){
+opt$gff1 <- "~/phd/RNASeq/combined_gff_files/esch_1-2-3_merged.gff"
+opt$gff2 <- "~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_900186905.1_merged.gff"
+opt$alignment <- "~/phd/RNASeq/escherichia/escherichia.backbone"
+opt$id1 <- "GCA_000017745.1-GCA_000017765.1"
+opt$id2 <- "GCA_000017745.1-GCA_000017985.1"
+opt$out_name <- "escherichia_1-2_TEST"
+}else{
+opt$gff1 <- "~/phd/RNASeq/escherichia/GCA_000017745_data/GCA_000017745.1_new_calls.txt"
+opt$gff2 <- "~/phd/RNASeq/escherichia/GCA_000017765.1_data/GCA_000017765.1_new_calls.txt"
 opt$alignment <- "~/phd/RNASeq/escherichia/escherichia.backbone"
 opt$id1 <- "GCA_000017745.1"
 opt$id2 <- "GCA_000017765.1"
 opt$out_name <- "escherichia_1-2_TEST"
+}
 }
 
 
@@ -492,12 +501,6 @@ mergedData <- mergeSRA(ncRNAgff = ncRNAgff,
                        filenum2 = opt$id2,
                        initial_data = initial_data, 
                        align = T)
-mergedData <- mergedData %>% 
-  mutate(set_val = paste(unique(c(set_val_1, set_val_2)), collapse = "-"))%>% 
-  mutate(id = paste(unique(c(id1, id2)), collapse = "-")) 
-
-mergedData <- mergedData[,c(1:13, 20,19, 18)]
-
 
 mergedData <- mergedData%>%mutate(change = ifelse(start < end, F, T))%>%
   mutate(start.tmp = end)%>%
@@ -506,36 +509,55 @@ mergedData <- mergedData%>%mutate(change = ifelse(start < end, F, T))%>%
   mutate(end = ifelse(change == T, end.tmp, end))%>%
   select(-start.tmp, -end.tmp, -change)
 
-col_count <- ncol(mergedData)
 
-mergedData <- mergedData%>%mutate(tmp1 = set_val)
-colnames(mergedData)[col_count + 1] <- mergedData[1,col_count]
+
+mergedData <- mergedData%>%filter(!is.na(sequence))
+mergedData[is.na(mergedData)] <- 0
+
+file_id1 <- unlist(strsplit(opt$id1, "-"))
+file_id2 <- unlist(strsplit(opt$id2, "-"))
+file_id <- paste(unique(c(file_id1, file_id2)), collapse = "-")
+
+
+tmp <- mergedData%>%
+  mutate(id = NA)%>%
+  mutate(set_val = NA)%>%
+  mutate(file_id = file_id)
+tmp[is.na(tmp)] <- 0
+
+i <- 4
+for(i in 1:nrow(tmp)){
+  id1_list <- unlist(strsplit(tmp$id1[i], "-"))
+  id2_list <- unlist(strsplit(tmp$id2[i], "-"))
+  id_list <- unique(c(id1_list, id2_list))
+  
+  tmp$id[i] <- paste(id_list, collapse = "-")
+  
+  
+  set_val_1 <- unlist(strsplit(tmp$set_val_1[i], "-"))
+  set_val_2 <- unlist(strsplit(tmp$set_val_2[i], "-"))
+  
+  
+  
+  
+  if(length(intersect(set_val_1, set_val_2)) > 0){
+    set_val <- intersect(set_val_1, set_val_2)
+  }else{
+    set_val <- union(set_val_1, set_val_2)
+  }
+  tmp$set_val[i] <- paste(set_val, collapse = "-")
+  
+  
+  
+}
+
+mergedData <- tmp[,c(1:13, (ncol(tmp) - 1):(ncol(tmp)), 18:(ncol(tmp) - 2) )]
+mergedData <- mergedData%>%mutate(V1 = set_val)
+colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
+
 
 }else{
-  #Need to consider if alignment is needed
 
-  #read file1
-  #read file2
-
-  #bind rows
-
-  #run mergeSRA
-  #do everything the same (taking into account the different column positions)
-  #Take filenum1 and filenum2 from file_id columns
-  #take the rna_ids and split out all the individual ids using the '-' as a separator
-  #get a unique list of these rna ids and write to id with '-' as a separator
-
-
-  #take the set_val and split out all the individual set values using the '-' as a separator
-  #take intersect if exists else take union and write to set_val
-
-  #take the file_id and split out all the individual files using the '-' as a separator
-  #get a unique list of these files and write to file_id with '-' as a separator
-
-  #>> Maybe look at a way to add a column each time
-  #select the end n columns and store separately
-  #take the output from set_val and file_id and create a new column of these values
-  #add the columns back onto the data
 
 
    # opt$gff1 <- "~/phd/RNASeq/combined_gff_files/esch_1-2-3-4-5_merged.gff"
@@ -546,17 +568,9 @@ colnames(mergedData)[col_count + 1] <- mergedData[1,col_count]
   gff1Dat <- read.table(opt$gff1, sep = "\t", header = T, as.is = T)
   gff2Dat <- read.table(opt$gff2, sep = "\t", header = T, as.is = T)
 
-##Taking a different approach to all of this to account for the changes to the ID section
-  # gff1SetValues <- gff1Dat[,c(14, 17:(ncol(gff1Dat)))]
-  # gff1SetValues <- gff1SetValues%>%dplyr::rename(id1 = id)
-  # gff1Working <- gff1Dat[,1:16]
-  # 
-  # gff2SetValues <- gff2Dat[,c(14, 17:(ncol(gff2Dat)))]
-  # gff2SetValues <- gff2SetValues%>%dplyr::rename(id2 = id)
-  # gff2Working <- gff2Dat[,1:16]
 
-  gff1Working <- gff1Dat
-  gff2Working <- gff2Dat
+  gff1Working <- gff1Dat %>% mutate(row_numbers = as.character(row_numbers))
+  gff2Working <- gff2Dat %>% mutate(row_numbers = as.character(row_numbers))
   
 
   filenum1 <- gff1Working$file_id[1]
