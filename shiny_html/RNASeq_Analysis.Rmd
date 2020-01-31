@@ -995,7 +995,11 @@ placeholderIDs <- data.frame(placeholderIDs = placeholderIDs)
 escherichiaMerged <- escherichiaMerged %>% bind_cols(totalIDs, placeholderIDs) %>% 
   mutate(number_of_ids = totalIDs -placeholderIDs)
 
+
+zeroDist <- escherichiaMerged %>% filter((end - start) <= 0)
+
 escherichiaMerged <- escherichiaMerged %>% filter((end - start) > 0)
+
 
 
 

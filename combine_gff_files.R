@@ -2,7 +2,9 @@
 suppressMessages(library('getopt'))
 
 
-##Getopts setup ####
+# getopts -----------------------------------------------------------------
+
+
 spec = matrix(c(
   'sra', 'f', 1, "character",
   'gff', 'g', 1, 'character',
@@ -43,8 +45,14 @@ if ( is.null(opt$out_name) ) {
 }
 
 
+# packages ----------------------------------------------------------------
+
+
 suppressMessages(library(tidyverse))
-suppressMessages(library(tjnFunctions))
+suppressMessages(library(comparativeSRA))
+
+# defining variables ------------------------------------------------------
+
 
 if ( is.null(opt$file_path ) ) { opt$file_path = "." }
 if ( is.null(opt$out_name ) ) { opt$out_name = opt$sra }
@@ -74,6 +82,10 @@ if(is.null(opt$quiet)){
 
 file_path <- opt$file_path
 files <- list.files(opt$sra, pattern = ".gff$")
+
+# import data -------------------------------------------------------------
+
+
 #print(files)
 dat <- data.frame(sequence = as.character("0"), source = as.character("0"), feature = as.character("0"),
                   start = as.integer("0"), end = as.integer("0"), score = as.character("0"),
@@ -111,7 +123,10 @@ ncRNAgff <- dat%>%
   filter(feature != "CDS", feature != "gene", feature != "pseudogene", feature != "exon", feature != "region")
 }
 
-ncRNAgff <- ncRNAgff%>%arrange(start)
+# main section  -------------------------------------------------------------------
+
+
+ncRNAgff <- ncRNAgff%>%arrange(start) %>% filter((end - start) > 0)
 
 
 mergedDat <- data.frame(sequence = as.character("0"), feature = as.character("0"),
@@ -123,11 +138,11 @@ mergedDat <- data.frame(sequence = as.character("0"), feature = as.character("0"
                         stringsAsFactors = F)
 
 ##loop through the combined gff files and combine features that overlap
-i <- 2
+#i <- 2
 current_feature <- F #is there a current feature being written?
 new_feature <- T
 
-for(i in 1:(nrow(ncRNAgff) - 1)){
+for(i in 1:(nrow(ncRNAgff))){
   ##check if the feature is already known
   if(ncRNAgff[i,2] != "sraAlignedncRNAExpression"){
     new_feature <- F
@@ -147,6 +162,32 @@ for(i in 1:(nrow(ncRNAgff) - 1)){
   end_val <- ncRNAgff[i,5]
   }
 
+  if(i == nrow(ncRNAgff)){
+    
+    ##check if the subsequent feature was contained within the first feature
+    if(ncRNAgff[start_i, 5] < end_val){
+      prop_val <- (ncRNAgff[start_i, 5] - ncRNAgff[i, 4])/(end_val - start_val)
+    }else{
+      prop_val <- 1
+    }
+    
+    tmp <- data.frame(sequence = ncRNAgff[i,1],
+                      feature = ncRNAgff[i,3],
+                      start = start_val, end = end_val,
+                      strand = ncRNAgff[i,7],
+                      file_names = paste(ncRNAgff[start_i:i, 10], collapse = ","),
+                      row_numbers = paste(c(start_i:i), collapse = ","),
+                      prop_overlap = prop_val,
+                      new_feature = new_feature,
+                      number_of_rnaseq_files = length(start_i:i),
+                      score = as.character(ncRNAgff[i,6]),
+                      stringsAsFactors = F)
+    mergedDat <- mergedDat%>%bind_rows(tmp)
+    current_feature <- F
+    new_feature <- T
+  }else{
+    
+    
   ##check if the cuurent end value overlaps with the next starting value and update the end value if it does
   if(end_val > ncRNAgff[i + 1, 4] & ncRNAgff[i,7] == ncRNAgff[i+1, 7]){
     end_val <- ncRNAgff[i + 1,5]
@@ -174,6 +215,7 @@ for(i in 1:(nrow(ncRNAgff) - 1)){
     mergedDat <- mergedDat%>%bind_rows(tmp)
     current_feature <- F
     new_feature <- T
+  }
   }
 }
 

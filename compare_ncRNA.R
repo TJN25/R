@@ -577,15 +577,6 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
   filenum1 <- gff1Working$file_id[1]
   filenum2 <- gff2Working$file_id[1]
   
-  print(opt$gff1)
-  print(opt$gff2)  
-  print(filenum1)
-  print(filenum2)
-  print(filePath)
-  print(opt$out_name)
-  print(align)
-  print(initial_data)
-
 
   if(align == T){
    ncRNAgff <- alignAndCombineTest(reference = opt$alignment,
@@ -602,14 +593,12 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
     ncRNAgff <- gff1Working%>%bind_rows(gff2Working)
     ncRNAgff[is.na(ncRNAgff)] <- 0
 }
-print(nrow(ncRNAgff))
   mergedData <- mergeSRA(ncRNAgff = ncRNAgff,
                          filenum1 = filenum1,
                          filenum2 = filenum2,
                          align = align, 
                          initial_data = F)
-  print(nrow(mergedData))
-  
+
 
   mergedData <- mergedData%>%mutate(change = ifelse(start < end, F, T))%>%
     mutate(start.tmp = end)%>%
