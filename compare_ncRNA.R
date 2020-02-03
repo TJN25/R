@@ -414,11 +414,7 @@ if ( !is.null(opt$initial_data) ) {
   initial_data <- F
 }
 
-if ( !is.null(opt$clean) ) {
-  clean_data <- T
-}else{
-  clean_data <- F
-}
+
 
 
 
@@ -453,19 +449,20 @@ suppressMessages(library(comparativeSRA))
 test_setup <- F
 if(test_setup == T){
   if(initial_data == F){
-opt$gff1 <- "~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_000017765.1_merged.gff"
-opt$gff2 <- "~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_000017985.1_merged.gff"
-opt$alignment <- "~/phd/RNASeq/escherichia/escherichia.backbone"
-opt$id1 <- "GCA_000017745.1-GCA_000017765.1"
-opt$id2 <- "GCA_000017745.1-GCA_000017985.1"
-opt$out_name <- "esch_1-2-3"
+opt$gff1 <- "~/phd/RNASeq/combined_gff_files/escherichia_merged.gff"
+opt$gff2 <- "~/phd/RNASeq/combined_gff_files/shigella_merged.gff"
+opt$alignment <- "~/phd/RNASeq/alignments/Shigella-Escherichia.backbone"
+opt$id1 <- "escherichia"
+opt$id2 <- "shigella"
+opt$out_name <- "escherichia-shigella"
 }else{
+  initial_data <- T
 opt$gff1 <- "~/phd/RNASeq/escherichia/GCA_000017745_data/GCA_000017745.1_new_calls.txt"
 opt$gff2 <- "~/phd/RNASeq/escherichia/GCA_000017765.1_data/GCA_000017765.1_new_calls.txt"
 opt$alignment <- "~/phd/RNASeq/escherichia/escherichia.backbone"
 opt$id1 <- "GCA_000017745.1"
 opt$id2 <- "GCA_000017765.1"
-opt$out_name <- "escherichia_1-2_TEST"
+opt$out_name <- "escherichia_1-2"
 }
 }
 
@@ -487,9 +484,13 @@ filePath <- opt$file_path
 # Main section ------------------------------------------------------------
 if(initial_data == T){
   cat("Analysing initial calls (from *_new_calls.gff)\n")
+  
+  gff1 <- read.table(opt$gff1, sep = "\t", header = T, as.is = T)
+  gff2 <- read.table(opt$gff2, sep = "\t", header = T, as.is = T)
+  
   ncRNAgff <- alignAndCombine(reference = opt$alignment,
-                                      gff1 = opt$gff1,
-                                      gff2 = opt$gff2,
+                                      gff1 = gff1,
+                                      gff2 = gff2,
                                       filenum1 = opt$id1,
                                       filenum2 = opt$id2,
                                       seqA = opt$s,
@@ -550,6 +551,9 @@ for(i in 1:nrow(tmp)){
   
 }
 
+
+
+
 mergedData <- tmp[,c(1:13, (ncol(tmp) - 1):(ncol(tmp)), 18:(ncol(tmp) - 2) )]
 mergedData <- mergedData%>%mutate(V1 = set_val)
 colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
@@ -576,10 +580,9 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
 
   filenum1 <- gff1Working$file_id[1]
   filenum2 <- gff2Working$file_id[1]
-  
 
   if(align == T){
-   ncRNAgff <- alignAndCombineTest(reference = opt$alignment,
+   ncRNAgff <- alignAndCombine(reference = opt$alignment,
                                gff1 = gff1Working,
                                gff2 = gff2Working,
                                filenum1 = filenum1,
@@ -587,8 +590,8 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
                                seqA = 1,
                                seqB = 2)
 
-   ncRNAgff <- ncRNAgff%>%select(-changed, -filenum)%>%unique()
-
+   ncRNAgff <- ncRNAgff%>%select(-changed)%>%unique()
+  ncRNAgff[is.na(ncRNAgff)] <- "0"
   }else{
     ncRNAgff <- gff1Working%>%bind_rows(gff2Working)
     ncRNAgff[is.na(ncRNAgff)] <- 0
@@ -648,11 +651,50 @@ for(i in 1:nrow(tmp)){
 
 
 }
-
+  fitchTest <- tmp %>% select(id, set_val) %>% mutate(fitch = 0, prop = 0)
+  
+  for(i in 1:nrow(fitchTest)){
+    files_1 <- c()
+    files_all <- c()
+    id_set <- unlist(strsplit(as.character(fitchTest$id[i]), "-"))
+    for(j in 1:length(id_set)){
+      number <- unlist(strsplit(as.character(id_set[j]), "_"))
+      file_id <- paste(number[1:2], collapse = "_")
+      number <- number[3]
+      files_all <- c(files_all, file_id)
+      if(number > 0){
+        files_1 <- c(files_1, file_id)
+      }
+    }
+    files_1 <- unique(files_1)
+    files_all <- unique(files_all)
+    if(align == F){
+      fitchTest$fitch[i] <- ifelse(length(files_1) == 1, "0-1", ifelse(length(files_1) == 0, "0", "1"))
+    }else{
+      fitchTest$fitch[i] <- fitchTest$set_val[i]
+    }
+    fitchTest$prop[i] <- paste(length(files_1), length(files_all), sep = "-")
+  }
+  fitchTest <- fitchTest %>% select(-set_val)
+  
+  
   mergedData <- tmp[,c(1:13, (ncol(tmp) - 1):(ncol(tmp)), 18:(ncol(tmp) - 2) )]
-  mergedData <- mergedData%>%mutate(V1 = set_val)
-  colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
+  mergedData <- mergedData %>% full_join(fitchTest, by = "id")
+  
+  
+  if(align == F){
+    mergedData <- mergedData%>%mutate(set_val = fitch)
+  }
+    mergedData <- mergedData%>%mutate(V1 = set_val)
 
+  
+  mergedData <- mergedData%>%mutate(V2 = prop)
+  colnames(mergedData)[ncol(mergedData) - 1] <- paste(opt$out_name, "fitch", sep = "-")
+  colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name, "prop", sep = "-")
+  
+  mergedData <- mergedData %>% select(-fitch, -prop)
+  mergedData[is.na(mergedData)] <- 0
+  
 }
 
 cat(paste("Writing the output to ", filePath, "/", opt$out_name, "_merged.gff\n", sep = ""))

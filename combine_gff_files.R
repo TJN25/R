@@ -126,7 +126,7 @@ ncRNAgff <- dat%>%
 # main section  -------------------------------------------------------------------
 
 
-ncRNAgff <- ncRNAgff%>%arrange(start) %>% filter((end - start) > 0)
+ncRNAgff <- ncRNAgff%>%arrange(start) %>% filter((end - start) > 0)# %>% arrange(strand)
 
 
 mergedDat <- data.frame(sequence = as.character("0"), feature = as.character("0"),

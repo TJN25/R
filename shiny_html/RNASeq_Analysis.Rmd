@@ -100,6 +100,8 @@ firstup <- function(x) {
 
 ![Figure . Overview of Approach](Colloquia_2019_1.png)
 
+###figures
+
 ##Methods
 
 ![Figure . Overview of the pipeline](rnaseq_flowchart.png)
@@ -982,9 +984,9 @@ escherichiaMerged <- read.table("~/phd/RNASeq/combined_gff_files/escherichia_mer
 escherichiaCalls <- read.table("~/phd/RNASeq/escherichia/escherichia_calls", header = T, sep = "\t", fill = T)
 
 sum(escherichiaMerged$number_of_features)
-
 nrow(escherichiaCalls)
 
+ 
 totalIDs <- str_count(escherichiaMerged$id, "-")
 totalIDs <- data.frame(totalIDs = totalIDs)
 totalIDs <- totalIDs %>% mutate(totalIDs = totalIDs + 1)
@@ -1237,7 +1239,79 @@ sum(tmp$number_of_features)
 
 ```
 
+```{r conservation_info_escherichia_test}
+escherichiaMerged <- read.table("~/phd/RNASeq/combined_gff_files/escherichia_merged.gff", sep = "\t", header = T, fill = T)
+shigellaMerged <- read.table("~/phd/RNASeq/combined_gff_files/shigella_merged.gff", sep = "\t", header = T, fill = T)
+escherichiaMerged %>% group_by(escherichia.fitch) %>% summarise(count = n())
 
+esch_1 <- read.table("~/phd/RNASeq/escherichia/GCA_000017745_data/GCA_000017745.1_new_calls.txt", header = T, sep = "\t", fill = T)
+esch_2 <- read.table("~/phd/RNASeq/escherichia/GCA_000017765.1_data/GCA_000017765.1_new_calls.txt", header = T, sep = "\t", fill = T)
+esch_3 <- read.table("~/phd/RNASeq/escherichia/GCA_000017985.1.data/GCA_000017985.1_new_calls.txt", header = T, sep = "\t", fill = T)
+esch_15 <- read.table("~/phd/RNASeq/escherichia/GCA_900186905.1.data/GCA_900186905.1_new_calls.txt", header = T, sep = "\t", fill = T)
+esch_14 <- read.table("~/phd/RNASeq/escherichia/GCA_002843685.1.data/GCA_002843685.1_new_calls.txt", header = T, sep = "\t", fill = T)
+esch_11 <- read.table("~/phd/RNASeq/escherichia/GCA_001559675.1.data/GCA_001559675.1_new_calls.txt", header = T, sep = "\t", fill = T)
+esch_1_2 <- read.table("~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_000017765.1_merged.gff", header = T, sep = "\t", fill = T)
+esch_1_3 <- read.table("~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_000017985.1_merged.gff", header = T, sep = "\t", fill = T)
+esch_1_2_3 <- read.table("~/phd/RNASeq/combined_gff_files/esch_1-2-3_merged.gff", header = T, sep = "\t", comment.char = "", quote = "")
+#esch_1_2_3_4 <- read.table("~/phd/RNASeq/combined_gff_files/esch_1-2-3-4_merged.gff", header = T, sep = "\t", comment.char = "", quote = "") ##old version
+#file.mtime("~/phd/RNASeq/combined_gff_files/esch_1-2-3-4_merged.gff")
+
+esch_1_2_3 %>% group_by(set_val) %>% summarise(count = n())
+esch_1_2 %>% group_by(set_val) %>% summarise(count = n())
+#esch1234 %>% group_by(set_val) %>% summarise(count = n())
+
+
+
+fitchTest <- escherichiaMerged %>% select(id, number_of_features) %>% mutate(fitch = 0, prop = 0)
+
+for(i in 1:nrow(fitchTest)){
+  files_1 <- c()
+  files_all <- c()
+  id_set <- unlist(strsplit(as.character(fitchTest$id[i]), "-"))
+  for(j in 1:length(id_set)){
+    number <- unlist(strsplit(as.character(id_set[j]), "_"))
+    file_id <- paste(number[1:2], collapse = "_")
+    number <- number[3]
+    files_all <- c(files_all, file_id)
+    if(number > 0){
+      files_1 <- c(files_1, file_id)
+    }
+  }
+  files_1 <- unique(files_1)
+  files_all <- unique(files_all)
+  fitchTest$fitch[i] <- ifelse(length(files_1) == 1, "0-1", ifelse(length(files_1) == 0, "0", "1"))
+  fitchTest$prop[i] <- paste(length(files_1), length(files_all), sep = "-")
+}
+
+
+ids <- data.frame(id = ids)
+ids <- ids %>% mutate(id = as.character(id))
+
+
+
+i <- 2
+for(i in 1:nrow(ids)){
+  number <- unlist(strsplit(as.character(ids$id[i]), "_"))
+  if(length(number)  < 3){
+    ids$id[i] <- "F"
+  }else{
+    number <- number[3]
+    if(number == "0"){
+      ids$id[i] <- "F"
+    }
+  }
+}
+
+
+```
+
+```{r conservation_esch-shigella}
+escherichiaMerged <- read.table("~/phd/RNASeq/combined_gff_files/escherichia-shigella-salmonella_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
+  escherichiaMerged[is.na(escherichiaMerged)] <- 0
+
+escherichiaMerged %>% group_by(set_val) %>% summarise(count = n())
+
+```
 ###UpsetR Plots
 ```{r UpSet_Plot, echo = F}
 inputPanel(
