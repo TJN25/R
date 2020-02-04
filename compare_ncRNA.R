@@ -449,12 +449,13 @@ suppressMessages(library(comparativeSRA))
 test_setup <- F
 if(test_setup == T){
   if(initial_data == F){
-opt$gff1 <- "~/phd/RNASeq/combined_gff_files/escherichia_merged.gff"
-opt$gff2 <- "~/phd/RNASeq/combined_gff_files/shigella_merged.gff"
-opt$alignment <- "~/phd/RNASeq/alignments/Shigella-Escherichia.backbone"
-opt$id1 <- "escherichia"
-opt$id2 <- "shigella"
-opt$out_name <- "escherichia-shigella"
+opt$gff1 <- "~/phd/RNASeq/combined_gff_files/escherichia-shigella_merged.gff"
+opt$gff2 <- "~/phd/RNASeq/combined_gff_files/salmonella_merged.gff"
+opt$alignment <- "~/phd/RNASeq/alignments/escherichia-salmonella.backbone"
+opt$id1 <- "escherichia-shigella"
+opt$id2 <- "salmonella"
+opt$out_name <- "escherichia-shigella-salmonella"
+align <- T
 }else{
   initial_data <- T
 opt$gff1 <- "~/phd/RNASeq/escherichia/GCA_000017745_data/GCA_000017745.1_new_calls.txt"
@@ -495,7 +496,7 @@ if(initial_data == T){
                                       filenum2 = opt$id2,
                                       seqA = opt$s,
                                       seqB = opt$t)
-
+ncRNAgff <- ncRNAgff %>% mutate(set_val = 1)
 mergedData <- mergeSRA(ncRNAgff = ncRNAgff,
                        filenum1 = opt$id1,
                        filenum2 = opt$id2,
@@ -626,7 +627,7 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
     mutate(file_id = file_id)
   tmp[is.na(tmp)] <- 0
 
-  i <- 4
+  #i <- 4
 for(i in 1:nrow(tmp)){
   id1_list <- unlist(strsplit(tmp$id1[i], "-"))
   id2_list <- unlist(strsplit(tmp$id2[i], "-"))

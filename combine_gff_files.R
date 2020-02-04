@@ -144,43 +144,43 @@ new_feature <- T
 
 for(i in 1:(nrow(ncRNAgff))){
   ##check if the feature is already known
-  if(ncRNAgff[i,2] != "sraAlignedncRNAExpression"){
+  if(ncRNAgff$source[i] != "sraAlignedncRNAExpression"){
     new_feature <- F
   }
 
   ##if there is no current feature then set a new start value
   if(current_feature == F){
-  start_val <- ncRNAgff[i,4]
+  start_val <- ncRNAgff$start[i]
   start_i <- i
-  end_val <- ncRNAgff[i,5]
+  end_val <- ncRNAgff$end[i]
   }
 
 
 
   ##set the new end value
-  if(ncRNAgff[i, 5] > end_val){
-  end_val <- ncRNAgff[i,5]
+  if(ncRNAgff$end[i] > end_val){
+  end_val <- ncRNAgff$end[i]
   }
 
   if(i == nrow(ncRNAgff)){
     
     ##check if the subsequent feature was contained within the first feature
-    if(ncRNAgff[start_i, 5] < end_val){
-      prop_val <- (ncRNAgff[start_i, 5] - ncRNAgff[i, 4])/(end_val - start_val)
+    if(ncRNAgff$end[start_i] < end_val){
+      prop_val <- (ncRNAgff$end[start_i] - ncRNAgff$start[i])/(end_val - start_val)
     }else{
       prop_val <- 1
     }
     
-    tmp <- data.frame(sequence = ncRNAgff[i,1],
-                      feature = ncRNAgff[i,3],
+    tmp <- data.frame(sequence = ncRNAgff$sequence[i],
+                      feature = ncRNAgff$feature[i],
                       start = start_val, end = end_val,
-                      strand = ncRNAgff[i,7],
-                      file_names = paste(ncRNAgff[start_i:i, 10], collapse = ","),
+                      strand = ncRNAgff$strand[i],
+                      file_names = paste(ncRNAgff$file_name[start_i:i], collapse = ","),
                       row_numbers = paste(c(start_i:i), collapse = ","),
                       prop_overlap = prop_val,
                       new_feature = new_feature,
                       number_of_rnaseq_files = length(start_i:i),
-                      score = as.character(ncRNAgff[i,6]),
+                      score = as.character(ncRNAgff$score[i]),
                       stringsAsFactors = F)
     mergedDat <- mergedDat%>%bind_rows(tmp)
     current_feature <- F
@@ -189,28 +189,28 @@ for(i in 1:(nrow(ncRNAgff))){
     
     
   ##check if the cuurent end value overlaps with the next starting value and update the end value if it does
-  if(end_val > ncRNAgff[i + 1, 4] & ncRNAgff[i,7] == ncRNAgff[i+1, 7]){
-    end_val <- ncRNAgff[i + 1,5]
+  if(end_val > ncRNAgff$start[i + 1]){
+    end_val <- ncRNAgff$end[i + 1]
     current_feature <- T
   }else{
 
     ##check if the subsequent feature was contained within the first feature
-    if(ncRNAgff[start_i, 5] < end_val){
-    prop_val <- (ncRNAgff[start_i, 5] - ncRNAgff[i, 4])/(end_val - start_val)
+    if(ncRNAgff$end[start_i] < end_val){
+    prop_val <- (ncRNAgff$end[start_i] - ncRNAgff$start[i])/(end_val - start_val)
     }else{
       prop_val <- 1
     }
 
-    tmp <- data.frame(sequence = ncRNAgff[i,1],
-                      feature = ncRNAgff[i,3],
+    tmp <- data.frame(sequence = ncRNAgff$sequence[i],
+                      feature = ncRNAgff$feature[i],
                       start = start_val, end = end_val,
-                      strand = ncRNAgff[i,7],
-                      file_names = paste(ncRNAgff[start_i:i, 10], collapse = ","),
+                      strand = ncRNAgff$strand[i],
+                      file_names = paste(ncRNAgff$file_name[start_i:i], collapse = ","),
                       row_numbers = paste(c(start_i:i), collapse = ","),
                       prop_overlap = prop_val,
                       new_feature = new_feature,
                       number_of_rnaseq_files = length(start_i:i),
-                      score = as.character(ncRNAgff[i,6]),
+                      score = as.character(ncRNAgff$score[i]),
                       stringsAsFactors = F)
     mergedDat <- mergedDat%>%bind_rows(tmp)
     current_feature <- F
@@ -235,20 +235,4 @@ cat(paste("Writing the output to ", file_path, "/", opt$out_name, "_new_calls.tx
 write.table(x = mergedDat, file = paste(file_path, "/", opt$out_name, "_new_calls.txt", sep = ""), row.names = F, col.names = T, quote = F, sep = "\t")
 
 
-
-# ggplot() +
-#   geom_histogram(data = mergedDat%>%filter(new_feature == T), aes(x = number_of_rnaseq_files, y = ..density..), alpha = 0, binwidth = 1, colour = "Red") +
-#   geom_histogram(data = mergedDat%>%filter(new_feature == F), aes(x = number_of_rnaseq_files, y = ..density..), alpha = 0, binwidth = 1, colour = "Blue")
-#
-#
-# ggplot() +
-#   geom_density(data = mergedDat%>%filter(new_feature == T), aes(x = as.numeric(score)), colour = "Red") +
-#   geom_density(data = mergedDat%>%filter(new_feature == F), aes(x = as.numeric(score)), colour = "Blue")
-#
-# ggplot() +
-#   geom_density(data = mergedDat%>%filter(new_feature == T), aes(x = prop_overlap))
-#
-# mergedDat%>%group_by(file_names)%>%summarise(count = n())%>%arrange(-count)%>%top_n(n = 10)
-# #mergedDat%>%group_by(source)%>%summarise(count = n())
-# mergedDat%>%group_by(new_feature)%>%summarise(count = n())
 

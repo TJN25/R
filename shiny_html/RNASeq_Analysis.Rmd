@@ -1306,12 +1306,103 @@ for(i in 1:nrow(ids)){
 ```
 
 ```{r conservation_esch-shigella}
-escherichiaMerged <- read.table("~/phd/RNASeq/combined_gff_files/escherichia-shigella-salmonella_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
+escherichiaMerged <- read.table("~/phd/RNASeq/combined_gff_files/escherichia-shigella-salmonella-enterobacter-klebsiella-serratia_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
+
+file.mtime("~/phd/RNASeq/combined_gff_files/escherichia-shigella_merged.gff")
+
+
   escherichiaMerged[is.na(escherichiaMerged)] <- 0
 
 escherichiaMerged %>% group_by(set_val) %>% summarise(count = n())
 
+salm_5 <-  read.table("~/phd/RNASeq/Salmonella/GCA_002813995.1.data/GCA_002813995.1_new_calls.txt", sep = "\t", header = T, fill = T, as.is = T)
+salm_merged <-  read.table("~/phd/RNASeq/combined_gff_files/salmonella_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
+
+
+
 ```
+
+```{buildPropSet_loop}
+idSetValues <- data.frame(a.prop = c("0", "1-6", "2-5", "3-6", "2-5"), stringsAsFactors = F)
+for(j in 1:ncol(idSetValues)){
+  
+  if(substr(x = colnames(idSetValues)[j], start = nchar(colnames(idSetValues)[j]) - 4, stop = 
+           nchar(colnames(idSetValues)[j])) == ".prop"){
+    idSetValues[idSetValues[,j] == "0", j] <- "0-0"
+    propSet <- data.frame(prop  = idSetValues[,j])
+    propSet <- propSet %>% separate(prop, into = c("a", "b"), sep = "-")
+    propSet <- propSet %>% mutate(a = as.numeric(a),
+                                  b = as.numeric(b))
+    idSetValues[1,j] <- paste(sum(propSet$a), sum(propSet$b), sep = "-")
+    }
+  }
+
+propSet
+
+```
+
+```{r random_vs_real}
+realMerged <- read.table("~/phd/RNASeq/combined_gff_files/escherichia-shigella-salmonella-enterobacter-klebsiella-serratia_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
+randomMerged <- read.table("~/phd/RNASeq/combined_gff_files_random/escherichia-shigella-salmonella-enterobacter-klebsiella-serratia_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
+#file.mtime("~/phd/RNASeq/combined_gff_files/escherichia-shigella_merged.gff")
+
+
+
+realMerged %>% group_by(set_val) %>% summarise(count = n())
+randomMerged %>% group_by(set_val) %>% summarise(count = n())
+
+realDist <- realMerged %>% select(set_val, escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.prop) %>% separate(escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.prop, into = c("count", "total"), sep = "-") %>% 
+  filter(count > 1)
+randomDist <- randomMerged %>% select(set_val, escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.prop) %>% separate(escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.prop, into = c("count", "total"), sep = "-")%>% 
+  filter(count > 1)
+
+ggplot() +
+  geom_histogram(data = realDist, aes(x = as.numeric(count)/as.numeric(total),  y = ..count..), fill = "red", binwidth = 0.05) +
+  geom_histogram(data = randomDist, aes(x = as.numeric(count)/as.numeric(total),  y = ..count..), fill = "blue", binwidth = 0.05)
+
+```
+```{r conservation_analysis}
+escherichiaMerged <- read.table("~/phd/RNASeq/combined_gff_files/escherichia-shigella-salmonella-enterobacter-klebsiella-serratia_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
+
+
+##family_2
+escherichiaMerged %>% group_by(escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.fitch) %>% summarise(count = n())
+
+##family
+escherichiaMerged %>% group_by(escherichia.shigella.salmonella.enterobacter.klebsiella.fitch) %>% summarise(count = n())
+
+##genus
+escherichiaMerged %>% group_by(escherichia.shigella.salmonella.fitch) %>% summarise(count = n())
+escherichiaMerged %>% group_by(enterobacter.klebsiella.fitch) %>% summarise(count = n())
+
+##species
+escherichiaMerged %>% group_by(escherichia.shigella.fitch) %>% summarise(count = n())
+escherichiaMerged %>% group_by(enterobacter) %>% summarise(count = n())
+escherichiaMerged %>% group_by(klebsiella) %>% summarise(count = n())
+escherichiaMerged %>% group_by(serratia.fitch) %>% summarise(count = n())
+escherichiaMerged %>% group_by(salmonella.fitch) %>% summarise(count = n())
+
+
+calls <- list()
+calls$names <- c("escherichia/escherichia_calls",
+              "Shigella/shigella_calls",
+              "Salmonella/salmonella_calls",
+              "Klebsiella/klebsiella_calls",
+              "enterobacter/enterobacter_calls",
+              "Serratia/serratia_calls")
+
+
+for(i in 1:length(calls$names)){
+  print(i)
+  tmp <- read.table(paste("~/phd/RNASeq/", calls$names[i], sep = ""))
+  calls$length[i] <- nrow(tmp)
+}
+calls
+
+sum(calls$length)
+
+```
+
 ###UpsetR Plots
 ```{r UpSet_Plot, echo = F}
 inputPanel(
