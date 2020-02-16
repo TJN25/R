@@ -40,7 +40,7 @@ if ( is.null(opt$name) ) {
 
 
 suppressMessages(library(tidyverse))
-suppressMessages(library(tjnFunctions))
+suppressMessages(library(comparativeSRA))
 suppressMessages(library(IRanges))
 suppressMessages(library(stringi))
 
@@ -166,7 +166,7 @@ if(opt$method == "shuffled"){
 
 
 
-sraLength <- nrow(sra)*10
+sraLength <- nrow(sra)
 if(sraLength < 500){sraLength <- 500}
 if(sraLength > 2000){sraLength <- 2000}
 
@@ -198,22 +198,15 @@ random <- random %>% arrange(start) %>%
 
   sraLength <- nrow(sra)
   if(sraLength < 50){sraLength <- 50}
-  if(sraLength > 200){sraLength <- 200}
+  if(sraLength > 2000){sraLength <- 2000}
 
-  shifts <- round(runif(10, min = -max(fasta$right)/2, max = max(fasta$right)/2))
+  shifts <- round(runif(1, min = -max(fasta$right)/2, max = max(fasta$right)/2))
 
   random <- sra %>% mutate(start = (start + shifts[1]) %% max(fasta$right),
                            end = (end + shifts[1])%% max(fasta$right)) %>%
     select(start,end, strand)
 
-  for(i in 2:10){
-    tmp <- sra %>% mutate(start = (start + shifts[i]) %% max(fasta$right),
-                             end = (end + shifts[i])%% max(fasta$right)) %>%
-      select(start,end, strand)
-
-    random <- random %>% bind_rows(tmp)
-    rm(tmp)
-  }
+  
 random <- random %>%
   filter(start < end)
 }
@@ -249,7 +242,7 @@ query <- IRanges(random$start, random$end)
 subject <- IRanges(features$start, features$end)
 
 x <- findOverlaps(query = query, subject = subject)
-x
+
 
 
 randomPositions <- x@from
@@ -283,13 +276,10 @@ random <- random %>% mutate(type = ifelse(grepl("CDS", feature_list), "CDS", ife
 
 random <- random %>% select(startR, type)
 
-overlaps <- overlaps %>%
-  left_join(random, by = "startR")
+overlaps <- random %>%
+  left_join(overlaps, by = "startR")
 
-overlaps <- overlaps %>% select(startR, endR, strandR, sense, type) %>% unique()
 
-cat(paste("Writing the output to ", filePath, "/", opt$out_name, "_random_data.txt\n", sep = ""))
-write.table(x = overlaps, file = paste(filePath, "/", opt$out_name, "_random_data.txt", sep = ""), row.names = F, col.names = T, quote = F, sep = "\t")
 
 
 sequences <- getSequencesFast(overlaps[,], fasta.list)
@@ -320,5 +310,12 @@ write.table(x = sequences, file = paste(filePath, "/", opt$out_name, "_random_se
 write.table(x = seqSense , file = paste(filePath, "/", opt$out_name, "_random_sequences_sense.fna", sep = ""), row.names = F, col.names = F, quote = F, sep = "\n")
 write.table(x = seqAntisense , file = paste(filePath, "/", opt$out_name, "_random_sequences_antisense.fna", sep = ""), row.names = F, col.names = F, quote = F, sep = "\n")
 
+
+overlaps <- overlaps %>% 
+  mutate(strandR = "+", sense = "sense") %>% 
+  select(startR, endR, strandR, sense, type) %>% unique()
+
+cat(paste("Writing the output to ", filePath, "/", opt$out_name, "_random_data.txt\n", sep = ""))
+write.table(x = overlaps, file = paste(filePath, "/", opt$out_name, "_random_data.txt", sep = ""), row.names = F, col.names = T, quote = F, sep = "\t")
 
 #

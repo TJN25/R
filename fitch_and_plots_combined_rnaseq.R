@@ -423,7 +423,7 @@ for(i in 1:nrow(dat)){
 
 # UpsetR plots ------------------------------------------------------------
 
-dat <- read.table("~/phd/RNASeq/enterics-serratia_merged.gff", header = T, sep = "\t",
+dat <- read.table("~/phd/RNASeq/combined_gff_files/escherichia-shigella-salmonella-enterobacter-klebsiella-serratia_merged.gff", header = T, sep = "\t",
                   comment.char = "", quote = "", as.is = T )
 
 ##get list of files and individual ids
@@ -440,7 +440,8 @@ j <- 1
 
 ##test yes/no (1/NA) if an ID was found in a file
 for(i in 1:nrow(ids)){
-  uid <- ids[i,1]
+printRemaining(length = nrow(ids),i = i)
+    uid <- ids[i,1]
   uid <- unlist(strsplit(uid, "-"))
   for(j in 1:length(uid)){
     x <- paste(unlist(strsplit(uid[j], "_"))[1:2], collapse = "_")
@@ -469,8 +470,8 @@ UpSetR::upset(ids, sets = colnames(ids)[2:ncol(ids)], mb.ratio = c(0.55, 0.45), 
 
 
 ##select the genera level column from the dat dataframe
-genera <- dat%>%select(GCA_000438825.1.GCA_000747565.1, GCA_001874505.1.GCA_002303275.1, salmonella,
-                       escherichia, klebsiella)
+genera <- dat%>%select(serratia.fitch, shigella.fitch, salmonella.fitch,
+                       escherichia.fitch, klebsiella, enterobacter)
 #genera[genera == "1-1"] <- 1
 
 ##set any value that is not 0 to 1

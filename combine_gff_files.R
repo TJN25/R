@@ -13,7 +13,7 @@ spec = matrix(c(
   'quiet' , 'q', 0, "logical",
   'file_path', 'p', 2, "character",
   'out_name', 'o', 2, "character",
-  'random_data', 'r', 0, "logical"
+  'random_data', 'r', 1, "character"
 ), byrow=TRUE, ncol=4)
 
 
@@ -27,7 +27,7 @@ if ( !is.null(opt$help) ) {
   cat("Options:\n")
   cat("  -f <files> The gff files\n")
   cat("  -s <stranded data> The data is stranded\n")
-  cat("  -r <random data> The data is from the random dataset\n")
+  cat("  -r <random data> The file to remove CDS regions from\n")
   cat("  -q <quiet> Do not print any updates\n")
   cat("  -p <file path> The location of the other files and the output file\n")
   cat("  -o <output file name> The name of the output file. Do not inclue the gff file extension. The default is the same as the sra input\n")
@@ -81,8 +81,7 @@ if(is.null(opt$quiet)){
 #####
 
 file_path <- opt$file_path
-files <- list.files(opt$sra, pattern = ".gff$")
-
+files <- list.files(paste(file_path, opt$sra, sep = "/"), pattern = ".gff$")
 # import data -------------------------------------------------------------
 
 
@@ -90,7 +89,7 @@ files <- list.files(opt$sra, pattern = ".gff$")
 dat <- data.frame(sequence = as.character("0"), source = as.character("0"), feature = as.character("0"),
                   start = as.integer("0"), end = as.integer("0"), score = as.character("0"),
                   strand = as.character("0"), phase = as.character("0"), Atrribute = as.character("0"), file_name = as.character("start_row"), stringsAsFactors = F)
-
+i <- 2
 for(i in 1:length(files)){
   tmp  <- tryCatch({
     suppressWarnings(tmp <- read.table(paste(file_path, opt$sra, files[i], sep = "/"), comment.char = "#", quote = "", sep = "\t", as.is = T))
@@ -112,12 +111,17 @@ for(i in 1:length(files)){
 
   tmp <- tmp%>%mutate(file_name = files[i])%>%mutate(score = as.character(score))
 
+  if(files[i] == opt$random_data){
+    tmp <- tmp%>%
+  filter(feature != "CDS", feature != "gene", feature != "pseudogene", feature != "exon", feature != "region")
+  }else{
+  
   dat <- dat%>%bind_rows(tmp)
-
+}
 }
 if(!is.null(opt$random_data)){
-  ncRNAgff <- dat%>%
-    filter(feature != "gene", feature != "pseudogene", feature != "exon", feature != "region")
+   ncRNAgff <- dat%>%
+     filter(feature != "gene", feature != "pseudogene", feature != "exon", feature != "region")
 }else{
 ncRNAgff <- dat%>%
   filter(feature != "CDS", feature != "gene", feature != "pseudogene", feature != "exon", feature != "region")
@@ -138,7 +142,7 @@ mergedDat <- data.frame(sequence = as.character("0"), feature = as.character("0"
                         stringsAsFactors = F)
 
 ##loop through the combined gff files and combine features that overlap
-#i <- 2
+i <- 3
 current_feature <- F #is there a current feature being written?
 new_feature <- T
 
@@ -225,9 +229,9 @@ for(i in 1:(nrow(ncRNAgff))){
 
 mergedDat <- mergedDat%>%filter(number_of_rnaseq_files > 0, file_names != "start_row")
 
-if(!is.null(opt$random_data)){
-  mergedDat <- mergedDat %>% filter(file_names != opt$gff)
-}
+# if(!is.null(opt$random_data)){
+#   mergedDat <- mergedDat %>% filter(file_names != opt$gff)
+# }
 
 mergedDat <- mergedDat %>% mutate(id =  paste(opt$out_name, row_number(), sep = "_"))
 

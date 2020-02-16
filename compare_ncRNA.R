@@ -670,7 +670,8 @@ for(i in 1:nrow(tmp)){
     files_1 <- unique(files_1)
     files_all <- unique(files_all)
     if(align == F){
-      fitchTest$fitch[i] <- ifelse(length(files_1) == 1, "0-1", ifelse(length(files_1) == 0, "0", "1"))
+       fitchTest$fitch[i] <- fitchTest$set_val[i]##use for random only thgis needs removing
+      #fitchTest$fitch[i] <- ifelse(length(files_1) == 1, "0-1", ifelse(length(files_1) == 0, "0", "1"))
     }else{
       fitchTest$fitch[i] <- fitchTest$set_val[i]
     }
