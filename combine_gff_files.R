@@ -55,7 +55,8 @@ suppressMessages(library(comparativeSRA))
 
 
 if ( is.null(opt$file_path ) ) { opt$file_path = "." }
-if ( is.null(opt$out_name ) ) { opt$out_name = opt$sra }
+if ( is.null(opt$file_path ) ) { opt$file_path = "." }
+if ( is.null(opt$random_data ) ) { opt$random_data = "" }
 if(is.null(opt$stranded)){
   stranded <- F
 }else{
