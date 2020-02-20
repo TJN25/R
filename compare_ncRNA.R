@@ -120,6 +120,7 @@ if ( is.null(opt$t ) ) { opt$t= "2" }
 
 filePath <- opt$file_path
 
+if(align){
 if(grepl("/", opt$alignment) == F){
   if(grepl(".backbone", opt$alignment) == F){
   opt$alignment <- paste("~/phd/RNASeq/alignments/backbones/", opt$alignment, ".backbone", sep = "")
@@ -128,10 +129,11 @@ if(grepl("/", opt$alignment) == F){
     
   }
 }
+}
 
 # Main section ------------------------------------------------------------
 if(initial_data == T){
-  cat("Analysing initial calls (from *_new_calls.gff)\n")
+  cat(paste("Analysing initial calls from ", "~/phd/RNASeq/new_calls/", opt$gff1, "_new_calls.txt and ", "~/phd/RNASeq/new_calls/", opt$gff2, "_new_calls.txt\n", sep = ""))
   
   gff1 <- read.table(paste("~/phd/RNASeq/new_calls/", opt$gff1, "_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
   gff2 <- read.table(paste("~/phd/RNASeq/new_calls/", opt$gff2, "_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
@@ -143,7 +145,8 @@ if(initial_data == T){
                                       filenum1 = opt$id1,
                                       filenum2 = opt$id2,
                                       seqA = opt$s,
-                                      seqB = opt$t)
+                                      seqB = opt$t,
+                                quiet = T)
 ncRNAgff <- ncRNAgff %>% mutate(set_val = 1)
 mergedData <- mergeSRA(ncRNAgff = ncRNAgff,
                        filenum1 = opt$id1,
