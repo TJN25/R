@@ -2,380 +2,20 @@
 
 ##Seems to all be working
 
-# functions ---------------------------------------------------------------
-
-
-mergeSRATest <- function(ncRNAgff, gff1, gff2, time.it = T, quiet = F, filenum1 = "1", filenum2 = "2", print_log = F, align = T){
-  error_message <- "Either gff1 and gff2 or ncRNAgff are needed:\n"
-  stop_val <- 0
-  log_file = ""
-  if(missing(gff1)){
-    error_message <- paste(error_message, "\tArugment gff1 missing\n", sep = "")
-    stop_val <- stop_val + 1
-  }else{
-    gff1 <- gff1%>%mutate(filenum = filenum1)
-  }
-
-  if(missing(gff2)){
-    error_message <- paste(error_message, "\tArugment gff2 missing\n", sep = "")
-    stop_val <- stop_val + 1
-  }else{
-    gff2b <- gff2%>%mutate(filenum = filenum2)
-  }
-
-
-  if(stop_val > 0){
-    if(missing(ncRNAgff)){
-      error_message <- paste(error_message, "\tArugment ncRNAgff missing\n", sep = "")
-      stop(error_message)
-    }
-  }
-  if(missing(ncRNAgff)){
-    ncRNAgff <- gff2b%>%bind_rows(gff1)%>%unique()
-  }else{
-    if(quiet == F){
-      cat("Using the ncRNAgff dataframe:\n")
-    }
-  }
-
-  ptm <- proc.time()
-
-  ncRNAgff <- ncRNAgff%>%arrange(start)%>%arrange(strand)
-
-
-  mergedDat <- data.frame(sequence = as.character("0"), feature = as.character("0"),
-                          start = as.integer("0"), end = as.integer("0"),
-                          strand = as.character("0"), file_names = as.character("start_row"),
-                          row_numbers = as.character("0"), prop_overlap = as.numeric(0), feature_match = F,
-                          number_of_features = as.integer("0"),
-                          score = as.character("0"),
-                          new_feature = F,
-                          number_of_rnaseq_files = as.integer("0"),
-                          id1 = as.character("0"),
-                          id2 = as.character("0"),
-                          set_val_1 = as.character("0"),
-                          set_val_2 = as.character("0"),
-                          stringsAsFactors = F)
-
-  ##loop through the combined gff files and combine features that overlap
-  i <- 2
-  current_feature <- F #is there a current feature being written?
-  new_feature <- F
-  for(i in 1:(nrow(ncRNAgff) - 1)){
-
-    if(quiet ==F){
-      printRemaining(i <- i, length = nrow(ncRNAgff) - 1, increment = 5)
-    }
-
-
-    if(ncRNAgff$start[i] < 0 && align == T){
-      start_val <- ncRNAgff$start[i]
-      start_i <- i
-      end_val <- ncRNAgff$end[i]
-
-      feature_matched <- ifelse(length(unique(ncRNAgff[start_i:i, 14])) > 1, T, F)
-      prop_val <- 1
-      idRows <- ncRNAgff[start_i:i,]
-      id1_val <- idRows[idRows[,16] == filenum1,14]
-      id2_val <- idRows[idRows[,16] == filenum2,14]
-      if(is_empty(id1_val)){
-
-        id_vals <- unlist(strsplit(filenum1, "-"))
-
-        id_vals <- paste(id_vals, "_0", sep = "")
-
-        id1_val <- paste(id_vals, collapse = "-")
-      }
-      if(is_empty(id2_val)){
-
-        id_vals <- unlist(strsplit(filenum2, "-"))
-
-        id_vals <- paste(id_vals, "_0", sep = "")
-
-        id2_val <- paste(id_vals, collapse = "-")
-      }
-
-
-      set_val1 <- ifelse(filenum1 == ncRNAgff$file_id[i], ncRNAgff$set_val[i], 0)
-
-      set_val2 <- ifelse(filenum2 == ncRNAgff$file_id[i], ncRNAgff$set_val[i], 0)
-
-
-
-
-      if(is_empty(set_val1)){
-        set_val1 <- "0"
-      }
-      if(is_empty(set_val2)){
-        set_val2 <- "0"
-      }
-
-
-
-
-      #id1_val <- "1"
-      #id2_val <- "2"
-
-
-      tmp <- data.frame(sequence = ncRNAgff[i,1],
-                        feature = ncRNAgff[i,2],
-                        start = start_val, end = end_val,
-                        strand = ncRNAgff[i,5],
-                        file_names = paste(unique(ncRNAgff[start_i:i, 16]), collapse = ","),
-                        row_numbers = paste(c(start_i:i), collapse = ","),
-                        prop_overlap = prop_val,
-                        feature_match = feature_matched,
-                        number_of_features = sum(ncRNAgff$number_of_features[start_i:i]),
-                        score = as.character(ncRNAgff[i,11]),
-                        new_feature = !(F %in% ncRNAgff[start_i:i, 12]),
-                        number_of_rnaseq_files = sum(as.integer(ncRNAgff[start_i:i, 10])),
-                        id1 = id1_val,
-                        id2 = id2_val,
-                        set_val_1 = as.character(set_val1),
-                        set_val_2 = as.character(set_val2),
-                        stringsAsFactors = F)
-      mergedDat <- mergedDat%>%bind_rows(tmp)
-
-
-      next
-    }
-
-
-
-    ##if there is no current feature then set a new start value
-    if(current_feature == F){
-      start_val <- ncRNAgff[i,3]
-      start_i <- i
-      end_val <- ncRNAgff[i,4]
-    }
-
-
-
-    ##set the new end value
-    if(ncRNAgff[i, 4] >= end_val){
-      end_val <- ncRNAgff[i,4]
-    }
-
-    if(ncRNAgff[i, 3] <= start_val){
-      start_val <- ncRNAgff[i,3]
-    }
-#& ncRNAgff[i,5] == ncRNAgff[i+1, 5] strand has been removed
-    ##check if the current end value overlaps with the next starting value and update the end value if it does
-    if(end_val >= ncRNAgff[i + 1, 3] ){
-      if(ncRNAgff[i + 1, 4] >= end_val){
-        end_val <- ncRNAgff[i + 1,4]
-      }
-
-      if(ncRNAgff[i + 1, 3] <= start_val){
-        start_val <- ncRNAgff[i + 1,3]
-      }
-      current_feature <- T
-    }else{
-
-      ##check if the subsequent feature was contained within the first feature
-      if(ncRNAgff[start_i, 4] <= end_val){
-        prop_val <- (ncRNAgff[start_i, 4] - ncRNAgff[i, 3])/(end_val - start_val)
-      }else{
-        prop_val <- 1
-      }
-      feature_matched <- ifelse(length(unique(ncRNAgff[start_i:i, 14])) > 1, T, F)
-
-
-
-        idRows <- ncRNAgff[start_i:i,]
-        id1_val <- paste(idRows$id[idRows$file_id == filenum1], collapse = "-")
-        id2_val <- paste(idRows$id[idRows$file_id == filenum2], collapse = "-")
-
-        if(id1_val == ""){
-          id_vals <- unlist(strsplit(filenum1, "-"))
-
-          id_vals <- paste(id_vals, "_0", sep = "")
-
-          id1_val <- paste(id_vals, collapse = "-")
-        }
-
-        if(id2_val == ""){
-          id_vals <- unlist(strsplit(filenum2, "-"))
-
-          id_vals <- paste(id_vals, "_0", sep = "")
-
-          id2_val <- paste(id_vals, collapse = "-")
-          }
-
-
-
-        set_val_1 <- idRows$set_val[idRows$file_id == filenum1]
-        set_val_2 <- idRows$set_val[idRows$file_id == filenum2]
-
-        set_val_1 <- interset_all(set_val_1)
-        set_val_2 <- interset_all(set_val_2)
-
-
-        if(set_val_1 == ""){
-          set_val_1 <- "0"
-        }
-        if(set_val_2 == ""){
-          set_val_2 <- "0"
-        }
-
-
-
-
-        tmp <- data.frame(sequence = ncRNAgff[i,1],
-                          feature = ncRNAgff[i,2],
-                          start = start_val, end = end_val,
-                          strand = ncRNAgff[i,5],
-                          file_names = paste(unique(ncRNAgff[start_i:i, 16]), collapse = ","),
-                          row_numbers = paste(c(start_i:i), collapse = ","),
-                          prop_overlap = prop_val,
-                          feature_match = feature_matched,
-                          number_of_features = sum(ncRNAgff$number_of_features[start_i:i]),
-                          score = as.character(ncRNAgff[i,11]),
-                          new_feature = !(F %in% ncRNAgff[start_i:i, 12]),
-                          number_of_rnaseq_files = sum(as.integer(ncRNAgff[start_i:i, 10])),
-                          id1 = id1_val,
-                          id2 = id2_val,
-                          set_val_1 = set_val_1,
-                          set_val_2 = set_val_2,
-                          stringsAsFactors = F)
-        mergedDat <- mergedDat%>%bind_rows(tmp)
-
-      current_feature <- F
-      new_feature <- F
-    }
-  }
-
-  runningTime <- proc.time() - ptm
-  if(time.it){
-    if(quiet == F){
-      printRunningTime(runningTime = runningTime)
-    }
-  }
-
-  if(print_log){
-    cat(log_file)
-  }
-
-  mergedDat <- mergedDat%>%filter(number_of_features > 0, file_names != "start_row")
-  return(mergedDat)
-
-}
-
-reorderGFFTest <- function(ref, gff, time.it = T, quiet = F, reference.genome = F){
-  ref2 <- ref%>%arrange(start.b)
-
-  ptm <- proc.time()
-
-  if(reference.genome == F){
-    for(i in 1:nrow(gff)){
-      if(quiet == F){
-        printRemaining(i = i, length = nrow(gff), increment = 5)
-      }
-      start_val <- gff[i, 3]
-      end_val <- gff[i, 4]
-      for(j in 1:nrow(ref2)){
-        if(start_val >= ref2[j,4] && start_val <= ref2[j,5]){
-          gff[i,3] <- gff[i,3] + ref2[j, 7]
-          gff[i,4] <- gff[i,4] + ref2[j, 7]
-          gff[i, 17] <- T
-        }
-      }
-
-    }
-  }else{
-    for(i in 1:nrow(gff)){
-      if(quiet == F){
-        printRemaining(i = i, length = nrow(gff), increment = 5)
-      }
-      start_val <- gff[i, 3]
-      end_val <- gff[i, 4]
-      for(j in 1:nrow(ref2)){
-        if(start_val >= ref2[j,1] && start_val <= ref2[j,2]){
-          gff[i, 17] <- T
-        }
-      }
-
-    }
-  }
-
-  runningTime <- proc.time() - ptm
-  if(time.it){
-    if(quiet == F){
-      printRunningTime(runningTime = runningTime)
-    }
-  }
-  gff <- gff%>%filter(changed == T)
-  return(gff)
-}
-
-alignAndCombineTest <- function(reference, gff1, gff2, time.it = T, quiet = F, filenum1 = "1", filenum2 = "2", seqA = 1, seqB = 2){
-
-  referenceEsch1Serr1 <- read.table(reference, header = T, as.is = T)
-  referenceEsch1Serr1Built <- buildReferenceLookup(reference = referenceEsch1Serr1,
-                                                   as.numeric(seqA), seqB = as.numeric(seqB),
-                                                   collapse.alignment = T,
-                                                   quiet = quiet)
-
-  esch1 <- gff1
-  serr1 <- gff2
-
-  esch1 <- esch1%>%mutate(changed = F)#%>%
-    #dplyr:: mutate(id = paste(filenum1, row_number(), sep = "_"))
-  serr1 <- serr1%>%mutate(changed = F)#%>%
-    #dplyr::mutate(id = paste(filenum2, row_number(), sep = "_"))
-
-
-
-  serr1b <- reorderGFFTest(ref = referenceEsch1Serr1Built, gff = serr1, time.it = time.it, quiet = quiet)
-  esch1b <- reorderGFFTest(ref = referenceEsch1Serr1Built, gff = esch1, reference.genome = T, time.it = time.it, quiet = quiet)
-
-  serr1b <- serr1b%>%mutate(filenum = filenum2)
-  esch1b <- esch1b%>%mutate(filenum = filenum1)
-  ncRNAgff <- esch1b%>%bind_rows(serr1b)
-
-
-  serr1 <- serr1%>%mutate(filenum = filenum2)
-  esch1 <- esch1%>%mutate(filenum = filenum1)
-  ncRNAgffUnchanged <- esch1%>%bind_rows(serr1)
-  tmp1 <- ncRNAgff %>% select(id) %>% mutate(found = T)
-  tmp2 <- ncRNAgffUnchanged %>% select(id)
-  tmp1 <- tmp1 %>% full_join(tmp2, by = "id") %>% filter(is.na(found)) %>% mutate(found = F)
-
-  otherncRNA <- ncRNAgffUnchanged %>% full_join(tmp1, by = "id") %>% filter(found == F) %>% select(-found) %>%
-    mutate(start = -start, end = -end)
-
-  ncRNAgff <- ncRNAgff %>% bind_rows(otherncRNA)
-
-  return(ncRNAgff)
-
-}
-
-interset_all <- function(set_val){
-  setList <- list()
-  for(j in 1:length(set_val)){
-    value <- set_val[j]
-    setList[j] <- strsplit(as.character(value), "-")
-  }
-
-  set_val <- paste(Reduce(intersect, setList), collapse = "-")
-  return(set_val)
-}
-
-
-
 
 # getopts -----------------------------------------------------------------
-
+print(1)
 
 
 suppressMessages(library('getopt'))
 
 
 spec = matrix(c(
+  'gff1' , 'r', 1, "character",
   'gff2', 'g', 1, "character",
   'help' , 'h', 0, "logical",
   'initial_data' , 'i', 0, "logical",
-  'gff1' , 'r', 1, "character",
+#  'intergenic' , 'j', 0, "logical",
   'alignment' , 'a', 1, "character",
   'file_path', 'p', 2, "character",
   'out_name', 'o', 2, "character",
@@ -385,9 +25,9 @@ spec = matrix(c(
   'seq2', 't', 2, "character"
 ), byrow=TRUE, ncol=4)
 
-
+print(2)
 opt = getopt(spec)
-
+print(3)
 if ( !is.null(opt$help) ) {
   cat("sraPlotGenomeAlignment.R version 1.0\n")
   cat(" \n")
@@ -404,6 +44,7 @@ if ( !is.null(opt$help) ) {
   cat("  -t <seq2 column> The column number for seq 2\n")
   cat("  -o <output file name> The name of the output file. Do not inclue the gff file extension. The default is the same as the sra input\n")
   cat("  -i <initial data> the input data is the output from combine_gff_files.R\n")
+  cat("  -j <intergenic data> the file locations are different\n")
   cat("  \n")
   q(status=1)
 }
@@ -419,14 +60,11 @@ if ( !is.null(opt$initial_data) ) {
 
 
 if ( is.null(opt$gff2) ) {
-  if(clean_data == F){
   cat("Error: -g <other gff file> is required.\n")
   q(status=1)
-  }
 }
 if ( is.null(opt$gff1) ) {
   cat("Error: -r <reference gff file> is required.\n")
-
   q(status=1)
 }
 
@@ -449,13 +87,15 @@ suppressMessages(library(comparativeSRA))
 test_setup <- F
 if(test_setup == T){
   if(initial_data == F){
-opt$gff1 <- "~/phd/RNASeq/combined_gff_files/escherichia-shigella_merged.gff"
-opt$gff2 <- "~/phd/RNASeq/combined_gff_files/salmonella_merged.gff"
+opt$gff1 <- "~/phd/RNASeq/combined_gff_files/esch_1-2-3_merged.gff"
+opt$gff2 <- "~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_900186905.1_merged.gff"
 opt$alignment <- "~/phd/RNASeq/alignments/escherichia-salmonella.backbone"
-opt$id1 <- "escherichia-shigella"
-opt$id2 <- "salmonella"
-opt$out_name <- "escherichia-shigella-salmonella"
-align <- T
+opt$id1 <- "esch_1-2-3"
+opt$id2 <- "GCA_900186905.1"
+opt$out_name <- "esch_1-2-3-15"
+opt$file_path <- "~/phd/RNASeq/combined_gff_files/"
+align <- F
+initial_data <- F
 }else{
   initial_data <- T
 opt$gff1 <- "~/phd/RNASeq/escherichia/GCA_000017745_data/GCA_000017745.1_new_calls.txt"
@@ -475,19 +115,29 @@ opt$out_name <- "escherichia_1-2"
 
 if ( is.null(opt$file_path ) ) { opt$file_path = "." }
 if ( is.null(opt$out_name ) ) { opt$out_name = paste(opt$x, opt$y, sep = "-") }
-if ( is.null(opt$x ) ) {  opt$x = "1" }
-if ( is.null(opt$y ) ) { opt$y = "2" }
+if ( is.null(opt$x ) ) {  opt$x = opt$gff1 }
+if ( is.null(opt$y ) ) { opt$y = opt$gff2 }
 if ( is.null(opt$s ) ) {  opt$s = "1" }
 if ( is.null(opt$t ) ) { opt$t= "2" }
 
 filePath <- opt$file_path
 
+if(grepl("/", opt$alignment) == F){
+  if(grepl(".backbone", opt$alignment) == F){
+  opt$alignment <- paste("~/phd/RNASeq/alignments/backbones/", opt$alignment, ".backbone", sep = "")
+  }else{
+    opt$alignment <- paste("~/phd/RNASeq/alignments/backbones/", opt$alignment, sep = "")
+    
+  }
+}
+
 # Main section ------------------------------------------------------------
 if(initial_data == T){
   cat("Analysing initial calls (from *_new_calls.gff)\n")
   
-  gff1 <- read.table(opt$gff1, sep = "\t", header = T, as.is = T)
-  gff2 <- read.table(opt$gff2, sep = "\t", header = T, as.is = T)
+  gff1Dat <- read.table(paste("~/phd/RNASeq/new_calls/", opt$gff1, "_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
+  gff2Dat <- read.table(paste("~/phd/RNASeq/new_calls/", opt$gff2, "_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
+
   
   ncRNAgff <- alignAndCombine(reference = opt$alignment,
                                       gff1 = gff1,
@@ -562,18 +212,14 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
 
 }else{
 
-
-
-   # opt$gff1 <- "~/phd/RNASeq/combined_gff_files/esch_1-2-3-4-5_merged.gff"
-   # opt$gff2 <- "~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_001559675.1_merged.gff"
-   # align <- F
-
- 
   
-  
-  gff1Dat <- read.table(opt$gff1, sep = "\t", header = T, as.is = T)
-  gff2Dat <- read.table(opt$gff2, sep = "\t", header = T, as.is = T)
-
+  if(is.null(opt$intergenic)){
+  gff1Dat <- read.table(paste("~/phd/RNASeq/combined_gff_files/", opt$gff1, "_merged.gff", sep = ""), sep = "\t", header = T, as.is = T)
+  gff2Dat <- read.table(paste("~/phd/RNASeq/combined_gff_files/", opt$gff2, "_merged.gff", sep = ""), sep = "\t", header = T, as.is = T)
+  }else{
+    gff1Dat <- read.table(paste("~/phd/RNASeq/combined_gff_files_random/", opt$gff1, "_merged.gff", sep = ""), sep = "\t", header = T, as.is = T)
+    gff2Dat <- read.table(paste("~/phd/RNASeq/combined_gff_files_random/", opt$gff2, "_merged.gff", sep = ""), sep = "\t", header = T, as.is = T)
+  }
 
   gff1Working <- gff1Dat %>% mutate(row_numbers = as.character(row_numbers))
   gff2Working <- gff2Dat %>% mutate(row_numbers = as.character(row_numbers))
@@ -596,7 +242,14 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
   }else{
     ncRNAgff <- gff1Working%>%bind_rows(gff2Working)
     ncRNAgff[is.na(ncRNAgff)] <- 0
-}
+  }
+  
+  if(test_setup == T){
+  mergeSRAData <- list(ncRNAgff = ncRNAgff, filenum1 = filenum1, filenum2 = filenum2, initial_data = initial_data, align = align)
+  save(mergeSRAData, file = "~/bin/r_git/R/mergeSRAData.Rda")
+  
+  }
+  
   mergedData <- mergeSRA(ncRNAgff = ncRNAgff,
                          filenum1 = filenum1,
                          filenum2 = filenum2,
