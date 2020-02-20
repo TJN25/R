@@ -244,8 +244,7 @@ DT::datatable(sra_rnaseq_files, filter = "top")
   })
 
 
-#list.dirs(path = "~/phd/RNASeq/", full.names = TRUE, recursive = F)
-
+##add another section to this where a genus can be selected and it generates a table of accessions with the number of suitable RNASeq datasets available
 ```
 
 
@@ -274,7 +273,7 @@ A plot file is produced. This contains a number for each nucleotide that indicat
 * [_compare\_ncRNA.R_](#section-compare_ncrna.r) _-r \<GFF 1\> -g \<GFF 2\> -a \<Aligment File\> -x \<File ID 1\> -y \<File ID 2\>  -s \<Alignment position for File 1\> -t \<Alignment position for File 2\>  -o \<Output Name\>_
 
 
-```{r tree_viewer_app, echo=FALSE, include=T, eval=T}
+```{r tree_viewer, echo=FALSE, include=T, eval=T}
 
 # shinyAppFile(appFile = "/Users/thomasnicholson/bin/tree-subset-shiny/app.R", options = list(
 #     width = "100%", height = 1000
@@ -284,13 +283,15 @@ A plot file is produced. This contains a number for each nucleotide that indicat
 selectInput(
               inputId = "tree_file",
               label = "Select Tree File:",
-              choices = c("All" = "~/phd/RNASeq/alignments/all_alignments/all.guide_tree", 
+              choices = c("All" = "~/phd/RNASeq/alignments/all_alignments/genera_11.guide_tree", 
+                          "Subset of All" = "~/phd/RNASeq/alignments/all_alignments/genera_10_pseudomonas_missing.guide_tree", 
                           "Escherichia" = "~/phd/RNASeq/alignments/all_alignments/escherichia.guide_tree",
                           "Shigella" = "~/phd/RNASeq/alignments/all_alignments/Shigella.tree",
                           "Salmonella" = "~/phd/RNASeq/alignments/all_alignments/salmonella.guide_tree", 
                           "Klebsiella" = "~/phd/RNASeq/alignments/all_alignments/Klebsiella.tree", 
                           "Enterobacter" = "~/phd/RNASeq/alignments/all_alignments/Enterobacter.tree",
-                          "Serratia" = "~/phd/RNASeq/alignments/all_alignments/serratia.guide_tree"),
+                          "Serratia" = "~/phd/RNASeq/alignments/all_alignments/serratia.guide_tree",
+                          "Escherichia-Shigella" = "~/phd/RNASeq/alignments/all_alignments/escherichia_shigella.guide_tree"),
               selected = "All"
             )
 
@@ -302,7 +303,7 @@ renderPlot({
 
   ggtree(tree) + 
   geom_tiplab() +
-  xlim(0,0.5)
+  xlim(0,0.8)
 
 })
 
@@ -319,7 +320,8 @@ selectInput(
               inputId = "alignment_file",
               label = "Select Alignment File:",
               choices = c("-",
-                          "All" = "~/phd/RNASeq/alignments/all_alignments/all", 
+                          "All" = "~/phd/RNASeq/alignments/all_alignments/all_new", 
+                          "Subset of All" = "~/phd/RNASeq/alignments/all_alignments/all",
                           "Escherichia" = "~/phd/RNASeq/alignments/all_alignments/escherichia",
                           "Shigella" = "~/phd/RNASeq/alignments/all_alignments/Shigella",
                           "Salmonella" = "~/phd/RNASeq/alignments/all_alignments/salmonella", 
@@ -332,9 +334,16 @@ selectInput(
 
 renderPlot({
 if(input$alignment_file != "-"){
-  bbone <- read_mauve_backbone(file = paste(input$alignment_file, ".backbone", sep = ""), ref = 1, gene_type = "side_blocks",
+  if(input$alignment_file == "~/phd/RNASeq/alignments/all_alignments/all_new"){
+      bbone <- read_mauve_backbone(file = paste(input$alignment_file, ".backbone", sep = ""), ref = 7, gene_type = "side_blocks",
+header = TRUE, filter_low = 10,
+common_blocks_only = F)
+  }else{
+      bbone <- read_mauve_backbone(file = paste(input$alignment_file, ".backbone", sep = ""), ref = 1, gene_type = "side_blocks",
 header = TRUE, filter_low = 1000,
 common_blocks_only = F)
+  }
+
 
 
 #     bbone <- read_mauve_backbone(file = "~/phd/RNASeq/alignments/all_alignments/Enterobacter.backbone", ref = 1, gene_type = "side_blocks",
@@ -384,9 +393,11 @@ bbone <- mauvePlotColourChange(bbone = bbone)
                            "text/.gff")
               )
 
+checkboxInput("file_header", value = T, label = "Use headers")
+
 renderDataTable({
   if(!is.null(input$upload_file)){ 
-   dat <- read.table(input$upload_file$datapath, sep = "\t", header = T, as.is = T)
+   dat <- read.table(input$upload_file$datapath, sep = "\t", header = input$file_header, as.is = T)
    renderDataTable({
      
    }) 
@@ -400,11 +411,255 @@ renderDataTable({
 
 ###Summary of Output Data
 
-```{r counts_at_each_step}
+```{r counts_at_each_step, echo = F, include=F}
+
+genera <- c("Escherichia", "Shigella", "Salmonella", "Enterobacter", "Klebsiella", "Serratia")
+file_path <- "~/phd/RNASeq/genera/"
+# i <- genera[1]
+# j <- folders[4]
+# k <- sra_calls[1]
+
+accessionsList <- list()
+total_number_of_plot_files <- 0
+total_number_of_calls <- 0
+total_number_of_known_rnas <- 0
+total_sRNAs <- 0
+for(i in genera){
+  folders <- list.files(paste(file_path, i, sep = "/"), pattern = ".data$")
+  accessionsList[[i]]$strains <- folders
+  for(j in folders){
+
+      gff <- list.files(paste(file_path, i, j, "gff_files", sep = "/"), pattern = ".gff$")
+      sra_calls <- list.files(paste(file_path, i, j, "gff_files", sep = "/"), pattern = "_sra_calls.gff$")
+      gca <- list.files(paste(file_path, i, j, "gff_files", sep = "/"), pattern = "GCA")
+      accessionsList[[i]][[j]]$individual_files <- gff
+      accessionsList[[i]][[j]]$number_of_plot_files <- length(sra_calls)
+      total_number_of_plot_files <- total_number_of_plot_files + length(sra_calls)
+      for(k in 1:length(gff)){
+       lines <- system(command = paste("grep -v 'CDS' ", file_path, "/", i, "/", j, "/", "gff_files/", gff[k], " | grep -v 'gene' | wc -l ", sep = ""), intern = T)
+         accessionsList[[i]][[j]]$individual_lengths[k] <-  as.numeric(strsplit(lines, "\\s+")[[1]][2]) -1
+      } 
+      
+      for(k in 1:length(sra_calls)){
+               lines <- system(command = paste("grep -v 'CDS' ", file_path, "/", i, "/", j, "/", "gff_files/", sra_calls[k], " | grep -v 'gene' | wc -l ", sep = ""), intern = T)
+        total_number_of_calls <- total_number_of_calls +  as.numeric(strsplit(lines, "\\s+")[[1]][2]) -1
+      }
+      
+            for(k in 1:length(gca)){
+               lines <- system(command = paste("grep -v 'CDS' ", file_path, "/", i, "/", j, "/", "gff_files/", gca[k], " | grep -v 'gene' | wc -l ", sep = ""), intern = T)
+        total_number_of_known_rnas <- total_number_of_known_rnas +  as.numeric(strsplit(lines, "\\s+")[[1]][2]) -1
+      }
+
+      
+      new_calls_file <- list.files(paste(file_path, i, j, sep = "/"), pattern = "new_calls.txt$")
+      newCalls <- read.table(paste(file_path, i, j, new_calls_file, sep = "/"), header = T, comment.char = "#", quote = "", sep = "\t", as.is = T)
+      accessionsList[[i]][[j]]$new_calls_feature_count <- nrow(newCalls)
+      accessionsList[[i]][[j]]$rnaseq_feature_count <- sum(accessionsList[[i]][[j]]$individual_lengths)
+      accessionsList[[i]][[j]]$new_calls_rnaseq_feature_count <- sum(newCalls$number_of_rnaseq_files)
+      total_sRNAs <- total_sRNAs + nrow(newCalls)
+  }
+}
 
 
+
+file_path <- "~/phd/RNASeq/combined_gff_files/"
+combinedList <- list()
+files <- list.files(path = file_path, pattern = ".gff$")
+for(i in files){
+  
+         lines <- system(command = paste("wc -l ", file_path, "/", i, sep = ""), intern = T)
+         combinedList[[i]]$number_of_features <-  as.numeric(strsplit(lines, "\\s+")[[1]][2]) -1 
+    
+}
+
+file_path <- "~/phd/RNASeq/combined_gff_files_random/"
+combinedListRandom <- list()
+files <- list.files(path = file_path, pattern = ".gff$")
+for(i in files){
+  
+         lines <- system(command = paste("wc -l ", file_path, "/", i, sep = ""), intern = T)
+         combinedListRandom[[i]]$number_of_features <-  as.numeric(strsplit(lines, "\\s+")[[1]][2]) -1 
+    
+}
+
+
+calls <- list()
+calls$names <- c("genera/Escherichia/escherichia_calls",
+              "genera/Shigella/shigella_calls",
+              "genera/Salmonella/salmonella_calls",
+              "genera/Klebsiella/klebsiella_calls",
+              "genera/Enterobacter/enterobacter_calls",
+              "genera/Serratia/serratia_calls")
+calls$names_random <- c("genera/Escherichia/escherichia_random_calls",
+              "genera/Shigella/shigella_random_calls",
+              "genera/Salmonella/salmonella_random_calls",
+              "genera/Klebsiella/klebsiella_random_calls",
+              "genera/Enterobacter/enterobacter_random_calls",
+              "genera/Serratia/serratia_random_calls")
+
+for(i in 1:length(calls$names)){
+  tmp <- read.table(paste("~/phd/RNASeq/", calls$names[i], sep = ""), header = T)
+  calls$length[i] <- nrow(tmp)
+  calls$known_feaures[i] <- tmp %>% filter(grepl(x = file_names, pattern = "GCA_") ==T) %>% nrow()
+  calls$new_feaures[i] <- tmp %>% filter(grepl(x = file_names, pattern = "GCA_") ==F) %>% nrow()
+  calls$expressed_regions[i] <- tmp %>% filter(grepl(x = file_names, pattern = "sra_calls")) %>% nrow()
+
+}
+
+for(i in 1:length(calls$names_random)){
+  tmp <- read.table(paste("~/phd/RNASeq/", calls$names_random[i], sep = ""), fill = T, header = T)
+  calls$length_random[i] <- nrow(tmp)
+}
+for(i in 1:length(calls$names_random)){
+  tmp <- read.table(paste("~/phd/RNASeq/", calls$names_random[i], sep = ""), fill = T, header = T)
+  tmp <- tmp %>% filter(feature == "intergenic")
+  calls$length_intergenic[i] <- nrow(tmp)
+}
+for(i in 1:length(calls$names_random)){
+  tmp <- read.table(paste("~/phd/RNASeq/", calls$names_random[i], sep = ""), fill = T, header = T)
+  tmp <- tmp %>% filter(feature == "CDS")
+  calls$length_cds[i] <- nrow(tmp)
+}
+
+
+
+sum(calls$length)
+sum(calls$known_feaures)
+sum(calls$new_feaures)
+sum(calls$expressed_regions)
+sum(calls$length_random)
+sum(calls$length_intergenic)
+sum(calls$length_cds)
+
+combined_sRNAs <-combinedList[["escherichia-shigella-salmonella-enterobacter-klebsiella-serratia_merged.gff"]]$number_of_features
+
+combined_random <-combinedListRandom[["escherichia-shigella-salmonella-enterobacter-klebsiella-serratia_merged.gff"]]$number_of_features
+ 
 
 ```
+
+* From 21 strains and 6 genera, there were `r total_number_of_plot_files` RNASeq files. 
+    + _Escherichia_ and _Shigella_ are separated in the pyhlogenetic tree for this data
+* This resulted in `r prettyNum(total_number_of_calls, big.mark = ",", scientific =  F)` expressed regions being predicted.
+* There were `r prettyNum(total_number_of_known_rnas, big.mark = ",", scientific =  F)` known ncRNAs included in the analysis.
+
+***
+
+* After combining all the individual calls for each genome there were a total of `r prettyNum(total_sRNAs, big.mark = ",", scientific =  F)` putative sRNAs.
+* This was reduced down to `r prettyNum(combined_sRNAs, big.mark = ",", scientific =  F)` putative sRNAs after combining features that overlapped between genomes.
+
+* For each sRNA that was predicted, a random intergenic region was selected.
+    + the file containing all calls for a given genome was used.
+    + this was done by randomly adding or subtracting a value from _1_ to _n_ where _n_ was half the length of the genome.
+* The same merging steps were then carried out.
+* There were `r sum(calls$length_random)` random regions chosen
+    + Of these, `r sum(calls$length_intergenic)` were intergenic.
+    + Analysis comparing intergenic and CDS regions will also be carried out.
+* There were `r prettyNum(combined_random, big.mark = ",", scientific =  F)` random regions once the combining steps were complete.
+
+
+###Analysis of Conservation
+
+```{r conservation_of_sRNAs, eval = T}
+
+tree <- read.tree("~/phd/RNASeq/alignments/all_alignments/all.guide_tree")
+
+nodes <- data.frame(tree$edge)
+
+nodes$distances <- tree$edge.length
+
+labels <- data.frame(names = tree$tip.label, X2 = c(1:length(tree$tip.label)))
+
+treeDat <- nodes %>% full_join(labels)
+
+treeLengths <- list()
+
+for(i in tree$tip.label){
+  initial_row <- treeDat %>% filter(names == i)
+  initial_row <- as.character(initial_row[1,])
+  treeLengths[[i]]$positions <- initial_row[1:2]
+  treeLengths[[i]]$distances <- as.numeric(initial_row[3])
+  if(treeLengths[[i]]$positions[1] %in% treeDat$X2){
+    treeLengths <- getTreeLengths(treeLengths, treeDat, name = i)
+  }
+  
+  treeLengths[[i]]$overall_distance <- sum(treeLengths[[i]]$distances)
+}
+
+
+sRNAs <- read.table("~/phd/RNASeq/combined_gff_files/version_1/escherichia-shigella-salmonella-enterobacter-klebsiella-serratia_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
+
+
+
+sRNAs[sRNAs == "1-0"] <- "0-1"
+
+sRNAs <- sRNAs %>% mutate(escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.fitch = ifelse(escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.fitch == "0-1", 
+                                                                                      ifelse(escherichia.shigella.salmonella.enterobacter.klebsiella.fitch == "0-1", 
+                                                                                             ifelse(serratia.fitch == "0-1",
+                                                                                                    "1",
+                                                                                                    "0-1"), 
+                                                                                             "0-1"),
+                                                                                      escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.fitch))
+
+
+
+sRNAs <- sRNAs %>% mutate(escherichia.shigella.salmonella.enterobacter.klebsiella.fitch = ifelse(escherichia.shigella.salmonella.enterobacter.klebsiella.fitch == "0-1", 
+                                                                                      ifelse(escherichia.shigella.salmonella.fitch == "0-1", 
+                                                                                             ifelse(enterobacter.klebsiella.fitch == "0-1",
+                                                                                                    "1",
+                                                                                                    "0-1"), 
+                                                                                             "0-1"),
+                                                                                      escherichia.shigella.salmonella.enterobacter.klebsiella.fitch))
+
+
+sRNAs <- sRNAs %>% mutate(escherichia.shigella.salmonella.fitch = ifelse(escherichia.shigella.salmonella.fitch == "0-1", 
+                                                                                      ifelse(escherichia.shigella.fitch == "0-1", 
+                                                                                             ifelse(salmonella.fitch == "0-1",
+                                                                                                    "1",
+                                                                                                    "0-1"), 
+                                                                                             "0-1"),
+                                                                                      escherichia.shigella.salmonella.fitch))
+
+sRNAs <- sRNAs %>% mutate(escherichia.shigella.fitch = ifelse(escherichia.shigella.fitch == "0-1", 
+                                                                                      ifelse(escherichia.fitch == "0-1", 
+                                                                                             ifelse(shigella.fitch == "0-1",
+                                                                                                    "1",
+                                                                                                    "0-1"), 
+                                                                                             "0-1"),
+                                                                                      escherichia.shigella.fitch))
+
+sRNAs <- sRNAs %>% mutate(enterobacter.klebsiella.fitch = ifelse(enterobacter.klebsiella.fitch == "0-1", 
+                                                                                      ifelse(enterobacter == "0-1", 
+                                                                                             ifelse(klebsiella == "0-1",
+                                                                                                    "1",
+                                                                                                    "0-1"), 
+                                                                                             "0-1"),
+                                                                                      enterobacter.klebsiella.fitch))
+
+
+sRNAsSmall <- sRNAs %>% select(id, escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.fitch, serratia.fitch, escherichia.shigella.salmonella.enterobacter.klebsiella.fitch, enterobacter.klebsiella.fitch, enterobacter, klebsiella, escherichia.fitch, escherichia.shigella.fitch, escherichia.shigella.salmonella.fitch, shigella.fitch, salmonella.fitch)
+sRNAsSmall[sRNAsSmall == "1-0"] <- "0"
+
+conservationOrder <- c("shigella.fitch",
+                       "escherichia.fitch",
+                       "serratia.fitch",
+                       "klebsiella",
+                       "enterobacter",
+                       "salmonella.fitch",
+                       "escherichia.shigella.fitch",
+                       "enterobacter.klebsiella.fitch",
+                       "escherichia.shigella.salmonella.fitch",
+                       "escherichia.shigella.salmonella.enterobacter.klebsiella.fitch", 
+                       "escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.fitch")
+
+sRNAsSmall$conserved_to <- ""
+for(i in conservationOrder){
+  sRNAsSmall$conserved_to[sRNAsSmall[i] == "1"] <- i
+}
+
+```
+
+
 
 ##Scripts
 

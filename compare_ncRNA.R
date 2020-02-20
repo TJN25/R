@@ -1,25 +1,17 @@
 #!/usr/bin/env Rscript
 
-##Seems to all be working
-
-# functions ---------------------------------------------------------------
-
-
-
-
-
 # getopts -----------------------------------------------------------------
-
 
 
 suppressMessages(library('getopt'))
 
 
 spec = matrix(c(
+  'gff1' , 'r', 1, "character",
   'gff2', 'g', 1, "character",
   'help' , 'h', 0, "logical",
   'initial_data' , 'i', 0, "logical",
-  'gff1' , 'r', 1, "character",
+  'intergenic' , 'j', 0, "logical",
   'alignment' , 'a', 1, "character",
   'file_path', 'p', 2, "character",
   'out_name', 'o', 2, "character",
@@ -28,7 +20,6 @@ spec = matrix(c(
   'seq1', 's', 2, "character",
   'seq2', 't', 2, "character"
 ), byrow=TRUE, ncol=4)
-
 
 opt = getopt(spec)
 
@@ -48,6 +39,7 @@ if ( !is.null(opt$help) ) {
   cat("  -t <seq2 column> The column number for seq 2\n")
   cat("  -o <output file name> The name of the output file. Do not inclue the gff file extension. The default is the same as the sra input\n")
   cat("  -i <initial data> the input data is the output from combine_gff_files.R\n")
+  cat("  -j <intergenic data> the file locations are different\n")
   cat("  \n")
   q(status=1)
 }
@@ -63,14 +55,11 @@ if ( !is.null(opt$initial_data) ) {
 
 
 if ( is.null(opt$gff2) ) {
-  if(clean_data == F){
   cat("Error: -g <other gff file> is required.\n")
   q(status=1)
-  }
 }
 if ( is.null(opt$gff1) ) {
   cat("Error: -r <reference gff file> is required.\n")
-
   q(status=1)
 }
 
@@ -93,13 +82,15 @@ suppressMessages(library(comparativeSRA))
 test_setup <- F
 if(test_setup == T){
   if(initial_data == F){
-opt$gff1 <- "~/phd/RNASeq/combined_gff_files/escherichia-shigella_merged.gff"
-opt$gff2 <- "~/phd/RNASeq/combined_gff_files/salmonella_merged.gff"
+opt$gff1 <- "~/phd/RNASeq/combined_gff_files/esch_1-2-3_merged.gff"
+opt$gff2 <- "~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_900186905.1_merged.gff"
 opt$alignment <- "~/phd/RNASeq/alignments/escherichia-salmonella.backbone"
-opt$id1 <- "escherichia-shigella"
-opt$id2 <- "salmonella"
-opt$out_name <- "escherichia-shigella-salmonella"
-align <- T
+opt$id1 <- "esch_1-2-3"
+opt$id2 <- "GCA_900186905.1"
+opt$out_name <- "esch_1-2-3-15"
+opt$file_path <- "~/phd/RNASeq/combined_gff_files/"
+align <- F
+initial_data <- F
 }else{
   initial_data <- T
 opt$gff1 <- "~/phd/RNASeq/escherichia/GCA_000017745_data/GCA_000017745.1_new_calls.txt"
@@ -119,19 +110,31 @@ opt$out_name <- "escherichia_1-2"
 
 if ( is.null(opt$file_path ) ) { opt$file_path = "." }
 if ( is.null(opt$out_name ) ) { opt$out_name = paste(opt$x, opt$y, sep = "-") }
-if ( is.null(opt$x ) ) {  opt$x = "1" }
-if ( is.null(opt$y ) ) { opt$y = "2" }
+if ( is.null(opt$id1 ) ) {  opt$id1 = opt$gff1 }
+if ( is.null(opt$id2 ) ) { opt$id2 = opt$gff2 }
 if ( is.null(opt$s ) ) {  opt$s = "1" }
 if ( is.null(opt$t ) ) { opt$t= "2" }
 
 filePath <- opt$file_path
 
+if(align){
+if(grepl("/", opt$alignment) == F){
+  if(grepl(".backbone", opt$alignment) == F){
+  opt$alignment <- paste("~/phd/RNASeq/alignments/backbones/", opt$alignment, ".backbone", sep = "")
+  }else{
+    opt$alignment <- paste("~/phd/RNASeq/alignments/backbones/", opt$alignment, sep = "")
+    
+  }
+}
+}
+
 # Main section ------------------------------------------------------------
 if(initial_data == T){
-  cat("Analysing initial calls (from *_new_calls.gff)\n")
+  cat(paste("Analysing initial calls from ", "~/phd/RNASeq/new_calls/", opt$gff1, "_new_calls.txt and ", "~/phd/RNASeq/new_calls/", opt$gff2, "_new_calls.txt\n", sep = ""))
   
-  gff1 <- read.table(opt$gff1, sep = "\t", header = T, as.is = T)
-  gff2 <- read.table(opt$gff2, sep = "\t", header = T, as.is = T)
+  gff1 <- read.table(paste("~/phd/RNASeq/new_calls/", opt$gff1, "_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
+  gff2 <- read.table(paste("~/phd/RNASeq/new_calls/", opt$gff2, "_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
+
   
   ncRNAgff <- alignAndCombine(reference = opt$alignment,
                                       gff1 = gff1,
@@ -139,7 +142,8 @@ if(initial_data == T){
                                       filenum1 = opt$id1,
                                       filenum2 = opt$id2,
                                       seqA = opt$s,
-                                      seqB = opt$t)
+                                      seqB = opt$t,
+                                quiet = T)
 ncRNAgff <- ncRNAgff %>% mutate(set_val = 1)
 mergedData <- mergeSRA(ncRNAgff = ncRNAgff,
                        filenum1 = opt$id1,
@@ -206,18 +210,14 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
 
 }else{
 
-
-
-   # opt$gff1 <- "~/phd/RNASeq/combined_gff_files/esch_1-2-3-4-5_merged.gff"
-   # opt$gff2 <- "~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_001559675.1_merged.gff"
-   # align <- F
-
- 
   
-  
-  gff1Dat <- read.table(opt$gff1, sep = "\t", header = T, as.is = T)
-  gff2Dat <- read.table(opt$gff2, sep = "\t", header = T, as.is = T)
-
+  if(is.null(opt$intergenic)){
+  gff1Dat <- read.table(paste("~/phd/RNASeq/combined_gff_files/", opt$gff1, "_merged.gff", sep = ""), sep = "\t", header = T, as.is = T)
+  gff2Dat <- read.table(paste("~/phd/RNASeq/combined_gff_files/", opt$gff2, "_merged.gff", sep = ""), sep = "\t", header = T, as.is = T)
+  }else{
+    gff1Dat <- read.table(paste("~/phd/RNASeq/combined_gff_files_random/", opt$gff1, "_merged.gff", sep = ""), sep = "\t", header = T, as.is = T)
+    gff2Dat <- read.table(paste("~/phd/RNASeq/combined_gff_files_random/", opt$gff2, "_merged.gff", sep = ""), sep = "\t", header = T, as.is = T)
+  }
 
   gff1Working <- gff1Dat %>% mutate(row_numbers = as.character(row_numbers))
   gff2Working <- gff2Dat %>% mutate(row_numbers = as.character(row_numbers))
@@ -240,7 +240,14 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
   }else{
     ncRNAgff <- gff1Working%>%bind_rows(gff2Working)
     ncRNAgff[is.na(ncRNAgff)] <- 0
-}
+  }
+  
+  if(test_setup == T){
+  mergeSRAData <- list(ncRNAgff = ncRNAgff, filenum1 = filenum1, filenum2 = filenum2, initial_data = initial_data, align = align)
+  save(mergeSRAData, file = "~/bin/r_git/R/mergeSRAData.Rda")
+  
+  }
+  
   mergedData <- mergeSRA(ncRNAgff = ncRNAgff,
                          filenum1 = filenum1,
                          filenum2 = filenum2,
