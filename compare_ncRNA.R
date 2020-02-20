@@ -1,8 +1,5 @@
 #!/usr/bin/env Rscript
 
-##Seems to all be working
-
-
 # getopts -----------------------------------------------------------------
 
 
