@@ -124,7 +124,7 @@ if(align){
     if ( is.null(opt$out_name ) ) { opt$out_name = paste(placeholer_1[1], "_", placeholer_1[2], "-", placeholer_2[2], sep = "") }
     
   }else{
-    if ( is.null(opt$out_name ) ) { opt$out_name = paste(opt$gff1,  "-", opt$gff2, sep = "") }
+    if ( is.null(opt$out_name ) ) { opt$out_name = paste(placeholer_1[1], "_", placeholer_1[2], "-", placeholer_1[1], "_", placeholer_2[2], sep = "") }
     
   }  
   
