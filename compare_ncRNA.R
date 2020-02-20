@@ -4,7 +4,6 @@
 
 
 # getopts -----------------------------------------------------------------
-print(1)
 
 
 suppressMessages(library('getopt'))
@@ -15,7 +14,7 @@ spec = matrix(c(
   'gff2', 'g', 1, "character",
   'help' , 'h', 0, "logical",
   'initial_data' , 'i', 0, "logical",
-#  'intergenic' , 'j', 0, "logical",
+  'intergenic' , 'j', 0, "logical",
   'alignment' , 'a', 1, "character",
   'file_path', 'p', 2, "character",
   'out_name', 'o', 2, "character",
@@ -25,9 +24,8 @@ spec = matrix(c(
   'seq2', 't', 2, "character"
 ), byrow=TRUE, ncol=4)
 
-print(2)
 opt = getopt(spec)
-print(3)
+
 if ( !is.null(opt$help) ) {
   cat("sraPlotGenomeAlignment.R version 1.0\n")
   cat(" \n")
@@ -135,8 +133,8 @@ if(grepl("/", opt$alignment) == F){
 if(initial_data == T){
   cat("Analysing initial calls (from *_new_calls.gff)\n")
   
-  gff1Dat <- read.table(paste("~/phd/RNASeq/new_calls/", opt$gff1, "_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
-  gff2Dat <- read.table(paste("~/phd/RNASeq/new_calls/", opt$gff2, "_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
+  gff1 <- read.table(paste("~/phd/RNASeq/new_calls/", opt$gff1, "_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
+  gff2 <- read.table(paste("~/phd/RNASeq/new_calls/", opt$gff2, "_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
 
   
   ncRNAgff <- alignAndCombine(reference = opt$alignment,
