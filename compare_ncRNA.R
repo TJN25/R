@@ -109,11 +109,26 @@ opt$out_name <- "escherichia_1-2"
 
 
 if ( is.null(opt$file_path ) ) { opt$file_path = "." }
-if ( is.null(opt$out_name ) ) { opt$out_name = paste(opt$x, opt$y, sep = "-") }
 if ( is.null(opt$id1 ) ) {  opt$id1 = opt$gff1 }
 if ( is.null(opt$id2 ) ) { opt$id2 = opt$gff2 }
-if ( is.null(opt$s ) ) {  opt$s = "1" }
-if ( is.null(opt$t ) ) { opt$t= "2" }
+if ( is.null(opt$seq1 ) ) {  opt$seq1 = "1" }
+if ( is.null(opt$seq2 ) ) { opt$seq2= "2" }
+
+if(align){
+  if ( is.null(opt$out_name ) ) { opt$out_name = paste(opt$alignment, "_", opt$seq1, "-", opt$seq2, sep = "") }
+  
+}else{
+  placeholer_1 <- unlist(strsplit(opt$gff1, "_"))
+  placeholer_2 <- unlist(strsplit(opt$gff2, "_"))
+  if(placeholer_1[1] == placeholer_2[[1]]){
+    if ( is.null(opt$out_name ) ) { opt$out_name = paste(placeholer_1[1], "_", placeholer_1[2], "-", placeholer_2[2], sep = "") }
+    
+  }else{
+    if ( is.null(opt$out_name ) ) { opt$out_name = paste(opt$gff1,  "-", opt$gff2, sep = "") }
+    
+  }  
+  
+}
 
 filePath <- opt$file_path
 
