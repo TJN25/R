@@ -156,8 +156,8 @@ if(initial_data == T){
                                       gff2 = gff2,
                                       filenum1 = opt$id1,
                                       filenum2 = opt$id2,
-                                      seqA = opt$s,
-                                      seqB = opt$t,
+                                      seqA = opt$seq1,
+                                      seqB = opt$seq2,
                                 quiet = T)
 ncRNAgff <- ncRNAgff %>% mutate(set_val = 1)
 mergedData <- mergeSRA(ncRNAgff = ncRNAgff,
