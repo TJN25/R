@@ -113,8 +113,8 @@ opt$out_name <- "escherichia_1-2"
 
 if ( is.null(opt$file_path ) ) { opt$file_path = "." }
 if ( is.null(opt$out_name ) ) { opt$out_name = paste(opt$x, opt$y, sep = "-") }
-if ( is.null(opt$id1 ) ) {  opt$x = opt$gff1 }
-if ( is.null(opt$id2 ) ) { opt$y = opt$gff2 }
+if ( is.null(opt$id1 ) ) {  opt$id1 = opt$gff1 }
+if ( is.null(opt$id2 ) ) { opt$id2 = opt$gff2 }
 if ( is.null(opt$s ) ) {  opt$s = "1" }
 if ( is.null(opt$t ) ) { opt$t= "2" }
 
