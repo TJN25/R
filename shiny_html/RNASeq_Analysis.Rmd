@@ -2133,6 +2133,17 @@ write.table(x = mergedData, file = paste(filePath, "/", opt$out_name, "_merged.g
 
 ##Tests
 
+```{r alignemnt_file_check, eval = F}
+  reference <- read.table("~/phd/RNASeq/alignments/backbones/escherichia.backbone", header = T, as.is = T)
+
+  dat1 <- read.table("~/phd/RNASeq/combined_gff_files/esch_1-2_merged.gff", header = T, as.is = T)
+  dat2 <- read.table("~/phd/RNASeq/combined_gff_files/test_esch_1-2_merged.gff", header = T, as.is = T)
+
+
+
+```
+
+
 ```{r ggtree, include= F, eval = F}
 ##all genera
 tree <- read.tree("~/phd/RNASeq/alignments/all_alignments/serratia.guide_tree")

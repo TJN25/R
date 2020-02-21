@@ -93,12 +93,14 @@ align <- F
 initial_data <- F
 }else{
   initial_data <- T
-opt$gff1 <- "~/phd/RNASeq/escherichia/GCA_000017745_data/GCA_000017745.1_new_calls.txt"
-opt$gff2 <- "~/phd/RNASeq/escherichia/GCA_000017765.1_data/GCA_000017765.1_new_calls.txt"
-opt$alignment <- "~/phd/RNASeq/escherichia/escherichia.backbone"
-opt$id1 <- "GCA_000017745.1"
-opt$id2 <- "GCA_000017765.1"
-opt$out_name <- "escherichia_1-2"
+opt$gff1 <- "GCA_000017745.1"
+opt$gff2 <- "GCA_000017765.1"
+opt$alignment <- "~/phd/RNASeq/alignments/backbones/escherichia.backbone"
+opt$seq1 <- "5"
+opt$seq2 <- "6"
+#opt$id1 <- "GCA_000017745.1"
+#opt$id2 <- "GCA_000017765.1"
+#opt$out_name <- "escherichia_1-2"
 }
 }
 
@@ -109,15 +111,17 @@ opt$out_name <- "escherichia_1-2"
 
 
 if ( is.null(opt$file_path ) ) { opt$file_path = "." }
-if ( is.null(opt$out_name ) ) { opt$out_name = paste(opt$x, opt$y, sep = "-") }
 if ( is.null(opt$id1 ) ) {  opt$id1 = opt$gff1 }
 if ( is.null(opt$id2 ) ) { opt$id2 = opt$gff2 }
-if ( is.null(opt$s ) ) {  opt$s = "1" }
-if ( is.null(opt$t ) ) { opt$t= "2" }
+if ( is.null(opt$seq1 ) ) {  opt$seq1 = "1" }
+if ( is.null(opt$seq2 ) ) { opt$seq2= "2" }
+
 
 filePath <- opt$file_path
 
+
 if(align){
+  if ( is.null(opt$out_name ) ) { opt$out_name = paste(opt$alignment, "_", opt$seq1, "-", opt$seq2, sep = "") }
 if(grepl("/", opt$alignment) == F){
   if(grepl(".backbone", opt$alignment) == F){
   opt$alignment <- paste("~/phd/RNASeq/alignments/backbones/", opt$alignment, ".backbone", sep = "")
@@ -126,6 +130,17 @@ if(grepl("/", opt$alignment) == F){
     
   }
 }
+}else{
+  placeholer_1 <- unlist(strsplit(opt$gff1, "_"))
+  placeholer_2 <- unlist(strsplit(opt$gff2, "_"))
+  if(placeholer_1[1] == placeholer_2[[1]]){
+    if ( is.null(opt$out_name ) ) { opt$out_name = paste(placeholer_1[1], "_", placeholer_1[2], "-", placeholer_2[2], sep = "") }
+    
+  }else{
+    if ( is.null(opt$out_name ) ) { opt$out_name = paste(placeholer_1[1], "_", placeholer_1[2], "-", placeholer_1[1], "_", placeholer_2[2], sep = "") }
+    
+  }  
+  
 }
 
 # Main section ------------------------------------------------------------
@@ -136,13 +151,19 @@ if(initial_data == T){
   gff2 <- read.table(paste("~/phd/RNASeq/new_calls/", opt$gff2, "_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
 
   
+  if(test_setup == T){
+    alignAndCombineData <- list(reference = opt$alignment, gff1 = gff1, gff2 = gff2, filenum1 = opt$id1, filenum2 = opt$id2, seqA = opt$seq1, seqB = opt$seq2)
+    save(alignAndCombineData, file = "~/bin/r_git/R/alignAndCombineData.Rda")
+    
+  }
+  
   ncRNAgff <- alignAndCombine(reference = opt$alignment,
                                       gff1 = gff1,
                                       gff2 = gff2,
                                       filenum1 = opt$id1,
                                       filenum2 = opt$id2,
-                                      seqA = opt$s,
-                                      seqB = opt$t,
+                                      seqA = opt$seq1,
+                                      seqB = opt$seq2,
                                 quiet = T)
 ncRNAgff <- ncRNAgff %>% mutate(set_val = 1)
 mergedData <- mergeSRA(ncRNAgff = ncRNAgff,
