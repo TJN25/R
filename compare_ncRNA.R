@@ -85,14 +85,14 @@ suppressMessages(library(comparativeSRA))
 test_setup <- F
 if(test_setup == T){
   if(initial_data == F){
-opt$gff1 <- "~/phd/RNASeq/combined_gff_files/esch_1-2-3_merged.gff"
-opt$gff2 <- "~/phd/RNASeq/combined_gff_files/GCA_000017745.1-GCA_900186905.1_merged.gff"
-opt$alignment <- "~/phd/RNASeq/alignments/escherichia-salmonella.backbone"
-opt$id1 <- "esch_1-2-3"
-opt$id2 <- "GCA_900186905.1"
-opt$out_name <- "esch_1-2-3-15"
-opt$file_path <- "~/phd/RNASeq/combined_gff_files/"
-align <- F
+opt$gff1 <- "escherichia_1-2"
+opt$gff2 <- "escherichia_5-6-5-4-5-3"
+opt$alignment <- "escherichia"
+opt$seq1 <- "1"
+opt$seq2 <- "5"
+#opt$out_name <- "esch_1-2-3-15"
+opt$file_path <- "~/phd/RNASeq/combined_gff_files/version_4/"
+#align <- F
 initial_data <- F
 }else{
   initial_data <- T
@@ -152,8 +152,7 @@ if(initial_data == T){
   
   gff1 <- read.table(paste("~/phd/RNASeq/new_calls/", opt$gff1, "_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
   gff2 <- read.table(paste("~/phd/RNASeq/new_calls/", opt$gff2, "_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
-  reference <- read.table(opt$alignment, header = T, as.is = T)
-  
+
   
   if(test_setup == T){
     alignAndCombineData <- list(reference = opt$alignment, gff1 = gff1, gff2 = gff2, filenum1 = opt$id1, filenum2 = opt$id2, seqA = opt$seq1, seqB = opt$seq2)
@@ -182,6 +181,12 @@ if(initial_data == T){
                                 quiet = T)
   
 ncRNAgff <- ncRNAgff %>% mutate(set_val = 1)
+
+
+if(test_setup){
+  mergeSRAData <- list(ncRNAgff = ncRNAgff, filenum1 = filenum1, filenum2 = filenum2, initial_data = initial_data, align = align)
+  save(mergeSRAData, file = "~/bin/r_git/R/mergeSRAData.Rda")
+}
 
 mergedData <- mergeSRA(ncRNAgff = ncRNAgff,
                        filenum1 = opt$id1,
