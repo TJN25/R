@@ -1,5 +1,7 @@
 #!/usr/bin/env Rscript
 
+###Version 4
+
 # getopts -----------------------------------------------------------------
 
 
@@ -18,7 +20,8 @@ spec = matrix(c(
   'id1', 'x', 2, "character",
   'id2', 'y', 2, "character",
   'seq1', 's', 2, "character",
-  'seq2', 't', 2, "character"
+  'seq2', 't', 2, "character",
+  'genus', 'z', 2, "character"
 ), byrow=TRUE, ncol=4)
 
 opt = getopt(spec)
@@ -149,23 +152,37 @@ if(initial_data == T){
   
   gff1 <- read.table(paste("~/phd/RNASeq/new_calls/", opt$gff1, "_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
   gff2 <- read.table(paste("~/phd/RNASeq/new_calls/", opt$gff2, "_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
-
+  reference <- read.table(opt$alignment, header = T, as.is = T)
+  
   
   if(test_setup == T){
     alignAndCombineData <- list(reference = opt$alignment, gff1 = gff1, gff2 = gff2, filenum1 = opt$id1, filenum2 = opt$id2, seqA = opt$seq1, seqB = opt$seq2)
     save(alignAndCombineData, file = "~/bin/r_git/R/alignAndCombineData.Rda")
     
+    
+    buildReferenceLookupData <- list(reference = reference,
+                                     seqA = as.numeric(opt$seq1), seqB = as.numeric(opt$seq2),
+                                     collapse.alignment = T,
+                                     quiet = T)
+    
+    reorderGFFData <- list(reference = reference,
+                           gff1 = gff1, gff2= gff2)
+    
+    save(reorderGFFData, file = "~/bin/r_git/R/reorderGFFData.Rda")
+    
   }
   
-  ncRNAgff <- alignAndCombine(reference = opt$alignment,
+
+  
+  ncRNAgff <- alignAndCombine(reference =  opt$alignment,
                                       gff1 = gff1,
                                       gff2 = gff2,
                                       filenum1 = opt$id1,
                                       filenum2 = opt$id2,
-                                      seqA = opt$seq1,
-                                      seqB = opt$seq2,
                                 quiet = T)
+  
 ncRNAgff <- ncRNAgff %>% mutate(set_val = 1)
+
 mergedData <- mergeSRA(ncRNAgff = ncRNAgff,
                        filenum1 = opt$id1,
                        filenum2 = opt$id2,
@@ -232,13 +249,11 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
 }else{
 
   
-  if(is.null(opt$intergenic)){
-  gff1Dat <- read.table(paste("~/phd/RNASeq/combined_gff_files/", opt$gff1, "_merged.gff", sep = ""), sep = "\t", header = T, as.is = T)
-  gff2Dat <- read.table(paste("~/phd/RNASeq/combined_gff_files/", opt$gff2, "_merged.gff", sep = ""), sep = "\t", header = T, as.is = T)
-  }else{
-    gff1Dat <- read.table(paste("~/phd/RNASeq/combined_gff_files_random/", opt$gff1, "_merged.gff", sep = ""), sep = "\t", header = T, as.is = T)
-    gff2Dat <- read.table(paste("~/phd/RNASeq/combined_gff_files_random/", opt$gff2, "_merged.gff", sep = ""), sep = "\t", header = T, as.is = T)
-  }
+  cat(paste("Analysing calls from ", filePath, "/", opt$gff1, "_merged.gff and ", filePath, "/", opt$gff2, "_merged.gff\n", sep = ""))
+  
+  gff1Dat <- read.table(paste(filePath, "/", opt$gff1, "_merged.gff", sep = ""), sep = "\t", header = T, as.is = T)
+  gff2Dat <- read.table(paste(filePath, "/", opt$gff2, "_merged.gff", sep = ""), sep = "\t", header = T, as.is = T)
+
 
   gff1Working <- gff1Dat %>% mutate(row_numbers = as.character(row_numbers))
   gff2Working <- gff2Dat %>% mutate(row_numbers = as.character(row_numbers))
@@ -254,7 +269,8 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
                                filenum1 = filenum1,
                                filenum2 = filenum2,
                                seqA = 1,
-                               seqB = 2)
+                               seqB = 2,
+                               quiet = T)
 
    ncRNAgff <- ncRNAgff%>%select(-changed)%>%unique()
   ncRNAgff[is.na(ncRNAgff)] <- "0"
@@ -341,9 +357,9 @@ for(i in 1:nrow(tmp)){
     }
     files_1 <- unique(files_1)
     files_all <- unique(files_all)
-    if(align == F){
-       fitchTest$fitch[i] <- fitchTest$set_val[i]##use for random only thgis needs removing
-      #fitchTest$fitch[i] <- ifelse(length(files_1) == 1, "0-1", ifelse(length(files_1) == 0, "0", "1"))
+    if(!is.null(opt$genus)){
+      # fitchTest$fitch[i] <- fitchTest$set_val[i]##use for random only thgis needs removing
+      fitchTest$fitch[i] <- ifelse(length(files_1) == 1, "0-1", ifelse(length(files_1) == 0, "0", "1"))
     }else{
       fitchTest$fitch[i] <- fitchTest$set_val[i]
     }
@@ -356,7 +372,7 @@ for(i in 1:nrow(tmp)){
   mergedData <- mergedData %>% full_join(fitchTest, by = "id")
   
   
-  if(align == F){
+  if(!is.null(opt$genus)){
     mergedData <- mergedData%>%mutate(set_val = fitch)
   }
     mergedData <- mergedData%>%mutate(V1 = set_val)
