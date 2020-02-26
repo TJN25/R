@@ -21,7 +21,7 @@ spec = matrix(c(
   'id2', 'y', 2, "character",
   'seq1', 's', 2, "character",
   'seq2', 't', 2, "character",
-  'genus', 'z', 2, "character"
+  'genus', 'z', 0, "logical"
 ), byrow=TRUE, ncol=4)
 
 opt = getopt(spec)
@@ -93,14 +93,17 @@ opt$seq2 <- "5"
 #opt$out_name <- "esch_1-2-3-15"
 opt$file_path <- "~/phd/RNASeq/combined_gff_files/version_4/"
 #align <- F
+opt$genus <- T
 initial_data <- F
 }else{
   initial_data <- T
-opt$gff1 <- "GCA_000017745.1"
-opt$gff2 <- "GCA_000017765.1"
-opt$alignment <- "~/phd/RNASeq/alignments/backbones/escherichia.backbone"
+opt$gff1 <- "GCA_002843685.1"
+opt$gff2 <- "GCA_900186905.1"
+opt$alignment <- "escherichia"
 opt$seq1 <- "5"
-opt$seq2 <- "6"
+opt$seq2 <- "4"
+opt$file_path <- "~/phd/RNASeq/combined_gff_files/version_5/"
+
 #opt$id1 <- "GCA_000017745.1"
 #opt$id2 <- "GCA_000017765.1"
 #opt$out_name <- "escherichia_1-2"
@@ -124,6 +127,7 @@ filePath <- opt$file_path
 
 
 if(align){
+  
   if ( is.null(opt$out_name ) ) { opt$out_name = paste(opt$alignment, "_", opt$seq1, "-", opt$seq2, sep = "") }
 if(grepl("/", opt$alignment) == F){
   if(grepl(".backbone", opt$alignment) == F){
@@ -150,8 +154,15 @@ if(grepl("/", opt$alignment) == F){
 if(initial_data == T){
   cat(paste("Analysing initial calls from ", "~/phd/RNASeq/new_calls/", opt$gff1, "_new_calls.txt and ", "~/phd/RNASeq/new_calls/", opt$gff2, "_new_calls.txt\n", sep = ""))
   
-  gff1 <- read.table(paste("~/phd/RNASeq/new_calls/", opt$gff1, "_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
-  gff2 <- read.table(paste("~/phd/RNASeq/new_calls/", opt$gff2, "_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
+  
+  if(!is.null(opt$intergenic)){
+    gff1 <- read.table(paste("~/phd/RNASeq/new_calls/random/version_2/", opt$gff1, "_shifted_random_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
+    gff2 <- read.table(paste("~/phd/RNASeq/new_calls/random/version_2/", opt$gff2, "_shifted_random_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
+  }else{
+    gff1 <- read.table(paste("~/phd/RNASeq/new_calls/", opt$gff1, "_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
+    gff2 <- read.table(paste("~/phd/RNASeq/new_calls/", opt$gff2, "_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T) 
+  }
+
 
   
   if(test_setup == T){
@@ -162,7 +173,7 @@ if(initial_data == T){
     buildReferenceLookupData <- list(reference = reference,
                                      seqA = as.numeric(opt$seq1), seqB = as.numeric(opt$seq2),
                                      collapse.alignment = T,
-                                     quiet = T)
+                                     quiet = F)
     
     reorderGFFData <- list(reference = reference,
                            gff1 = gff1, gff2= gff2)
@@ -178,7 +189,7 @@ if(initial_data == T){
                                       gff2 = gff2,
                                       filenum1 = opt$id1,
                                       filenum2 = opt$id2,
-                                quiet = T)
+                                quiet = F)
   
 ncRNAgff <- ncRNAgff %>% mutate(set_val = 1)
 
@@ -188,7 +199,7 @@ if(test_setup){
   save(mergeSRAData, file = "~/bin/r_git/R/mergeSRAData.Rda")
 }
 
-mergedData <- mergeSRA(ncRNAgff = ncRNAgff,
+mergedData <- mergeSRAFast(ncRNAgff = ncRNAgff,
                        filenum1 = opt$id1,
                        filenum2 = opt$id2,
                        initial_data = initial_data, 
@@ -275,7 +286,7 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
                                filenum2 = filenum2,
                                seqA = 1,
                                seqB = 2,
-                               quiet = T)
+                               quiet = F)
 
    ncRNAgff <- ncRNAgff%>%select(-changed)%>%unique()
   ncRNAgff[is.na(ncRNAgff)] <- "0"
@@ -290,24 +301,18 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
   
   }
   
-  mergedData <- mergeSRA(ncRNAgff = ncRNAgff,
-                         filenum1 = filenum1,
-                         filenum2 = filenum2,
-                         align = align, 
-                         initial_data = F)
-
-
-  mergedData <- mergedData%>%mutate(change = ifelse(start < end, F, T))%>%
-    mutate(start.tmp = end)%>%
-    mutate(end.tmp = start)%>%
-    mutate(start = ifelse(change == T, start.tmp, start))%>%
-    mutate(end = ifelse(change == T, end.tmp, end))%>%
-    select(-start.tmp, -end.tmp, -change)
+    
+  mergedData <- mergeSRAFast(ncRNAgff = ncRNAgff,
+                           filenum1 = filenum1,
+                           filenum2 = filenum2,
+                           align = align, 
+                           initial_data = F,
+                           quiet = F)
 
 
 
-  mergedData <- mergedData%>%filter(!is.na(sequence))
-  mergedData[is.na(mergedData)] <- 0
+
+
 
   file_id1 <- unlist(strsplit(filenum1, "-"))
   file_id2 <- unlist(strsplit(filenum2, "-"))
@@ -320,7 +325,7 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
     mutate(file_id = file_id)
   tmp[is.na(tmp)] <- 0
 
-  #i <- 4
+  i <- 1
 for(i in 1:nrow(tmp)){
   id1_list <- unlist(strsplit(tmp$id1[i], "-"))
   id2_list <- unlist(strsplit(tmp$id2[i], "-"))
@@ -332,21 +337,34 @@ for(i in 1:nrow(tmp)){
   set_val_1 <- unlist(strsplit(tmp$set_val_1[i], "-"))
   set_val_2 <- unlist(strsplit(tmp$set_val_2[i], "-"))
 
-
-
-
-  if(length(intersect(set_val_1, set_val_2)) > 0){
-    set_val <- intersect(set_val_1, set_val_2)
+  if(is.null(opt$genus)){
+    if(set_val_1 == "1-0" && set_val_2 == "1-0"){
+      set_val <- "1"
+    }else{
+      if(length(intersect(set_val_1, set_val_2)) > 0){
+        set_val <- intersect(set_val_1, set_val_2)
+      }else{
+        set_val <- union(set_val_1, set_val_2)
+      }
+    }
   }else{
-    set_val <- union(set_val_1, set_val_2)
+    if(length(intersect(set_val_1, set_val_2)) > 0){
+      set_val <- intersect(set_val_1, set_val_2)
+    }else{
+      set_val <- union(set_val_1, set_val_2)
+    }
   }
-  tmp$set_val[i] <- paste(set_val, collapse = "-")
+
+  tmp$set_val[i] <- paste(ifelse(length(set_val) == 1, set_val, "1-0"), collapse = "-")
 
 
 
 }
-  fitchTest <- tmp %>% select(id, set_val) %>% mutate(fitch = 0, prop = 0)
+ 
   
+  fitchTest <- tmp %>% select(id, set_val) %>% mutate(fitch = 0, prop = 0)
+  i <- 1
+  j <- 1
   for(i in 1:nrow(fitchTest)){
     files_1 <- c()
     files_all <- c()
@@ -391,6 +409,8 @@ for(i in 1:nrow(tmp)){
   mergedData[is.na(mergedData)] <- 0
   
 }
+
+
 
 cat(paste("Writing the output to ", filePath, "/", opt$out_name, "_merged.gff\n", sep = ""))
 write.table(x = mergedData, file = paste(filePath, "/", opt$out_name, "_merged.gff", sep = ""), row.names = F, col.names = T, quote = F, sep = "\t")
