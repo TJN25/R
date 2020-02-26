@@ -112,21 +112,14 @@ for(i in 1:length(files)){
 
   tmp <- tmp%>%mutate(file_name = files[i])%>%mutate(score = as.character(score))
 
-  if(files[i] == opt$random_data){
-    tmp <- tmp%>%
-  filter(feature != "CDS", feature != "gene", feature != "pseudogene", feature != "exon", feature != "region")
-  }else{
   
   dat <- dat%>%bind_rows(tmp)
+
 }
-}
-if(!is.null(opt$random_data)){
-   ncRNAgff <- dat%>%
-     filter(feature != "gene", feature != "pseudogene", feature != "exon", feature != "region")
-}else{
+
 ncRNAgff <- dat%>%
   filter(feature != "CDS", feature != "gene", feature != "pseudogene", feature != "exon", feature != "region")
-}
+
 
 # main section  -------------------------------------------------------------------
 

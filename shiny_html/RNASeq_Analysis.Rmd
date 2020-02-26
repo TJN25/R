@@ -135,6 +135,11 @@ RNASeq data is another approach that has helped and there are a number of tools 
 
 So this in this example here, 4 rnas might be predicted. The challenge with this is that a lot of the peaks that show up are likely noise and it can be very hard to distinguish noise from real signal. 
 
+
+![Figure 3. Example of how conserved sRNAs could be used to identify real sRNAs](conserved_sra_example.png)
+
+
+
 ##Overview of Methods
 
 
@@ -148,7 +153,7 @@ So this in this example here, 4 rnas might be predicted. The challenge with this
 * Remap sRNAs
 * Check if the sRNAs are conserved
 
-![Figure 3. Workflow of methods](method_scripts_workflow.png)
+![Figure 4. Workflow of methods](method_scripts_workflow.png)
 
 
 
@@ -270,7 +275,7 @@ A plot file is produced. This contains a number for each nucleotide that indicat
 * Combining genomes was done in a stepwise manner
     + combine files for two genomes at a node and use this node as the new file
     + repeat at each node moving down the tree
-* [_compare\_ncRNA.R_](#section-compare_ncrna.r) _-r \<GFF 1\> -g \<GFF 2\> -a \<Aligment File\> -x \<File ID 1\> -y \<File ID 2\>  -s \<Alignment position for File 1\> -t \<Alignment position for File 2\>  -o \<Output Name\>_
+* [_compare\_ncRNA.R_](#section-compare_ncrna.r) _-r \<GCA 1\> -g \<GCA 2\> -a \<Aligment File\> -s \<Alignment position for File 1\> -t \<Alignment position for File 2\>  -o \<Output Name\>_
 
 
 ```{r tree_viewer, echo=FALSE, include=T, eval=T}
@@ -291,6 +296,10 @@ selectInput(
                           "Klebsiella" = "~/phd/RNASeq/alignments/all_alignments/Klebsiella.tree", 
                           "Enterobacter" = "~/phd/RNASeq/alignments/all_alignments/Enterobacter.tree",
                           "Serratia" = "~/phd/RNASeq/alignments/all_alignments/serratia.guide_tree",
+                          "Alteromonas" = "~/phd/RNASeq/alignments/all_alignments/Altermonas.guide_tree",
+                          "Xanthomonas" = "~/phd/RNASeq/alignments/all_alignments/xanthomonas.guide_tree",
+                          "Acinetobacter" = "~/phd/RNASeq/alignments/all_alignments/acinetobacter.guide_tree",
+                          "Pseudomonas" = "~/phd/RNASeq/alignments/all_alignments/pseudomonas.guide_tree",
                           "Escherichia-Shigella" = "~/phd/RNASeq/alignments/all_alignments/escherichia_shigella.guide_tree"),
               selected = "All"
             )
@@ -299,12 +308,17 @@ selectInput(
 
 renderPlot({
   tree <- read.tree(input$tree_file)
- #tree <- read.tree("~/phd/RNASeq/alignments/all_alignments/all.guide_tree")
+ #tree <- read.tree("~/phd/RNASeq/alignments/all_alignments/genera_11.guide_tree")
 
-  ggtree(tree) + 
+ 
+ 
+  p <-ggtree(tree) + 
   geom_tiplab() +
   xlim(0,0.8)
+  p
+#    ggsave(file="~/phd/RNASeq/figures/main_tree.svg", plot=p)
 
+  
 })
 
 
@@ -549,6 +563,9 @@ combined_random <-combinedListRandom[["escherichia-shigella-salmonella-enterobac
 * This was reduced down to `r prettyNum(combined_sRNAs, big.mark = ",", scientific =  F)` putative sRNAs after combining features that overlapped between genomes.
 
 * For each sRNA that was predicted, a random intergenic region was selected.
+    + _[generateRandomSRACalls.sh](#section-generaterandomsracalls.sh) -g GCA\_002208745.1_
+    + _[selectRandomSRA.R](#section-selectrandomsra.r) -i in\_file -m shifted -o in\_file\_shifted_
+    + _[randomDataReformat.R](#section-randomdatareformat.r) -i in\_file\_shifted -g in\_file_
     + the file containing all calls for a given genome was used.
     + this was done by randomly adding or subtracting a value from _1_ to _n_ where _n_ was half the length of the genome.
 * The same merging steps were then carried out.
@@ -2131,6 +2148,582 @@ write.table(x = mergedData, file = paste(filePath, "/", opt$out_name, "_merged.g
 
 ```
 
+
+###generateRandomSRACalls.sh
+
+```{bash generateRandomSRACalls.sh, eval = F}
+#!/bin/bash
+
+##Aligns genomes according to a .phy or .nwk file
+##GCA accession number.
+
+usage(){
+    echo "generateRandomSRACalls.sh is a script for aligning a set of genomes given an order to do this in. 
+Usage:
+ generateRandomSRACalls.sh [opts] [input] [output]
+
+Options:
+	-h	Display this help
+
+Input	       
+	-g	GCA Accession
+	-o output name
+
+"
+}
+
+method="shifted"
+
+while getopts "g:o:m:h" arg; do
+case $arg in
+	g) 
+	in_file=${OPTARG}
+	;;
+	o) 
+	out_file=${OPTARG}
+	;;
+	m)
+	method= ${OPTARG}
+	;;
+    h)
+		usage
+		exit
+      ;;    
+	\?) 
+	echo "Unknown option: -${OPTARG}" >&2; exit 1;;
+    esac
+done
+
+if [[ -z $in_file ]]; then
+echo 'Error: GCA needed. Specify with -i <gca>'
+echo ' '
+echo 'Use -h for more help.'
+echo ' '
+exit
+fi
+
+if [[ -z $out_file ]]; then
+	out_file=$in_file
+fi
+
+if [[ $method == "both" ]]; then
+
+echo "Shuffling Data"
+
+selectRandomSRA.R -i $in_file -m shifted -o ${in_file}_shifted -q
+selectRandomSRA.R -i $in_file -m shuffled -o ${in_file}_shuffled -q
+randomDataReformat.R -i ${in_file}_shifted -g $in_file -q
+randomDataReformat.R -i ${in_file}_shuffled -g $in_file -q
+
+echo "Combining shifted calls"
+
+cd ./random_sequences/shifted/
+mkdir gff_files
+mv ../../${in_file}_shifted_random_sra.gff gff_files
+cp ../../${in_file}.gff gff_files
+combine_gff_files.R -f gff_files/ -o ${in_file}_shifted_random -r ${in_file}.gff -g ${in_file}.gff
+mv ../../${in_file}_shifted_random* ./
+
+
+echo "Combining shuffled calls"
+
+cd ../../random_sequences/shuffled/
+mkdir gff_files
+mv ../../${in_file}_shuffled_random_sra.gff gff_files
+cp ../../${in_file}.gff gff_files
+combine_gff_files.R -f gff_files/ -o ${in_file}_shuffled_random -r ${in_file}.gff -g ${in_file}.gff
+mv ../../${in_file}_shuffled_random* ./
+
+fi
+
+if [[ $method == "shifted" ]]; then
+
+echo "Shuffling Data"
+
+selectRandomSRA.R -i $in_file -m shifted -o ${in_file}_shifted -q
+randomDataReformat.R -i ${in_file}_shifted -g $in_file -q
+
+echo "Combining shifted calls"
+
+cd ./random_sequences/shifted/
+mkdir gff_files
+mv ../../${in_file}_shifted_random_sra.gff gff_files
+cp ../../${in_file}.gff gff_files
+combine_gff_files.R -f gff_files/ -o ${in_file}_shifted_random -r -g ${in_file}.gff
+mv ../../${in_file}_shifted_random* ./
+
+fi
+
+if [[ $method == "shuffled" ]]; then
+
+echo "Shuffling Data"
+
+selectRandomSRA.R -i $in_file -m shuffled -o ${in_file}_shuffled -q
+randomDataReformat.R -i ${in_file}_shuffled -g $in_file -q
+
+echo "Combining shuffled calls"
+
+cd ./random_sequences/shuffled/
+mkdir gff_files
+mv ../../${in_file}_shuffled_random_sra.gff gff_files
+cp ../../${in_file}.gff gff_files
+combine_gff_files.R -f gff_files/ -o ${in_file}_shuffled_random -r -g ${in_file}.gff
+mv ../../${in_file}_shuffled_random* ./
+
+fi
+
+```
+
+
+###selectRandomSRA.R
+
+```{r selectRandomSRA.R, eval = F}
+#!/usr/bin/env Rscript
+suppressMessages(library('getopt'))
+
+
+##Getopts setup ####
+spec = matrix(c(
+  'help' , 'h', 0, "logical",
+  'quiet' , 'q', 0, "logical",
+  'file_path', 'p', 2, "character",
+  'out_name', 'o', 2, "character",
+  'name', 'i', 1, "character",
+  'method', 'm', 1, "character"
+), byrow=TRUE, ncol=4)
+
+
+opt = getopt(spec)
+if ( !is.null(opt$help) ) {
+  cat("selectRandomSRA.R version 1.1\n")
+  cat(" \n")
+  cat("Use selectRandomSRA. <options> -i <name>\n")
+  cat(" \n")
+  cat("Options:\n")
+  cat("  -i <name> The GCA accession to work with. Do not inclue the gff file extension. The default is the same as the sra input\n")
+  cat("  -m <method> Either 'shuffled' or 'shifted' (Shuffled in default)\n")
+  cat("  -q <quiet> Do not print any updates\n")
+  cat("  -p <file path> The location of the other files and the output file\n")
+  cat("  -o <output file name> The name of the output file. Do not inclue the gff file extension. The default is the same as the sra input\n")
+  q(status=1)
+}
+
+if ( is.null(opt$name) ) {
+  cat("Error: -i <input> is required.\n")
+  q(status=1)
+}
+
+
+
+
+
+
+
+suppressMessages(library(tidyverse))
+suppressMessages(library(comparativeSRA))
+suppressMessages(library(IRanges))
+suppressMessages(library(stringi))
+
+if ( is.null(opt$file_path ) ) { opt$file_path = "." }
+if ( is.null(opt$out_name ) ) { opt$out_name = opt$name }
+if ( is.null(opt$method ) ) { opt$method = 'shuffled' }
+opt$method <- tolower(opt$method)
+if(opt$method != 'shuffled' && opt$method != 'shifted'){
+  opt$method <- 'shuffled'
+  cat("Incorrect method selected. Using 'shuffled")
+}
+
+filePath <- opt$file_path
+
+if (file.exists(paste(filePath,"/random_sequences", sep = "")) == F){
+    dir.create(file.path(filePath,"/random_sequences"))
+    if(is.null(opt$quiet)){
+    cat(paste(filePath,"/random_sequences made\n", sep = ""))
+    }
+  }else{
+    if(is.null(opt$quiet)){
+
+    cat(paste(filePath,"/random_sequences exists\n", sep = ""))
+    }
+  }
+
+
+# Functions ---------------------------------------------------------------
+##this is just copied from getRNASequences and will need to be adapted/tested
+getSequences <- function(ids_lookup){
+    tmp <- ids_lookup
+  tmp <- tmp%>%mutate(sequence = "")
+
+  for(i in 1:nrow(tmp)){
+    printRemaining(i = i, length = nrow(tmp), increment = 5)
+    # x <- system(command = paste("sed -n '", (as.numeric(tmp[i, 2]) + 1), "p'",
+    #                             " ~/phd/RNASeq/new_calls/",
+    #                             tmp[i, 3],
+    #                             "_new_calls.txt", sep = ""), intern = T)
+    # x <- unlist(strsplit(as.character(x), split = "\t"))
+    #print(x[3:4])
+
+
+   try( tmp[i, ncol(tmp)] <- system(paste("test_string=`grep -v ^'>' ~/phd/RNASeq/sequences/",
+                                      "GCA_000017765.1",
+                                      ".fna | tr -d '\n'`; echo ${test_string:",
+                                      ids_lookup[i,1], ":", as.numeric(ids_lookup[i,2]) - as.numeric(ids_lookup[i,1]),
+                                      "}", sep = ""), intern = T))
+  }
+
+  return(tmp)
+}
+
+
+getSequencesFast <- function(ids_lookup, fasta){
+  tmp <- ids_lookup
+  tmp <- tmp%>%mutate(sequence = "")
+
+  for(i in 1:nrow(tmp)){
+    printRemaining(i = i, length = nrow(tmp), increment = 5)
+    # x <- system(command = paste("sed -n '", (as.numeric(tmp[i, 2]) + 1), "p'",
+    #                             " ~/phd/RNASeq/new_calls/",
+    #                             tmp[i, 3],
+    #                             "_new_calls.txt", sep = ""), intern = T)
+    # x <- unlist(strsplit(as.character(x), split = "\t"))
+    #print(x[3:4])
+
+
+    try( tmp[i, ncol(tmp)] <- substr(fasta, ids_lookup[i,1], ids_lookup[i,2]))
+
+  }
+
+  return(tmp)
+}
+
+
+# working -----------------------------------------------------------------
+
+
+sra <- read.table(paste(filePath, "/", opt$name, "_new_calls.txt", sep = ""), header = T, sep = "\t", quote = "")
+gff <- read.table(paste(filePath, "/", opt$name, ".gff", sep = ""), header = F, sep = "\t", quote = "")
+colnames(gff) <- c("sequence", "source", "feature", "start", "end", "score", "strand", "phase", "Atrribute")
+
+#fileName <- "~/phd/RNASeq/escherichia/GCA_000017765.1_data/GCA_000017765.1.fna"
+
+#fasta <- readLines(fileName)
+
+fasta <- readLines(paste(filePath, "/", opt$name, ".fna", sep = ""))
+fasta <- data.frame(sequence = fasta)
+
+
+fasta <- fasta %>% filter(grepl(">", sequence) == F) %>%
+  mutate(length = str_length(sequence)) %>%
+  mutate(left = 1) %>%
+  mutate(length.total = cumsum(length)) %>%
+  mutate(right =  length.total) %>%
+  mutate(left = right - length + 1) %>%
+  select(left, sequence, right)
+fasta.list <- paste(as.vector(fasta$sequence), collapse = "")
+
+lengths <- sra$end - sra$start
+strands <- sra$strand
+
+sdLength <- sd(lengths)
+meanLength <- mean(lengths)
+
+propStrand <- prop.table(table(strands))
+
+
+if(opt$method == "shuffled"){
+
+  if (file.exists(paste(filePath,"/random_sequences/shuffled", sep = "")) == F){
+    dir.create(file.path(filePath,"/random_sequences/shuffled"))
+    if(is.null(opt$quiet)){
+      cat(paste(filePath,"/random_sequences/shuffled made\n", sep = ""))
+    }
+  }else{
+    if(is.null(opt$quiet)){
+
+      cat(paste(filePath,"/random_sequences/shuffled exists\n", sep = ""))
+    }
+  }
+
+
+
+sraLength <- nrow(sra)
+if(sraLength < 500){sraLength <- 500}
+if(sraLength > 2000){sraLength <- 2000}
+
+startsRandom <- round(runif(sraLength, min = 1, max = max(fasta$right)))
+lengthsRandom <- round(rnorm(sraLength, mean=meanLength, sd=sdLength))
+strandRandom <- sample(c("-", "+"), sraLength, replace = T, prob = c( propStrand["-"],  propStrand["+"]))
+
+
+random <- data.frame(start= startsRandom, end = startsRandom + lengthsRandom, strand = strandRandom)
+random <- random %>% arrange(start) %>%
+  mutate(tmp.end = ifelse(start > end, start, end),
+         tmp.start = ifelse(start > end, end, start)) %>%
+  mutate(start = tmp.start,
+         end = tmp.end) %>%
+  filter(start < end)
+}else{
+
+  if (file.exists(paste(filePath,"/random_sequences/shifted", sep = "")) == F){
+    dir.create(file.path(filePath,"/random_sequences/shifted"))
+    if(is.null(opt$quiet)){
+      cat(paste(filePath,"/random_sequences/shifted made\n", sep = ""))
+    }
+  }else{
+    if(is.null(opt$quiet)){
+
+      cat(paste(filePath,"/random_sequences/shifted exists\n", sep = ""))
+    }
+  }
+
+  sraLength <- nrow(sra)
+  if(sraLength < 50){sraLength <- 50}
+  if(sraLength > 2000){sraLength <- 2000}
+
+  shifts <- round(runif(1, min = -max(fasta$right)/2, max = max(fasta$right)/2))
+
+  random <- sra %>% mutate(start = (start + shifts[1]) %% max(fasta$right),
+                           end = (end + shifts[1])%% max(fasta$right)) %>%
+    select(start,end, strand)
+
+  
+random <- random %>%
+  filter(start < end)
+}
+
+
+ncRNA <- sra%>%
+  mutate(feature = ifelse(new_feature == T, "sra_novel", "sra_known")) %>% select(start, end, strand, feature)
+
+ncRNA <- ncRNA %>% arrange(start) %>%
+  mutate(tmp.end = ifelse(start > end, start, end),
+         tmp.start = ifelse(start > end, end, start)) %>%
+  mutate(start = tmp.start,
+         end = tmp.end) %>%
+  filter(start < end)
+
+
+cds <- gff %>% filter(feature == "CDS")  %>% select(start, end, strand, feature)
+
+cds <- cds %>% arrange(start) %>%
+  mutate(tmp.end = ifelse(start > end, start, end),
+         tmp.start = ifelse(start > end, end, start)) %>%
+  mutate(start = tmp.start,
+         end = tmp.end) %>%
+  filter(start < end)
+
+features <- ncRNA %>% bind_rows(cds) %>%
+  arrange(start)
+
+
+
+
+query <- IRanges(random$start, random$end)
+subject <- IRanges(features$start, features$end)
+
+x <- findOverlaps(query = query, subject = subject)
+
+
+
+randomPositions <- x@from
+featuresPositions <- x@to
+
+random <- random %>% mutate(random_row = row_number()) %>%
+  select(start, end, strand, random_row) %>%
+  dplyr::rename(startR = start,
+                endR = end,
+                strandR = strand)
+
+features <- features %>% mutate(features_row = row_number())%>%
+  select(start, end, strand, features_row, feature) %>%
+  dplyr::rename(startF = start,
+                endF = end,
+                strandF = strand)
+
+overlaps <- data.frame(random_row = randomPositions,
+                       features_row = featuresPositions)
+overlaps <- overlaps %>%
+  full_join(random, by  = "random_row")%>%
+  left_join(features, by  = "features_row")
+
+overlaps <- overlaps %>% mutate(sense = ifelse(strandR == strandF, "sense", "antisense"),
+                                sense = ifelse(feature == "sra_novel", "sense", sense),
+                                sense = ifelse(is.na(sense), "sense", sense))
+
+random <- overlaps %>% group_by(startR) %>% summarise(feature_list = paste(unique(feature), collapse = ","))
+
+random <- random %>% mutate(type = ifelse(grepl("CDS", feature_list), "CDS", ifelse(grepl("known", feature_list), "sra_known", ifelse(grepl("novel", feature_list), "sra_novel", "intergenic"))))
+
+random <- random %>% select(startR, type)
+
+overlaps <- random %>%
+  left_join(overlaps, by = "startR")
+
+
+
+
+sequences <- getSequencesFast(overlaps[,], fasta.list)
+
+sequences <- sequences %>%
+  mutate(tmp.seq = str_replace_all(string = sequence, pattern = "A", replacement = "B")) %>%
+  mutate(tmp.seq = str_replace_all(string = tmp.seq, pattern = "C", replacement = "D")) %>%
+  mutate(tmp.seq = str_replace_all(string = tmp.seq, pattern = "G", replacement = "H")) %>%
+  mutate(tmp.seq = str_replace_all(string = tmp.seq, pattern = "T", replacement = "U")) %>%
+  mutate(tmp.seq = str_replace_all(string = tmp.seq, pattern = "B", replacement = "T")) %>%
+  mutate(tmp.seq = str_replace_all(string = tmp.seq, pattern = "D", replacement = "G")) %>%
+  mutate(tmp.seq = str_replace_all(string = tmp.seq, pattern = "H", replacement = "C")) %>%
+  mutate(tmp.seq = str_replace_all(string = tmp.seq, pattern = "U", replacement = "A")) %>%
+  mutate(tmp.seq = stri_reverse(tmp.seq))
+
+seqSense <- sequences %>% filter(sense == "sense", type != "intergenic") %>% mutate(id = paste(">", opt$name, "_random_", row_number(), sep = "")) %>%
+  select(id, sequence)
+
+seqAntisense <- sequences %>% filter(sense == "antisense", type != "intergenic") %>% mutate(id = paste(">", opt$name, "_random_", row_number(), sep = "")) %>%
+  select(id, sequence)
+
+sequences <- sequences %>% mutate(id = paste(">", opt$name, "_random_", row_number(), sep = "")) %>%
+  select(id, sequence)
+
+cat(paste("Writing the output to ", filePath, "/", opt$out_name, "_random_sequences.txt\n", sep = ""))
+write.table(x = sequences, file = paste(filePath, "/", opt$out_name, "_random_sequences.fna", sep = ""), row.names = F, col.names = F, quote = F, sep = "\n")
+
+write.table(x = seqSense , file = paste(filePath, "/", opt$out_name, "_random_sequences_sense.fna", sep = ""), row.names = F, col.names = F, quote = F, sep = "\n")
+write.table(x = seqAntisense , file = paste(filePath, "/", opt$out_name, "_random_sequences_antisense.fna", sep = ""), row.names = F, col.names = F, quote = F, sep = "\n")
+
+
+overlaps <- overlaps %>% 
+  mutate(strandR = "+", sense = "sense") %>% 
+  select(startR, endR, strandR, sense, type) %>% unique()
+
+cat(paste("Writing the output to ", filePath, "/", opt$out_name, "_random_data.txt\n", sep = ""))
+write.table(x = overlaps, file = paste(filePath, "/", opt$out_name, "_random_data.txt", sep = ""), row.names = F, col.names = T, quote = F, sep = "\t")
+
+#
+
+```
+
+###randomDataReformat.R 
+
+```{r randomDataReformat.R , eval = F}
+#!/usr/bin/env Rscript
+suppressMessages(library('getopt'))
+
+spec = matrix(c(
+  'help' , 'h', 0, "logical",
+  'quiet' , 'q', 0, "logical",
+  'gff' , 'g', 1, "character",
+  'input' , 'i', 1, "character",
+  'file_path', 'p', 2, "character",
+  'out_name', 'o', 2, "character"
+), byrow=TRUE, ncol=4)
+
+
+opt = getopt(spec)
+
+if ( !is.null(opt$help) ) {
+  cat(" version 1.0\n")
+  cat(" \n")
+  cat("Use  <options> -f <sra plot file> -g <gff file>\n")
+  cat(" \n")
+  cat("Options:\n")
+  cat("  -g <gff file> The file that contains the gff data. Do not inclue the gff file extension\n")
+  cat("  -p <file path> The location of the other files and the output file\n")
+  cat("  -o <output file name> The name of the output file. Do not inclue the gff file extension. The default is the same as the sra input\n")
+  q(status=1)
+}
+
+
+if ( is.null(opt$gff) ) {
+  cat("Error: -g <gff file> is required.\n")
+  q(status=1)
+}
+
+
+
+suppressMessages(library(tidyverse))
+suppressMessages(library(tjnFunctions))
+###--- column 1 is reverse and column 2 is forward ---###
+
+if ( is.null(opt$file_path ) ) { opt$file_path = "." }
+if ( is.null(opt$out_name ) ) { opt$out_name = opt$input }
+
+if ( is.null(opt$input ) ) { opt$input = opt$gff }
+
+
+
+gffName <- opt$gff
+filePath <- opt$file_path
+
+
+
+
+
+
+
+
+
+##change this
+sraDat  <- tryCatch({
+suppressWarnings(sraDat <- read.table(paste(filePath, "/", opt$input, "_random_data.txt", sep = ""), sep = "\t", header = T))
+  sraDat
+}, error =  function(e) {
+  cat(paste("Error: ", opt$file_path, "/", opt$input, sep = ""))
+  q(status=1)
+})
+
+
+
+gffMain <- readLines(paste(filePath, "/", gffName, ".gff", sep = ""))
+gffMain <- data.frame(text = gffMain)
+genomeInfo <- as.character(gffMain[8,1])
+genomeBuild <- as.character(gffMain[4,1])
+genomeSpecies <- as.character(gffMain[9,1])
+accession <- strsplit(genomeInfo, " ")[[1]][2]
+
+
+#Change this
+gff <- sraDat%>%mutate(strand = strandR,
+                       start = startR,
+                       stop = endR,
+                       source = "random_sequence",
+                       seqname = accession,
+                       median.val = 1,
+                       feature = type,
+                       frame = ".",
+                       attribute = paste("ID=random_rna_", row_number(), sep = ""))%>%
+  select(seqname, source, feature, start, stop, median.val, strand, frame, attribute) %>%
+  arrange(as.numeric(start))
+
+
+
+gff <- gff%>%filter(start != 0)
+
+
+
+
+fileConn<-file(paste(filePath, "/", opt$out_name, "_random_sra.gff", sep = ""))
+writeLines(c("##gff-version 3",
+             "#!gff-spec-version 1.21",
+             "#!processor R script (local) with manual add of top section",
+             genomeBuild,
+             paste("#!genome-build-accession NCBI_Assembly:", opt$gff, sep = ""),
+             paste("#!annotation-date ", Sys.Date(), sep = ""),
+             "#!annotation-source randomDataReformat.R (local version)",
+             genomeInfo,
+             genomeSpecies), fileConn)
+close(fileConn)
+
+cat(paste("Writing the gff output to ", filePath, "/", opt$out_name, "_random_sra.gff\n", sep = ""))
+write.table(x = gff, file = paste(filePath, "/", opt$out_name, "_random_sra.gff", sep = ""), row.names = F, col.names = F, quote = F, sep = "\t", append = T)
+
+
+
+
+
+
+```
+
+
 ##Tests
 
 ```{r alignemnt_file_check, eval = F}
@@ -2880,7 +3473,7 @@ combinedCalls <- read.table("~/phd/RNASeq/escherichia/GCA_000017745_data/random_
 
 ```{r escherichia_merging_analysis, eval=F}
 
-escherichiaMerged <- read.table("~/phd/RNASeq/combined_gff_files/escherichia_merged.gff", sep = "\t", header = T, fill = T)
+escherichiaMerged <- read.table("~/phd/RNASeq/combined_gff_files/version_4/lysobacter-pseudomonas_merged.gff", sep = "\t", header = T, fill = T)
 escherichiaCalls <- read.table("~/phd/RNASeq/escherichia/escherichia_calls", header = T, sep = "\t", fill = T)
 
 randomMerged <- read.table("~/phd/RNASeq/combined_gff_files_random/escherichia_merged.gff", sep = "\t", header = T, fill = T)
@@ -3424,12 +4017,15 @@ ggplot() +
 
 ```
 
+###Conservation Analysis
 
 ```{r conservation_analysis, eval=F}
 
 
 ##set to real or random as needed
-escherichiaMerged <- read.table("~/phd/RNASeq/combined_gff_files_random/escherichia-shigella-salmonella-enterobacter-klebsiella-serratia_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
+escherichiaMerged <- read.table("~/phd/RNASeq/combined_gff_files/version_5/all_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
+
+tab <- escherichiaMerged %>% group_by(all.prop) %>%  summarise(count = n())
 
 # serr <- read.table("~/phd/RNASeq/combined_gff_files_random/shigella_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
 # serr %>% group_by(shigella.prop) %>% summarise(count = n())
@@ -3440,7 +4036,7 @@ escherichiaMerged[escherichiaMerged == "1-0"] <- "0-1"
 
 escherichiaMerged %>% group_by(feature) %>% summarise(count = n())
 
-escherichiaMerged <- escherichiaMerged %>% filter(feature == "CDS")
+#escherichiaMerged <- escherichiaMerged %>% filter(feature == "CDS")
 
 random_data <- T
 if(random_data == T){
@@ -3486,7 +4082,7 @@ escherichiaMerged <- escherichiaMerged %>% mutate(escherichia.shigella.salmonell
 
 escherichiaMerged <- escherichiaMerged %>% mutate(escherichia.shigella.fitch = ifelse(escherichia.shigella.fitch == "0-1", 
                                                                                       ifelse(escherichia.fitch == "0-1", 
-                                                                                             ifelse(shigella.fitch == "0-1",
+                                                                                             ifelse(Shigella.fitch == "0-1",
                                                                                                     "1",
                                                                                                     "0-1"), 
                                                                                              "0-1"),
@@ -3494,7 +4090,7 @@ escherichiaMerged <- escherichiaMerged %>% mutate(escherichia.shigella.fitch = i
 
 escherichiaMerged <- escherichiaMerged %>% mutate(enterobacter.klebsiella.fitch = ifelse(enterobacter.klebsiella.fitch == "0-1", 
                                                                                       ifelse(enterobacter == "0-1", 
-                                                                                             ifelse(klebsiella == "0-1",
+                                                                                             ifelse(klebsiella.fitch == "0-1",
                                                                                                     "1",
                                                                                                     "0-1"), 
                                                                                              "0-1"),
@@ -3541,7 +4137,7 @@ escherichiaMerged <- escherichiaMerged %>% mutate(group = ifelse(is.na(group), i
 
 escherichiaMerged <- escherichiaMerged %>% mutate(group = ifelse(is.na(group), ifelse(escherichia.shigella.fitch == 1, "species", NA) , group))
 escherichiaMerged <- escherichiaMerged %>% mutate(group = ifelse(is.na(group), ifelse(enterobacter == 1, "species", NA) , group))
-escherichiaMerged <- escherichiaMerged %>% mutate(group = ifelse(is.na(group), ifelse(klebsiella == 1, "species", NA) , group))
+escherichiaMerged <- escherichiaMerged %>% mutate(group = ifelse(is.na(group), ifelse(klebsiella.fitch == 1, "species", NA) , group))
 escherichiaMerged <- escherichiaMerged %>% mutate(group = ifelse(is.na(group), ifelse(salmonella.fitch == 1, "species", NA) , group))
 escherichiaMerged <- escherichiaMerged %>% mutate(group = ifelse(is.na(group), ifelse(serratia.fitch == 1, "species", NA) , group))
 

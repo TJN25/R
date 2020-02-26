@@ -1,4 +1,5 @@
 #!/usr/bin/env Rscript
+options(warn = -1)
 suppressMessages(library('getopt'))
 
 spec = matrix(c(
@@ -54,7 +55,6 @@ filePath <- opt$file_path
 
 
 
-
 ##change this
 sraDat  <- tryCatch({
 suppressWarnings(sraDat <- read.table(paste(filePath, "/", opt$input, "_random_data.txt", sep = ""), sep = "\t", header = T))
@@ -65,14 +65,12 @@ suppressWarnings(sraDat <- read.table(paste(filePath, "/", opt$input, "_random_d
 })
 
 
-
-gffMain <- readLines(paste(filePath, "/", gffName, ".gff", sep = ""))
+gffMain <- readLines(paste(filePath, "/gff_files/", gffName, ".gff", sep = ""))
 gffMain <- data.frame(text = gffMain)
 genomeInfo <- as.character(gffMain[8,1])
 genomeBuild <- as.character(gffMain[4,1])
 genomeSpecies <- as.character(gffMain[9,1])
 accession <- strsplit(genomeInfo, " ")[[1]][2]
-
 
 #Change this
 gff <- sraDat%>%mutate(strand = strandR,
