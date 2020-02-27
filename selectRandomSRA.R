@@ -45,9 +45,21 @@ suppressMessages(library(comparativeSRA))
 suppressMessages(library(IRanges))
 suppressMessages(library(stringi))
 
+
+test_setup <- F
+if(test_setup == T){
+
+    opt$name <- "GCA_000213655.1"
+
+    opt$file_path <- "~/phd/RNASeq/genera/Alteromonas//GCA_000213655.1.data/"
+
+
+}
+
+
 if ( is.null(opt$file_path ) ) { opt$file_path = "." }
 if ( is.null(opt$out_name ) ) { opt$out_name = opt$name }
-if ( is.null(opt$method ) ) { opt$method = 'shuffled' }
+if ( is.null(opt$method ) ) { opt$method = 'shifted' }
 opt$method <- tolower(opt$method)
 if(opt$method != 'shuffled' && opt$method != 'shifted'){
   opt$method <- 'shuffled'
