@@ -68,7 +68,7 @@ if ( is.null(opt$gff1) ) {
 
 if ( is.null(opt$alignment) ) {
   align <- F
-  cat("Warning: -a <alignment file> not specified. Files will not be aligned.\n")
+  #cat("Warning: -a <alignment file> not specified. Files will not be aligned.\n")
 
 
 }else{
@@ -176,7 +176,7 @@ if(initial_data == T){
     buildReferenceLookupData <- list(reference = reference,
                                      seqA = as.numeric(opt$seq1), seqB = as.numeric(opt$seq2),
                                      collapse.alignment = T,
-                                     quiet = F)
+                                     quiet = T)
     
     reorderGFFData <- list(reference = reference,
                            gff1 = gff1, gff2= gff2)
@@ -192,9 +192,9 @@ if(initial_data == T){
                                       gff2 = gff2,
                                       filenum1 = opt$id1,
                                       filenum2 = opt$id2,
-                                quiet = F)
+                                quiet = T)
   
-ncRNAgff <- ncRNAgff %>% mutate(set_val = 1)
+ncRNAgff <- ncRNAgff %>% mutate(set_val = 1) %>% filter(as.numeric(end) - as.numeric(start) <= 1000)
 
 
 if(test_setup){
@@ -206,7 +206,8 @@ mergedData <- mergeSRAFast(ncRNAgff = ncRNAgff,
                        filenum1 = opt$id1,
                        filenum2 = opt$id2,
                        initial_data = initial_data, 
-                       align = T)
+                       align = T,
+                       quiet = T)
 
 mergedData <- mergedData%>%mutate(change = ifelse(start < end, F, T))%>%
   mutate(start.tmp = end)%>%
@@ -290,7 +291,7 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
     buildReferenceLookupData <- list(reference = reference,
                                      seqA = as.numeric(opt$seq1), seqB = as.numeric(opt$seq2),
                                      collapse.alignment = T,
-                                     quiet = F)
+                                     quiet = T)
     
     reorderGFFData <- list(reference = reference,
                            gff1 = gff1, gff2= gff2)
@@ -308,7 +309,7 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
                                filenum2 = filenum2,
                                seqA = 1,
                                seqB = 2,
-                               quiet = F)
+                               quiet = T)
 
    ncRNAgff <- ncRNAgff%>%select(-changed)%>%unique()
   ncRNAgff[is.na(ncRNAgff)] <- "0"
@@ -316,6 +317,7 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
     ncRNAgff <- gff1Working%>%bind_rows(gff2Working)
     ncRNAgff[is.na(ncRNAgff)] <- 0
   }
+  ncRNAgff <- ncRNAgff %>% mutate(set_val = 1) %>% filter(as.numeric(end) - as.numeric(start) <= 1000)
   
   if(test_setup == T){
   mergeSRAData <- list(ncRNAgff = ncRNAgff, filenum1 = filenum1, filenum2 = filenum2, initial_data = initial_data, align = align)
@@ -329,7 +331,7 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
                            filenum2 = filenum2,
                            align = align, 
                            initial_data = F,
-                           quiet = F)
+                           quiet = T)
 
 
 
