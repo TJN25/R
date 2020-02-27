@@ -1,4 +1,5 @@
 #!/usr/bin/env Rscript
+options(warn = -1)
 suppressMessages(library('getopt'))
 
 
@@ -121,7 +122,7 @@ getSequencesFast <- function(ids_lookup, fasta){
 
 
 sra <- read.table(paste(filePath, "/", opt$name, "_new_calls.txt", sep = ""), header = T, sep = "\t", quote = "")
-gff <- read.table(paste(filePath, "/", opt$name, ".gff", sep = ""), header = F, sep = "\t", quote = "")
+gff <- read.table(paste(filePath, "/gff_files/", opt$name, ".gff", sep = ""), header = F, sep = "\t", quote = "")
 colnames(gff) <- c("sequence", "source", "feature", "start", "end", "score", "strand", "phase", "Atrribute")
 
 #fileName <- "~/phd/RNASeq/escherichia/GCA_000017765.1_data/GCA_000017765.1.fna"
@@ -278,7 +279,6 @@ random <- random %>% select(startR, type)
 
 overlaps <- random %>%
   left_join(overlaps, by = "startR")
-
 
 
 
