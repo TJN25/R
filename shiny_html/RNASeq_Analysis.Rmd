@@ -427,7 +427,7 @@ renderDataTable({
 
 ```{r counts_at_each_step, echo = F, include=F}
 
-genera <- c("Escherichia", "Shigella", "Salmonella", "Enterobacter", "Klebsiella", "Serratia")
+genera <- c("Escherichia", "Shigella", "Salmonella", "Enterobacter", "Klebsiella", "Serratia", "Lysobacter", "Acinetobacter", "Alteromonas", "Pseudomonas", "Xanthomonas")
 file_path <- "~/phd/RNASeq/genera/"
 # i <- genera[1]
 # j <- folders[4]
@@ -577,7 +577,230 @@ combined_random <-combinedListRandom[["escherichia-shigella-salmonella-enterobac
 
 ###Analysis of Conservation
 
-```{r conservation_of_sRNAs, eval = T}
+```{r conservation_of_sRNAs, eval = F}
+
+#list.files("~/phd/RNASeq/combined_gff_files/version_5/", pattern = "_merged.gff$")
+
+resList <- list()
+
+levelList <- list()
+
+resList$strain <- c("escherichia", "shigella", "Salmonella")
+resList$species <- c("Acinetobacter", "Altermonas", "Enterobacter", "escherichia-shigella", "Klebsiella", "pseudomonas", "serratia", "xanthomonas")
+resList$genus <- c("escherichia-shigella-salmonella", "enterobacter-klebsiella", "xanthomonas-lysobacter", "escherichia-shigella-salmonella-enterobacter-klebsiella")
+resList$family <- c("escherichia-shigella-salmonella-enterobacter-klebsiella-serratia", "acinetobacter-pseudomonas")
+resList$order <- c("acinetobacter-pseudomonas-alteromonas", "escherichia-shigella-salmonella-enterobacter-klebsiella-serratia-xanthomonas-lysobacter", 
+                   "all_2")
+random <- T
+if(random){
+  filePath <- "~/phd/RNASeq/combined_gff_files_random/version_5/"
+}else{
+  filePath <- "~/phd/RNASeq/combined_gff_files/version_5/"
+}
+
+resDat <- data.frame(id = NA,
+                     strain.fitch = NA,
+                     strain.prop = NA,
+                     species.fitch = NA,
+                     species.prop = NA,
+                     genus.fitch = NA,
+                     genus.prop = NA,
+                     family.fitch = NA,
+                     family.prop = NA,
+                     order.fitch = NA,
+                     order.prop = NA,
+                     file.name = NA,
+                     category = NA, stringsAsFactors = F)
+resDat <- resDat %>% mutate_all(as.character)
+
+i <- resList$species[3]
+for(i in resList$species){
+  dat <- read.table(paste(filePath, i, "_merged.gff", sep =""), sep = "\t", header = T, fill = T, as.is = T)
+
+  if(grepl(".prop", colnames(dat)[ncol(dat)]) == F){
+  
+    dat <- dat %>% mutate(prop = ifelse(set_val == "1", "2-2", "1-2"))
+    
+  tmp <- data.frame(id = dat$id,
+                     strain.fitch = NA,
+                     strain.prop = NA,
+                     species.fitch = dat$set_val,
+                     species.prop = dat$prop,
+                     genus.fitch = NA,
+                     genus.prop = NA,
+                     family.fitch = NA,
+                     family.prop = NA,
+                     order.fitch = NA,
+                     order.prop = NA,
+                     file.name = i,
+                    category = "species")
+        tmp <- tmp %>% mutate_all(as.character)
+
+  resDat <- resDat %>% bind_rows(tmp)
+  }else{
+      tmp <- data.frame(id = dat$id,
+                     strain.fitch = NA,
+                     strain.prop = NA,
+                     species.fitch = dat[,(ncol(dat) - 1)],
+                     species.prop = dat[,ncol(dat)],
+                     genus.fitch = NA,
+                     genus.prop = NA,
+                     family.fitch = NA,
+                     family.prop = NA,
+                     order.fitch = NA,
+                     order.prop = NA,
+                     file.name = i,
+                     category = "species")
+            tmp <- tmp %>% mutate_all(as.character)
+
+  resDat <- resDat %>% bind_rows(tmp)
+  }
+  
+  }
+
+for(i in resList$strain){
+  dat <- read.table(paste(filePath, i, "_merged.gff", sep =""), sep = "\t", header = T, fill = T, as.is = T)
+
+  if(grepl(".prop", colnames(dat)[ncol(dat)]) == F){
+  
+    dat <- dat %>% mutate(prop = ifelse(set_val == "1", "2-2", "1-2"))
+    
+  tmp <- data.frame(id = dat$id,
+                     strain.fitch = dat$set_val,
+                     strain.prop =  dat$prop,
+                     species.fitch = NA,
+                     species.prop = NA,
+                      genus.fitch = NA,
+                     genus.prop = NA,
+                     family.fitch = NA,
+                     family.prop = NA,
+                     order.fitch = NA,
+                     order.prop = NA,
+                     file.name = i,
+                    category = "strain")
+        tmp <- tmp %>% mutate_all(as.character)
+
+  resDat <- resDat %>% bind_rows(tmp)
+  }else{
+      tmp <- data.frame(id = dat$id,
+                     strain.fitch = dat[,(ncol(dat) - 1)],
+                     strain.prop = dat[,ncol(dat)],
+                     species.fitch = NA,
+                     species.prop = NA,
+                     genus.fitch = NA,
+                     genus.prop = NA,
+                     family.fitch = NA,
+                     family.prop = NA,
+                     order.fitch = NA,
+                     order.prop = NA,
+                     file.name = i,
+                     category = "strain")
+            tmp <- tmp %>% mutate_all(as.character)
+
+  resDat <- resDat %>% bind_rows(tmp)
+  }
+  
+  }
+
+for(i in resList$genus){
+  dat <- read.table(paste(filePath, i, "_merged.gff", sep =""), sep = "\t", header = T, fill = T, as.is = T)
+
+  if(grepl(".prop", colnames(dat)[ncol(dat)]) == F){
+  
+    dat <- dat %>% mutate(prop = ifelse(set_val == "1", "2-2", "1-2"))
+    
+  tmp <- data.frame(id = dat$id,
+                     strain.fitch = NA,
+                     strain.prop =  NA,
+                     species.fitch = NA,
+                     species.prop = NA,
+                      genus.fitch = dat$set_val,
+                     genus.prop = dat$prop,
+                     family.fitch = NA,
+                     family.prop = NA,
+                     order.fitch = NA,
+                     order.prop = NA,
+                     file.name = i,
+                    category = "genus")
+        tmp <- tmp %>% mutate_all(as.character)
+
+  resDat <- resDat %>% bind_rows(tmp)
+  }else{
+      tmp <- data.frame(id = dat$id,
+                     strain.fitch = NA,
+                     strain.prop = NA,
+                     species.fitch = NA,
+                     species.prop = NA,
+                     genus.fitch = dat[,(ncol(dat) - 1)],
+                     genus.prop = dat[,ncol(dat)],
+                     family.fitch = NA,
+                     family.prop = NA,
+                     order.fitch = NA,
+                     order.prop = NA,
+                     file.name = i,
+                     category = "genus")
+            tmp <- tmp %>% mutate_all(as.character)
+
+  resDat <- resDat %>% bind_rows(tmp)
+  }
+  
+}
+
+for(i in resList$family){
+  dat <- read.table(paste(filePath, i, "_merged.gff", sep =""), sep = "\t", header = T, fill = T, as.is = T)
+
+
+      tmp <- data.frame(id = dat$id,
+                     strain.fitch = NA,
+                     strain.prop = NA,
+                     species.fitch = NA,
+                     species.prop = NA,
+                     genus.fitch = NA,
+                     genus.prop = NA,
+                     family.fitch = dat[,(ncol(dat) - 1)],
+                     family.prop = dat[,ncol(dat)],
+                     order.fitch = NA,
+                     order.prop = NA,
+                     file.name = i,
+                     category = "family")
+            tmp <- tmp %>% mutate_all(as.character)
+
+  resDat <- resDat %>% bind_rows(tmp)
+  }
+
+for(i in resList$order){
+  dat <- read.table(paste(filePath, i, "_merged.gff", sep =""), sep = "\t", header = T, fill = T, as.is = T)
+
+
+      tmp <- data.frame(id = dat$id,
+                     strain.fitch = NA,
+                     strain.prop = NA,
+                     species.fitch = NA,
+                     species.prop = NA,
+                     genus.fitch = NA,
+                     genus.prop = NA,
+                     family.fitch = NA,
+                     family.prop = NA,
+                     order.fitch = dat[,(ncol(dat) - 1)],
+                     order.prop = dat[,ncol(dat)],
+                     file.name = i,
+                     category = "order")
+      tmp <- tmp %>% mutate_all(as.character)
+
+  resDat <- resDat %>% bind_rows(tmp)
+  }
+
+for(i in names(resList)){
+  print(i)
+  summary <- resDat %>% filter(category == i) %>% 
+    group_by(strain.fitch, species.fitch, genus.fitch, family.fitch, order.fitch) %>%
+    summarise(count = n())
+
+  print(summary)
+}
+
+
+
 
 tree <- read.tree("~/phd/RNASeq/alignments/all_alignments/all.guide_tree")
 
@@ -3473,10 +3696,10 @@ combinedCalls <- read.table("~/phd/RNASeq/escherichia/GCA_000017745_data/random_
 
 ```{r escherichia_merging_analysis, eval=F}
 
-escherichiaMerged <- read.table("~/phd/RNASeq/combined_gff_files/version_4/lysobacter-pseudomonas_merged.gff", sep = "\t", header = T, fill = T)
+escherichiaMerged <- read.table("~/phd/RNASeq/combined_gff_files/version_5/all_2_merged.gff", sep = "\t", header = T, fill = T)
 escherichiaCalls <- read.table("~/phd/RNASeq/escherichia/escherichia_calls", header = T, sep = "\t", fill = T)
 
-randomMerged <- read.table("~/phd/RNASeq/combined_gff_files_random/escherichia_merged.gff", sep = "\t", header = T, fill = T)
+randomMerged <- read.table("~/phd/RNASeq/combined_gff_files_random/version_5/all_2_merged.gff", sep = "\t", header = T, fill = T)
 randomCalls <- read.table("~/phd/RNASeq/escherichia/escherichia_random_calls", header = T, sep = "\t", fill = T)
 
 sum(escherichiaMerged$number_of_features)

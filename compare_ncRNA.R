@@ -91,17 +91,17 @@ opt$alignment <- "escherichia"
 opt$seq1 <- "1"
 opt$seq2 <- "5"
 #opt$out_name <- "esch_1-2-3-15"
-opt$file_path <- "~/phd/RNASeq/combined_gff_files/version_4/"
+opt$file_path <- "~/phd/RNASeq/combined_gff_files_random/version_5/"
 #align <- F
 opt$genus <- T
 initial_data <- F
 }else{
   initial_data <- T
-opt$gff1 <- "GCA_002843685.1"
-opt$gff2 <- "GCA_900186905.1"
+opt$gff1 <- "GCA_000017745.1"
+opt$gff2 <- "GCA_000017765.1"
 opt$alignment <- "escherichia"
-opt$seq1 <- "5"
-opt$seq2 <- "4"
+opt$seq1 <- "1"
+opt$seq2 <- "2"
 opt$file_path <- "~/phd/RNASeq/combined_gff_files/version_5/"
 
 #opt$id1 <- "GCA_000017745.1"
@@ -152,13 +152,16 @@ if(grepl("/", opt$alignment) == F){
 
 # Main section ------------------------------------------------------------
 if(initial_data == T){
-  cat(paste("Analysing initial calls from ", "~/phd/RNASeq/new_calls/", opt$gff1, "_new_calls.txt and ", "~/phd/RNASeq/new_calls/", opt$gff2, "_new_calls.txt\n", sep = ""))
   
   
   if(!is.null(opt$intergenic)){
+    cat(paste("Analysing initial calls from ", "~/phd/RNASeq/new_calls/random/version_2/", opt$gff1, "_new_calls.txt and ", "~/phd/RNASeq/new_calls/random/version_2/", opt$gff2, "_new_calls.txt\n", sep = ""))
+    
     gff1 <- read.table(paste("~/phd/RNASeq/new_calls/random/version_2/", opt$gff1, "_shifted_random_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
     gff2 <- read.table(paste("~/phd/RNASeq/new_calls/random/version_2/", opt$gff2, "_shifted_random_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
   }else{
+    cat(paste("Analysing initial calls from ", "~/phd/RNASeq/new_calls/", opt$gff1, "_new_calls.txt and ", "~/phd/RNASeq/new_calls/", opt$gff2, "_new_calls.txt\n", sep = ""))
+    
     gff1 <- read.table(paste("~/phd/RNASeq/new_calls/", opt$gff1, "_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
     gff2 <- read.table(paste("~/phd/RNASeq/new_calls/", opt$gff2, "_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T) 
   }
@@ -271,13 +274,32 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
   gff2Dat <- read.table(paste(filePath, "/", opt$gff2, "_merged.gff", sep = ""), sep = "\t", header = T, as.is = T)
 
 
-  gff1Working <- gff1Dat %>% mutate(row_numbers = as.character(row_numbers))
-  gff2Working <- gff2Dat %>% mutate(row_numbers = as.character(row_numbers))
+  gff1Working <- gff1Dat %>% mutate(row_numbers = as.character(row_numbers), score = as.character(score), set_val = as.character(set_val))
+  gff2Working <- gff2Dat %>% mutate(row_numbers = as.character(row_numbers), score = as.character(score), set_val = as.character(set_val))
   
 
   filenum1 <- gff1Working$file_id[1]
   filenum2 <- gff2Working$file_id[1]
 
+  
+  if(test_setup == T){
+    alignAndCombineData <- list(reference = opt$alignment, gff1 = gff1Dat, gff2 = gff2Dat, filenum1 = filenum1, filenum2 = filenum2, seqA = opt$seq1, seqB = opt$seq2)
+    save(alignAndCombineData, file = "~/bin/r_git/R/alignAndCombineData.Rda")
+    
+    
+    buildReferenceLookupData <- list(reference = reference,
+                                     seqA = as.numeric(opt$seq1), seqB = as.numeric(opt$seq2),
+                                     collapse.alignment = T,
+                                     quiet = F)
+    
+    reorderGFFData <- list(reference = reference,
+                           gff1 = gff1, gff2= gff2)
+    
+    save(reorderGFFData, file = "~/bin/r_git/R/reorderGFFData.Rda")
+    
+  }
+  
+  
   if(align == T){
    ncRNAgff <- alignAndCombine(reference = opt$alignment,
                                gff1 = gff1Working,
@@ -363,8 +385,9 @@ for(i in 1:nrow(tmp)){
  
   
   fitchTest <- tmp %>% select(id, set_val) %>% mutate(fitch = 0, prop = 0)
-  i <- 1
-  j <- 1
+ # i <- 175
+#  j <- 1
+
   for(i in 1:nrow(fitchTest)){
     files_1 <- c()
     files_all <- c()
