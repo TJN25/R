@@ -85,15 +85,15 @@ suppressMessages(library(comparativeSRA))
 test_setup <- F
 if(test_setup == T){
   if(initial_data == F){
-opt$gff1 <- "escherichia_1-2"
-opt$gff2 <- "escherichia_5-6-5-4-5-3"
-opt$alignment <- "escherichia"
+opt$gff1 <- "enterobacter"
+opt$gff2 <- "klebsiella"
+opt$alignment <- "enterobacter-klebsiella"
 opt$seq1 <- "1"
-opt$seq2 <- "5"
+opt$seq2 <- "2"
 #opt$out_name <- "esch_1-2-3-15"
 opt$file_path <- "~/phd/RNASeq/combined_gff_files_random/version_5/"
 #align <- F
-opt$genus <- T
+opt$genus <- F
 initial_data <- F
 }else{
   initial_data <- T
@@ -102,7 +102,7 @@ opt$gff2 <- "GCA_000017765.1"
 opt$alignment <- "escherichia"
 opt$seq1 <- "1"
 opt$seq2 <- "2"
-opt$file_path <- "~/phd/RNASeq/combined_gff_files/version_5/"
+opt$file_path <- "~/phd/RNASeq/combined_gff_files/version_6/"
 
 #opt$id1 <- "GCA_000017745.1"
 #opt$id2 <- "GCA_000017765.1"
@@ -121,6 +121,7 @@ if ( is.null(opt$id1 ) ) {  opt$id1 = opt$gff1 }
 if ( is.null(opt$id2 ) ) { opt$id2 = opt$gff2 }
 if ( is.null(opt$seq1 ) ) {  opt$seq1 = "1" }
 if ( is.null(opt$seq2 ) ) { opt$seq2= "2" }
+if ( is.null(opt$genus ) ) { opt$genus= F }else{ opt$genus = T}
 
 
 filePath <- opt$file_path
@@ -317,7 +318,7 @@ colnames(mergedData)[ncol(mergedData)] <- paste(opt$out_name)
     ncRNAgff <- gff1Working%>%bind_rows(gff2Working)
     ncRNAgff[is.na(ncRNAgff)] <- 0
   }
-  ncRNAgff <- ncRNAgff %>% mutate(set_val = 1) %>% filter(as.numeric(end) - as.numeric(start) <= 1000)
+  ncRNAgff <- ncRNAgff  %>% filter(as.numeric(end) - as.numeric(start) <= 1000)
   
   if(test_setup == T){
   mergeSRAData <- list(ncRNAgff = ncRNAgff, filenum1 = filenum1, filenum2 = filenum2, initial_data = initial_data, align = align)
@@ -405,7 +406,7 @@ for(i in 1:nrow(tmp)){
     }
     files_1 <- unique(files_1)
     files_all <- unique(files_all)
-    if(!is.null(opt$genus)){
+    if(opt$genus == T){
       # fitchTest$fitch[i] <- fitchTest$set_val[i]##use for random only thgis needs removing
       fitchTest$fitch[i] <- ifelse(length(files_1) == 1, "0-1", ifelse(length(files_1) == 0, "0", "1"))
     }else{
@@ -420,7 +421,7 @@ for(i in 1:nrow(tmp)){
   mergedData <- mergedData %>% full_join(fitchTest, by = "id")
   
   
-  if(!is.null(opt$genus)){
+  if(opt$genus == T){
     mergedData <- mergedData%>%mutate(set_val = fitch)
   }
     mergedData <- mergedData%>%mutate(V1 = set_val)
