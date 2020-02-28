@@ -116,10 +116,15 @@ for(i in 1:length(files)){
   dat <- dat%>%bind_rows(tmp)
 
 }
-
+if(opt$random_data == ""){
+  
 ncRNAgff <- dat%>%
   filter(feature != "CDS", feature != "gene", feature != "pseudogene", feature != "exon", feature != "region")
-
+}else{
+  
+  ncRNAgff <- dat%>%
+    filter( feature != "gene", feature != "pseudogene", feature != "exon", feature != "region")
+}
 
 # main section  -------------------------------------------------------------------
 

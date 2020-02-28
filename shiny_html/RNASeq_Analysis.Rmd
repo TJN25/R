@@ -476,7 +476,7 @@ for(i in genera){
 
 
 
-file_path <- "~/phd/RNASeq/combined_gff_files/"
+file_path <- "~/phd/RNASeq/combined_gff_files/version_5/"
 combinedList <- list()
 files <- list.files(path = file_path, pattern = ".gff$")
 for(i in files){
@@ -486,7 +486,7 @@ for(i in files){
     
 }
 
-file_path <- "~/phd/RNASeq/combined_gff_files_random/"
+file_path <- "~/phd/RNASeq/combined_gff_files_random/version_5/"
 combinedListRandom <- list()
 files <- list.files(path = file_path, pattern = ".gff$")
 for(i in files){
@@ -545,9 +545,9 @@ sum(calls$length_random)
 sum(calls$length_intergenic)
 sum(calls$length_cds)
 
-combined_sRNAs <-combinedList[["escherichia-shigella-salmonella-enterobacter-klebsiella-serratia_merged.gff"]]$number_of_features
+combined_sRNAs <-combinedList[["all_2_merged.gff"]]$number_of_features
 
-combined_random <-combinedListRandom[["escherichia-shigella-salmonella-enterobacter-klebsiella-serratia_merged.gff"]]$number_of_features
+combined_random <-combinedListRandom[["all_2_merged.gff"]]$number_of_features
  
 
 ```
@@ -577,7 +577,7 @@ combined_random <-combinedListRandom[["escherichia-shigella-salmonella-enterobac
 
 ###Analysis of Conservation
 
-```{r conservation_of_sRNAs, eval = F}
+```{r conservation_of_sRNAs, eval = T}
 
 #list.files("~/phd/RNASeq/combined_gff_files/version_5/", pattern = "_merged.gff$")
 
@@ -591,26 +591,34 @@ resList$genus <- c("escherichia-shigella-salmonella", "enterobacter-klebsiella",
 resList$family <- c("escherichia-shigella-salmonella-enterobacter-klebsiella-serratia", "acinetobacter-pseudomonas")
 resList$order <- c("acinetobacter-pseudomonas-alteromonas", "escherichia-shigella-salmonella-enterobacter-klebsiella-serratia-xanthomonas-lysobacter", 
                    "all_2")
-random <- T
+conservationDataFrame <- function(resList, random = F){
 if(random){
-  filePath <- "~/phd/RNASeq/combined_gff_files_random/version_5/"
+  filePath <- "~/phd/RNASeq/combined_gff_files_random/version_6/"
 }else{
-  filePath <- "~/phd/RNASeq/combined_gff_files/version_5/"
+  filePath <- "~/phd/RNASeq/combined_gff_files/version_6/"
 }
 
 resDat <- data.frame(id = NA,
                      strain.fitch = NA,
                      strain.prop = NA,
+                    strain.score = NA,
                      species.fitch = NA,
                      species.prop = NA,
+                    species.score = NA,
                      genus.fitch = NA,
                      genus.prop = NA,
+                    genus.score = NA,
                      family.fitch = NA,
                      family.prop = NA,
+                    family.score = NA,
                      order.fitch = NA,
                      order.prop = NA,
+                    order.score = NA,
                      file.name = NA,
-                     category = NA, stringsAsFactors = F)
+                     category = NA,
+                    keep = F,
+                    score = NA,
+                    stringsAsFactors = F)
 resDat <- resDat %>% mutate_all(as.character)
 
 i <- resList$species[3]
@@ -624,34 +632,44 @@ for(i in resList$species){
   tmp <- data.frame(id = dat$id,
                      strain.fitch = NA,
                      strain.prop = NA,
+                    strain.score = NA,
                      species.fitch = dat$set_val,
                      species.prop = dat$prop,
+                    species.score = dat$prop_overlap,
                      genus.fitch = NA,
                      genus.prop = NA,
+                    genus.score = NA,
                      family.fitch = NA,
                      family.prop = NA,
+                    family.score = NA,
                      order.fitch = NA,
                      order.prop = NA,
+                    order.score = NA,
                      file.name = i,
                     category = "species")
-        tmp <- tmp %>% mutate_all(as.character)
+        tmp <- tmp %>% mutate(keep = ifelse(abs(species.score) > 0.25, T, ifelse(is.na(species.score), T,F))) %>% mutate_all(as.character) %>% mutate(score = species.score)
 
   resDat <- resDat %>% bind_rows(tmp)
   }else{
       tmp <- data.frame(id = dat$id,
                      strain.fitch = NA,
                      strain.prop = NA,
-                     species.fitch = dat[,(ncol(dat) - 1)],
+                    strain.score = NA,
+                    species.fitch = dat[,(ncol(dat) - 1)],
                      species.prop = dat[,ncol(dat)],
+                     species.score = dat$prop_overlap,
                      genus.fitch = NA,
                      genus.prop = NA,
+                    genus.score = NA,
                      family.fitch = NA,
                      family.prop = NA,
+                    family.score = NA,
                      order.fitch = NA,
                      order.prop = NA,
+                    order.score = NA,
                      file.name = i,
                      category = "species")
-            tmp <- tmp %>% mutate_all(as.character)
+        tmp <- tmp %>% mutate(keep = ifelse(abs(species.score) > 0.25, T, ifelse(is.na(species.score), T,F))) %>% mutate_all(as.character) %>% mutate(score = species.score)
 
   resDat <- resDat %>% bind_rows(tmp)
   }
@@ -668,34 +686,44 @@ for(i in resList$strain){
   tmp <- data.frame(id = dat$id,
                      strain.fitch = dat$set_val,
                      strain.prop =  dat$prop,
+                    strain.score = dat$prop_overlap,
                      species.fitch = NA,
                      species.prop = NA,
-                      genus.fitch = NA,
+                    species.score = NA,
+                     genus.fitch = NA,
                      genus.prop = NA,
+                    genus.score = NA,
                      family.fitch = NA,
                      family.prop = NA,
+                    family.score = NA,
                      order.fitch = NA,
                      order.prop = NA,
+                    order.score = NA,
                      file.name = i,
                     category = "strain")
-        tmp <- tmp %>% mutate_all(as.character)
+        tmp <- tmp %>% mutate(keep = ifelse(abs(strain.score) > 0.25, T, ifelse(is.na(strain.score), T,F))) %>% mutate_all(as.character) %>% mutate(score = strain.score)
 
   resDat <- resDat %>% bind_rows(tmp)
   }else{
       tmp <- data.frame(id = dat$id,
                      strain.fitch = dat[,(ncol(dat) - 1)],
                      strain.prop = dat[,ncol(dat)],
+                    strain.score = dat$prop_overlap,
                      species.fitch = NA,
                      species.prop = NA,
+                    species.score = NA,
                      genus.fitch = NA,
                      genus.prop = NA,
+                    genus.score = NA,
                      family.fitch = NA,
                      family.prop = NA,
+                    family.score = NA,
                      order.fitch = NA,
                      order.prop = NA,
+                    order.score = NA,
                      file.name = i,
                      category = "strain")
-            tmp <- tmp %>% mutate_all(as.character)
+        tmp <- tmp %>% mutate(keep = ifelse(abs(strain.score) > 0.25, T, ifelse(is.na(strain.score), T,F))) %>% mutate_all(as.character) %>% mutate(score = strain.score)
 
   resDat <- resDat %>% bind_rows(tmp)
   }
@@ -711,35 +739,45 @@ for(i in resList$genus){
     
   tmp <- data.frame(id = dat$id,
                      strain.fitch = NA,
-                     strain.prop =  NA,
+                     strain.prop = NA,
+                    strain.score = NA,
                      species.fitch = NA,
                      species.prop = NA,
+                    species.score = NA,
                       genus.fitch = dat$set_val,
                      genus.prop = dat$prop,
+                    genus.score = dat$prop_overlap,
                      family.fitch = NA,
                      family.prop = NA,
+                    family.score = NA,
                      order.fitch = NA,
                      order.prop = NA,
+                    order.score = NA,
                      file.name = i,
                     category = "genus")
-        tmp <- tmp %>% mutate_all(as.character)
+        tmp <- tmp %>% mutate(keep = ifelse(abs(genus.score) > 0.25, T, ifelse(is.na(genus.score), T,F))) %>% mutate_all(as.character) %>% mutate(score = genus.score)
 
   resDat <- resDat %>% bind_rows(tmp)
   }else{
       tmp <- data.frame(id = dat$id,
                      strain.fitch = NA,
                      strain.prop = NA,
+                    strain.score = NA,
                      species.fitch = NA,
                      species.prop = NA,
+                    species.score = NA,
                      genus.fitch = dat[,(ncol(dat) - 1)],
                      genus.prop = dat[,ncol(dat)],
+                    genus.score = dat$prop_overlap,
                      family.fitch = NA,
                      family.prop = NA,
+                    family.score = NA,
                      order.fitch = NA,
                      order.prop = NA,
+                    order.score = NA,
                      file.name = i,
                      category = "genus")
-            tmp <- tmp %>% mutate_all(as.character)
+        tmp <- tmp %>% mutate(keep = ifelse(abs(genus.score) > 0.25, T, ifelse(is.na(genus.score), T,F))) %>% mutate_all(as.character) %>% mutate(score = genus.score)
 
   resDat <- resDat %>% bind_rows(tmp)
   }
@@ -753,17 +791,22 @@ for(i in resList$family){
       tmp <- data.frame(id = dat$id,
                      strain.fitch = NA,
                      strain.prop = NA,
+                    strain.score = NA,
                      species.fitch = NA,
                      species.prop = NA,
+                    species.score = NA,
                      genus.fitch = NA,
                      genus.prop = NA,
+                    genus.score = NA,
                      family.fitch = dat[,(ncol(dat) - 1)],
                      family.prop = dat[,ncol(dat)],
+                    family.score = dat$prop_overlap,
                      order.fitch = NA,
                      order.prop = NA,
+                    order.score = NA,
                      file.name = i,
                      category = "family")
-            tmp <- tmp %>% mutate_all(as.character)
+        tmp <- tmp %>% mutate(keep = ifelse(abs(family.score) > 0.25, T, ifelse(is.na(family.score), T,F))) %>% mutate_all(as.character) %>% mutate(score = family.score)
 
   resDat <- resDat %>% bind_rows(tmp)
   }
@@ -775,24 +818,45 @@ for(i in resList$order){
       tmp <- data.frame(id = dat$id,
                      strain.fitch = NA,
                      strain.prop = NA,
+                    strain.score = NA,
                      species.fitch = NA,
                      species.prop = NA,
+                    species.score = NA,
                      genus.fitch = NA,
                      genus.prop = NA,
+                    genus.score = NA,
                      family.fitch = NA,
                      family.prop = NA,
+                    family.score = NA,
                      order.fitch = dat[,(ncol(dat) - 1)],
                      order.prop = dat[,ncol(dat)],
+                    order.score = dat$prop_overlap,
                      file.name = i,
                      category = "order")
-      tmp <- tmp %>% mutate_all(as.character)
+        tmp <- tmp %>% mutate(keep = ifelse(abs(order.score) > 0.25, T, ifelse(is.na(order.score), T,F))) %>% mutate_all(as.character)%>% mutate(score = order.score)
 
   resDat <- resDat %>% bind_rows(tmp)
   }
 
+return(resDat)
+}
+
+
+resDatReal <- conservationDataFrame(resList = resList, random = F)
+resDatRandom <- conservationDataFrame(resList = resList, random = T)
+
+
+
+ggplot() +
+  geom_freqpoly(data = resDatReal, aes(x = as.numeric(score)), colour = "blue")+
+  geom_freqpoly(data = resDatRandom, aes(x = as.numeric(score)), colour = "red")+
+  scale_y_continuous(trans = 'log10')
+
+
+
 for(i in names(resList)){
   print(i)
-  summary <- resDat %>% filter(category == i) %>% 
+  summary <- resDatReal %>% filter(category == i) %>% 
     group_by(strain.fitch, species.fitch, genus.fitch, family.fitch, order.fitch) %>%
     summarise(count = n())
 
@@ -899,7 +963,13 @@ for(i in conservationOrder){
 
 ```
 
+```{r individual_conserved_files, eval = F}
+dat <- read.table("~/phd/RNASeq/combined_gff_files_random/version_6/all_2_merged.gff", sep = "\t", header = T, fill = T)
 
+
+dat %>% group_by(feature) %>% summarise(count = n())
+
+```
 
 ##Scripts
 
