@@ -593,7 +593,7 @@ resList$order <- c("acinetobacter-pseudomonas-alteromonas", "escherichia-shigell
                    "all_2")
 conservationDataFrame <- function(resList, random = F){
 if(random){
-  filePath <- "~/phd/RNASeq/combined_gff_files_random/version_5/"
+  filePath <- "~/phd/RNASeq/combined_gff_files_random/version_6/"
 }else{
   filePath <- "~/phd/RNASeq/combined_gff_files/version_6/"
 }
@@ -848,8 +848,8 @@ resDatRandom <- conservationDataFrame(resList = resList, random = T)
 
 
 ggplot() +
-  geom_freqpoly(data = resDatReal, aes(x = as.numeric(score)), binwidth = 0.05, colour = "blue")+
-  geom_freqpoly(data = resDatRandom, aes(x = as.numeric(score)), binwidth = 0.05, colour = "red")+
+  geom_freqpoly(data = resDatReal, aes(x = as.numeric(score)), colour = "blue")+
+  geom_freqpoly(data = resDatRandom, aes(x = as.numeric(score)), colour = "red")+
   scale_y_continuous(trans = 'log10')
 
 
@@ -963,7 +963,13 @@ for(i in conservationOrder){
 
 ```
 
+```{r individual_conserved_files, eval = F}
+dat <- read.table("~/phd/RNASeq/combined_gff_files_random/version_6/all_2_merged.gff", sep = "\t", header = T, fill = T)
 
+
+dat %>% group_by(feature) %>% summarise(count = n())
+
+```
 
 ##Scripts
 
