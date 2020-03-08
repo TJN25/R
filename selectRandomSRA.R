@@ -62,8 +62,8 @@ if ( is.null(opt$out_name ) ) { opt$out_name = opt$name }
 if ( is.null(opt$method ) ) { opt$method = 'shifted' }
 opt$method <- tolower(opt$method)
 if(opt$method != 'shuffled' && opt$method != 'shifted'){
-  opt$method <- 'shuffled'
-  cat("Incorrect method selected. Using 'shuffled")
+  opt$method <- 'shifted'
+  cat("Incorrect method selected. Using 'shifted")
 }
 
 filePath <- opt$file_path
@@ -180,21 +180,17 @@ if(opt$method == "shuffled"){
 
 
 sraLength <- nrow(sra)
-if(sraLength < 500){sraLength <- 500}
-if(sraLength > 2000){sraLength <- 2000}
+#if(sraLength < 500){sraLength <- 500}
+#if(sraLength > 2000){sraLength <- 2000}
 
-startsRandom <- round(runif(sraLength, min = 1, max = max(fasta$right)))
-lengthsRandom <- round(rnorm(sraLength, mean=meanLength, sd=sdLength))
-strandRandom <- sample(c("-", "+"), sraLength, replace = T, prob = c( propStrand["-"],  propStrand["+"]))
+random <- sra %>% mutate(random.start = round(runif(n = sraLength, min = 1, max = max(fasta$right))),
+                         random.end = random.start + end - start)
 
-
-random <- data.frame(start= startsRandom, end = startsRandom + lengthsRandom, strand = strandRandom)
-random <- random %>% arrange(start) %>%
-  mutate(tmp.end = ifelse(start > end, start, end),
-         tmp.start = ifelse(start > end, end, start)) %>%
-  mutate(start = tmp.start,
-         end = tmp.end) %>%
+random <- random %>%  mutate(start = random.start,
+                             end = random.end)%>%
   filter(start < end)
+
+
 }else{
 
   if (file.exists(paste(filePath,"/random_sequences/shifted", sep = "")) == F){

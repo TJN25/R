@@ -107,8 +107,8 @@ plotDatncRNA  <- tryCatch({
 
 plotDatncRNA$V1 <- plotDatncRNA$V1/total
 plotDatncRNA$V2 <- plotDatncRNA$V2/total
-
-
+print(15/total)
+q(status = 1)
 
 cat("Running rnPeakCalling\n")
 
