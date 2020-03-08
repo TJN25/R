@@ -85,13 +85,13 @@ suppressMessages(library(comparativeSRA))
 test_setup <- F
 if(test_setup == T){
   if(initial_data == F){
-opt$gff1 <- "enterobacter"
-opt$gff2 <- "klebsiella"
-opt$alignment <- "enterobacter-klebsiella"
+opt$gff1 <- "escherichia-shigella-salmonella-enterobacter-klebsiella-serratia-xanthomonas-lysobacter"
+opt$gff2 <- "acinetobacter-pseudomonas-alteromonas"
+opt$alignment <- "escherichia-acinetobacter"
 opt$seq1 <- "1"
 opt$seq2 <- "2"
 #opt$out_name <- "esch_1-2-3-15"
-opt$file_path <- "~/phd/RNASeq/combined_gff_files_random/version_5/"
+opt$file_path <- "~/phd/RNASeq/combined_gff_files/version_8/"
 #align <- F
 opt$genus <- F
 initial_data <- F
@@ -156,10 +156,10 @@ if(initial_data == T){
   
   
   if(!is.null(opt$intergenic)){
-    cat(paste("Analysing initial calls from ", "~/phd/RNASeq/new_calls/random/version_2/", opt$gff1, "_new_calls.txt and ", "~/phd/RNASeq/new_calls/random/version_2/", opt$gff2, "_new_calls.txt\n", sep = ""))
+    cat(paste("Analysing initial calls from ", "~/phd/RNASeq/new_calls/random/shuffled/version_3/", opt$gff1, "_new_calls.txt and ", "~/phd/RNASeq/new_calls/random/version_2/", opt$gff2, "_new_calls.txt\n", sep = ""))
     
-    gff1 <- read.table(paste("~/phd/RNASeq/new_calls/random/version_2/", opt$gff1, "_shifted_random_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
-    gff2 <- read.table(paste("~/phd/RNASeq/new_calls/random/version_2/", opt$gff2, "_shifted_random_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
+    gff1 <- read.table(paste("~/phd/RNASeq/new_calls/random/shuffled/version_3/", opt$gff1, "_shuffled_random_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
+    gff2 <- read.table(paste("~/phd/RNASeq/new_calls/random/shuffled/version_3/", opt$gff2, "_shuffled_random_new_calls.txt", sep = ""), sep = "\t", header = T, as.is = T)
   }else{
     cat(paste("Analysing initial calls from ", "~/phd/RNASeq/new_calls/", opt$gff1, "_new_calls.txt and ", "~/phd/RNASeq/new_calls/", opt$gff2, "_new_calls.txt\n", sep = ""))
     
