@@ -33,6 +33,7 @@ library(Biostrings)
 library(ggtree)
 library(treeio)
 library(geiger)
+library(ROSE)
 #setwd("~/phd/RNASeq/r_files/")
 filePath <- "~/phd/RNASeq/r_files/"
 ```
@@ -586,37 +587,27 @@ resList <- list()
 levelList <- list()
 
 resList$strain <- c("escherichia", "shigella", "Salmonella")
-resList$species <- c("Acinetobacter", "Altermonas", "Enterobacter", "escherichia-shigella", "Klebsiella", "pseudomonas", "serratia", "xanthomonas")
+resList$species <- c("Acinetobacter", "Altermonas", "Enterobacter", "escherichia-shigella", "Klebsiella", "serratia", "xanthomonas")
 resList$genus <- c("escherichia-shigella-salmonella", "enterobacter-klebsiella", "xanthomonas-lysobacter", "escherichia-shigella-salmonella-enterobacter-klebsiella")
-resList$family <- c("escherichia-shigella-salmonella-enterobacter-klebsiella-serratia", "acinetobacter-pseudomonas")
-resList$order <- c("acinetobacter-pseudomonas-alteromonas", "escherichia-shigella-salmonella-enterobacter-klebsiella-serratia-xanthomonas-lysobacter", 
-                   "all_2")
+resList$family <- c("escherichia-shigella-salmonella-enterobacter-klebsiella-serratia")
+resList$order <- c( "escherichia-shigella-salmonella-enterobacter-klebsiella-serratia-xanthomonas-lysobacter")
 conservationDataFrame <- function(resList, random = F){
 if(random){
-  filePath <- "~/phd/RNASeq/combined_gff_files_random/version_6/"
+  filePath <- "~/phd/RNASeq/combined_gff_files_random/version_8/"
 }else{
-  filePath <- "~/phd/RNASeq/combined_gff_files/version_6/"
+  filePath <- "~/phd/RNASeq/combined_gff_files/version_8/"
 }
 
 resDat <- data.frame(id = NA,
-                     strain.fitch = NA,
-                     strain.prop = NA,
-                    strain.score = NA,
-                     species.fitch = NA,
-                     species.prop = NA,
-                    species.score = NA,
-                     genus.fitch = NA,
-                     genus.prop = NA,
-                    genus.score = NA,
-                     family.fitch = NA,
-                     family.prop = NA,
-                    family.score = NA,
-                     order.fitch = NA,
-                     order.prop = NA,
-                    order.score = NA,
+                     fitch = NA,
+                    prop = NA,
+                    score = NA,
                      file.name = NA,
+                    feature_match = NA,
+                    new_feature = NA,
+                    feature = NA,
+                    file_id = NA,
                      category = NA,
-                    keep = F,
                     score = NA,
                     stringsAsFactors = F)
 resDat <- resDat %>% mutate_all(as.character)
@@ -630,46 +621,31 @@ for(i in resList$species){
     dat <- dat %>% mutate(prop = ifelse(set_val == "1", "2-2", "1-2"))
     
   tmp <- data.frame(id = dat$id,
-                     strain.fitch = NA,
-                     strain.prop = NA,
-                    strain.score = NA,
-                     species.fitch = dat$set_val,
-                     species.prop = dat$prop,
-                    species.score = dat$prop_overlap,
-                     genus.fitch = NA,
-                     genus.prop = NA,
-                    genus.score = NA,
-                     family.fitch = NA,
-                     family.prop = NA,
-                    family.score = NA,
-                     order.fitch = NA,
-                     order.prop = NA,
-                    order.score = NA,
+                     fitch = dat$set_val,
+                     prop = dat$prop,
+                    score = dat$prop_overlap,
                      file.name = i,
+                    feature_match = dat$feature_match,
+                    new_feature = dat$new_feature,
+                    feature = dat$feature,
+                    file_id = dat$file_id,
                     category = "species")
-        tmp <- tmp %>% mutate(keep = ifelse(abs(species.score) > 0.25, T, ifelse(is.na(species.score), T,F))) %>% mutate_all(as.character) %>% mutate(score = species.score)
+        tmp <- tmp %>%  mutate_all(as.character) 
 
   resDat <- resDat %>% bind_rows(tmp)
   }else{
       tmp <- data.frame(id = dat$id,
-                     strain.fitch = NA,
-                     strain.prop = NA,
-                    strain.score = NA,
-                    species.fitch = dat[,(ncol(dat) - 1)],
-                     species.prop = dat[,ncol(dat)],
-                     species.score = dat$prop_overlap,
-                     genus.fitch = NA,
-                     genus.prop = NA,
-                    genus.score = NA,
-                     family.fitch = NA,
-                     family.prop = NA,
-                    family.score = NA,
-                     order.fitch = NA,
-                     order.prop = NA,
-                    order.score = NA,
+                    fitch = dat[,(ncol(dat) - 1)],
+                     prop = dat[,ncol(dat)],
+                     score = dat$prop_overlap,
                      file.name = i,
+                    feature_match = dat$feature_match,
+                    new_feature = dat$new_feature,
+                    feature = dat$feature,
+                    file_id = dat$file_id,
                      category = "species")
-        tmp <- tmp %>% mutate(keep = ifelse(abs(species.score) > 0.25, T, ifelse(is.na(species.score), T,F))) %>% mutate_all(as.character) %>% mutate(score = species.score)
+
+        tmp <- tmp %>%  mutate_all(as.character) 
 
   resDat <- resDat %>% bind_rows(tmp)
   }
@@ -684,46 +660,30 @@ for(i in resList$strain){
     dat <- dat %>% mutate(prop = ifelse(set_val == "1", "2-2", "1-2"))
     
   tmp <- data.frame(id = dat$id,
-                     strain.fitch = dat$set_val,
-                     strain.prop =  dat$prop,
-                    strain.score = dat$prop_overlap,
-                     species.fitch = NA,
-                     species.prop = NA,
-                    species.score = NA,
-                     genus.fitch = NA,
-                     genus.prop = NA,
-                    genus.score = NA,
-                     family.fitch = NA,
-                     family.prop = NA,
-                    family.score = NA,
-                     order.fitch = NA,
-                     order.prop = NA,
-                    order.score = NA,
+                     fitch = dat$set_val,
+                     prop = dat$prop,
+                    score = dat$prop_overlap,
                      file.name = i,
+                    feature_match = dat$feature_match,
+                    new_feature = dat$new_feature,
+                    feature = dat$feature,
+                    file_id = dat$file_id,
                     category = "strain")
-        tmp <- tmp %>% mutate(keep = ifelse(abs(strain.score) > 0.25, T, ifelse(is.na(strain.score), T,F))) %>% mutate_all(as.character) %>% mutate(score = strain.score)
+        tmp <- tmp %>% mutate_all(as.character) 
 
   resDat <- resDat %>% bind_rows(tmp)
   }else{
       tmp <- data.frame(id = dat$id,
-                     strain.fitch = dat[,(ncol(dat) - 1)],
-                     strain.prop = dat[,ncol(dat)],
-                    strain.score = dat$prop_overlap,
-                     species.fitch = NA,
-                     species.prop = NA,
-                    species.score = NA,
-                     genus.fitch = NA,
-                     genus.prop = NA,
-                    genus.score = NA,
-                     family.fitch = NA,
-                     family.prop = NA,
-                    family.score = NA,
-                     order.fitch = NA,
-                     order.prop = NA,
-                    order.score = NA,
+                   fitch = dat[,(ncol(dat) - 1)],
+                     prop = dat[,ncol(dat)],
+                     score = dat$prop_overlap,
                      file.name = i,
+                    feature_match = dat$feature_match,
+                    new_feature = dat$new_feature,
+                    feature = dat$feature,
+                    file_id = dat$file_id,
                      category = "strain")
-        tmp <- tmp %>% mutate(keep = ifelse(abs(strain.score) > 0.25, T, ifelse(is.na(strain.score), T,F))) %>% mutate_all(as.character) %>% mutate(score = strain.score)
+        tmp <- tmp %>%  mutate_all(as.character)
 
   resDat <- resDat %>% bind_rows(tmp)
   }
@@ -738,46 +698,30 @@ for(i in resList$genus){
     dat <- dat %>% mutate(prop = ifelse(set_val == "1", "2-2", "1-2"))
     
   tmp <- data.frame(id = dat$id,
-                     strain.fitch = NA,
-                     strain.prop = NA,
-                    strain.score = NA,
-                     species.fitch = NA,
-                     species.prop = NA,
-                    species.score = NA,
-                      genus.fitch = dat$set_val,
-                     genus.prop = dat$prop,
-                    genus.score = dat$prop_overlap,
-                     family.fitch = NA,
-                     family.prop = NA,
-                    family.score = NA,
-                     order.fitch = NA,
-                     order.prop = NA,
-                    order.score = NA,
+                     fitch = dat$set_val,
+                     prop = dat$prop,
+                    score = dat$prop_overlap,
                      file.name = i,
+                    feature_match = dat$feature_match,
+                    new_feature = dat$new_feature,
+                    feature = dat$feature,
+                    file_id = dat$file_id,
                     category = "genus")
-        tmp <- tmp %>% mutate(keep = ifelse(abs(genus.score) > 0.25, T, ifelse(is.na(genus.score), T,F))) %>% mutate_all(as.character) %>% mutate(score = genus.score)
+        tmp <- tmp  %>% mutate_all(as.character) 
 
   resDat <- resDat %>% bind_rows(tmp)
   }else{
       tmp <- data.frame(id = dat$id,
-                     strain.fitch = NA,
-                     strain.prop = NA,
-                    strain.score = NA,
-                     species.fitch = NA,
-                     species.prop = NA,
-                    species.score = NA,
-                     genus.fitch = dat[,(ncol(dat) - 1)],
-                     genus.prop = dat[,ncol(dat)],
-                    genus.score = dat$prop_overlap,
-                     family.fitch = NA,
-                     family.prop = NA,
-                    family.score = NA,
-                     order.fitch = NA,
-                     order.prop = NA,
-                    order.score = NA,
+                   fitch = dat[,(ncol(dat) - 1)],
+                     prop = dat[,ncol(dat)],
+                     score = dat$prop_overlap,
                      file.name = i,
+                    feature_match = dat$feature_match,
+                    new_feature = dat$new_feature,
+                    feature = dat$feature,
+                    file_id = dat$file_id,
                      category = "genus")
-        tmp <- tmp %>% mutate(keep = ifelse(abs(genus.score) > 0.25, T, ifelse(is.na(genus.score), T,F))) %>% mutate_all(as.character) %>% mutate(score = genus.score)
+        tmp <- tmp %>%  mutate_all(as.character) 
 
   resDat <- resDat %>% bind_rows(tmp)
   }
@@ -789,24 +733,16 @@ for(i in resList$family){
 
 
       tmp <- data.frame(id = dat$id,
-                     strain.fitch = NA,
-                     strain.prop = NA,
-                    strain.score = NA,
-                     species.fitch = NA,
-                     species.prop = NA,
-                    species.score = NA,
-                     genus.fitch = NA,
-                     genus.prop = NA,
-                    genus.score = NA,
-                     family.fitch = dat[,(ncol(dat) - 1)],
-                     family.prop = dat[,ncol(dat)],
-                    family.score = dat$prop_overlap,
-                     order.fitch = NA,
-                     order.prop = NA,
-                    order.score = NA,
+                   fitch = dat[,(ncol(dat) - 1)],
+                     prop = dat[,ncol(dat)],
+                     score = dat$prop_overlap,
                      file.name = i,
+                    feature_match = dat$feature_match,
+                    new_feature = dat$new_feature,
+                    feature = dat$feature,
+                    file_id = dat$file_id,
                      category = "family")
-        tmp <- tmp %>% mutate(keep = ifelse(abs(family.score) > 0.25, T, ifelse(is.na(family.score), T,F))) %>% mutate_all(as.character) %>% mutate(score = family.score)
+        tmp <- tmp %>% mutate_all(as.character)
 
   resDat <- resDat %>% bind_rows(tmp)
   }
@@ -816,24 +752,16 @@ for(i in resList$order){
 
 
       tmp <- data.frame(id = dat$id,
-                     strain.fitch = NA,
-                     strain.prop = NA,
-                    strain.score = NA,
-                     species.fitch = NA,
-                     species.prop = NA,
-                    species.score = NA,
-                     genus.fitch = NA,
-                     genus.prop = NA,
-                    genus.score = NA,
-                     family.fitch = NA,
-                     family.prop = NA,
-                    family.score = NA,
-                     order.fitch = dat[,(ncol(dat) - 1)],
-                     order.prop = dat[,ncol(dat)],
-                    order.score = dat$prop_overlap,
+                   fitch = dat[,(ncol(dat) - 1)],
+                     prop = dat[,ncol(dat)],
+                     score = dat$prop_overlap,
                      file.name = i,
+                    feature_match = dat$feature_match,
+                    new_feature = dat$new_feature,
+                    feature = dat$feature,
+                    file_id = dat$file_id,
                      category = "order")
-        tmp <- tmp %>% mutate(keep = ifelse(abs(order.score) > 0.25, T, ifelse(is.na(order.score), T,F))) %>% mutate_all(as.character)%>% mutate(score = order.score)
+        tmp <- tmp %>%  mutate_all(as.character)
 
   resDat <- resDat %>% bind_rows(tmp)
   }
@@ -846,22 +774,65 @@ resDatReal <- conservationDataFrame(resList = resList, random = F)
 resDatRandom <- conservationDataFrame(resList = resList, random = T)
 
 
+resDatReal <- resDatReal %>% mutate(score = ifelse(feature_match == F, 1000, score))
+resDatRandom <- resDatRandom %>% mutate(score = ifelse(feature_match == F, 1000, score))
 
-ggplot() +
-  geom_freqpoly(data = resDatReal, aes(x = as.numeric(score)), colour = "blue")+
-  geom_freqpoly(data = resDatRandom, aes(x = as.numeric(score)), colour = "red")+
+resDatReal <- resDatReal %>% separate(col = prop, into = c("count", "total"), remove = F)
+resDatRandom <- resDatRandom %>% separate(col = prop, into = c("count", "total"), remove = F)
+
+   
+positiveControlsList <- c("rRNA", "tRNA", "riboswitch", "tmRNA", "SRP_RNA", "antisense")
+
+resDatReal <- resDatReal %>% mutate(positive_control = ifelse(feature %in% positiveControlsList, T, F))
+
+allMerged <- resDatReal
+allRandom <- resDatRandom
+
+save(allMerged, file = "~/bin/r_git/R/allMerged_version_8.Rda")
+save(allRandom, file = "~/bin/r_git/R/allRandom_version_8.Rda")
+
+ resDatReal%>% 
+    group_by(fitch, category) %>%
+    summarise(count = n()) %>% arrange(category, fitch)
+ resDatRandom%>% 
+    group_by(fitch, category) %>%
+    summarise(count = n()) %>% arrange(category, fitch)
+
+   resDatReal%>% 
+    group_by(fitch, new_feature) %>%
+    summarise(count = n()) %>% arrange(new_feature, fitch)
+   
+     realFitch <- resDatReal%>% 
+    group_by(fitch, positive_control) %>%
+    summarise(count = n()) %>% arrange(positive_control, fitch)
+ 
+
+
+  resDatRandom%>% 
+    group_by(fitch, feature) %>%
+    summarise(count = n()) %>% arrange(feature, fitch)
+  
+  
+
+  p <- ggplot() +
+  geom_freqpoly(data = resDatReal %>% filter(fitch != "0", as.numeric(score) >= 0, as.numeric(score) < 1), aes(x = as.numeric(score), y = ..density.., group = positive_control, colour = positive_control), binwidth = 0.1)+
+  geom_freqpoly(data = resDatRandom %>% filter(fitch != "0",  as.numeric(score) >= 0, as.numeric(score) < 1), aes(x = as.numeric(score), y = ..density..), binwidth = 0.1)+
+  scale_y_continuous(trans = 'log10')
+p
+  
+ggsave(filename = "~/phd/RNASeq/figures/scores_version_8.svg", plot = p, device = "svg")
+  
+p <- ggplot() +
+  geom_freqpoly(data = resDatReal%>% filter(fitch != "0", category == "genus"), aes(x = as.numeric(count), y = ..density.., group = positive_control, colour = positive_control), binwidth = 1)+
+  geom_freqpoly(data = resDatRandom%>% filter(fitch != "0",  category == "genus"), aes(x = as.numeric(count), y = ..density..), binwidth = 1)+
   scale_y_continuous(trans = 'log10')
 
+ggsave(filename = "~/phd/RNASeq/figures/counts_version_8.svg", plot = p, device = "svg")
 
 
-for(i in names(resList)){
-  print(i)
-  summary <- resDatReal %>% filter(category == i) %>% 
-    group_by(strain.fitch, species.fitch, genus.fitch, family.fitch, order.fitch) %>%
-    summarise(count = n())
 
-  print(summary)
-}
+
+tmp <- resDatReal%>% filter( as.numeric(score) >= 0, as.numeric(score) < 1, category == "genus")
 
 
 
@@ -891,75 +862,6 @@ for(i in tree$tip.label){
 }
 
 
-sRNAs <- read.table("~/phd/RNASeq/combined_gff_files/version_1/escherichia-shigella-salmonella-enterobacter-klebsiella-serratia_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
-
-
-
-sRNAs[sRNAs == "1-0"] <- "0-1"
-
-sRNAs <- sRNAs %>% mutate(escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.fitch = ifelse(escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.fitch == "0-1", 
-                                                                                      ifelse(escherichia.shigella.salmonella.enterobacter.klebsiella.fitch == "0-1", 
-                                                                                             ifelse(serratia.fitch == "0-1",
-                                                                                                    "1",
-                                                                                                    "0-1"), 
-                                                                                             "0-1"),
-                                                                                      escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.fitch))
-
-
-
-sRNAs <- sRNAs %>% mutate(escherichia.shigella.salmonella.enterobacter.klebsiella.fitch = ifelse(escherichia.shigella.salmonella.enterobacter.klebsiella.fitch == "0-1", 
-                                                                                      ifelse(escherichia.shigella.salmonella.fitch == "0-1", 
-                                                                                             ifelse(enterobacter.klebsiella.fitch == "0-1",
-                                                                                                    "1",
-                                                                                                    "0-1"), 
-                                                                                             "0-1"),
-                                                                                      escherichia.shigella.salmonella.enterobacter.klebsiella.fitch))
-
-
-sRNAs <- sRNAs %>% mutate(escherichia.shigella.salmonella.fitch = ifelse(escherichia.shigella.salmonella.fitch == "0-1", 
-                                                                                      ifelse(escherichia.shigella.fitch == "0-1", 
-                                                                                             ifelse(salmonella.fitch == "0-1",
-                                                                                                    "1",
-                                                                                                    "0-1"), 
-                                                                                             "0-1"),
-                                                                                      escherichia.shigella.salmonella.fitch))
-
-sRNAs <- sRNAs %>% mutate(escherichia.shigella.fitch = ifelse(escherichia.shigella.fitch == "0-1", 
-                                                                                      ifelse(escherichia.fitch == "0-1", 
-                                                                                             ifelse(shigella.fitch == "0-1",
-                                                                                                    "1",
-                                                                                                    "0-1"), 
-                                                                                             "0-1"),
-                                                                                      escherichia.shigella.fitch))
-
-sRNAs <- sRNAs %>% mutate(enterobacter.klebsiella.fitch = ifelse(enterobacter.klebsiella.fitch == "0-1", 
-                                                                                      ifelse(enterobacter == "0-1", 
-                                                                                             ifelse(klebsiella == "0-1",
-                                                                                                    "1",
-                                                                                                    "0-1"), 
-                                                                                             "0-1"),
-                                                                                      enterobacter.klebsiella.fitch))
-
-
-sRNAsSmall <- sRNAs %>% select(id, escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.fitch, serratia.fitch, escherichia.shigella.salmonella.enterobacter.klebsiella.fitch, enterobacter.klebsiella.fitch, enterobacter, klebsiella, escherichia.fitch, escherichia.shigella.fitch, escherichia.shigella.salmonella.fitch, shigella.fitch, salmonella.fitch)
-sRNAsSmall[sRNAsSmall == "1-0"] <- "0"
-
-conservationOrder <- c("shigella.fitch",
-                       "escherichia.fitch",
-                       "serratia.fitch",
-                       "klebsiella",
-                       "enterobacter",
-                       "salmonella.fitch",
-                       "escherichia.shigella.fitch",
-                       "enterobacter.klebsiella.fitch",
-                       "escherichia.shigella.salmonella.fitch",
-                       "escherichia.shigella.salmonella.enterobacter.klebsiella.fitch", 
-                       "escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.fitch")
-
-sRNAsSmall$conserved_to <- ""
-for(i in conservationOrder){
-  sRNAsSmall$conserved_to[sRNAsSmall[i] == "1"] <- i
-}
 
 ```
 
@@ -970,6 +872,716 @@ dat <- read.table("~/phd/RNASeq/combined_gff_files_random/version_6/all_2_merged
 dat %>% group_by(feature) %>% summarise(count = n())
 
 ```
+
+```{r number_of_sRNAs_conserved, eval=F}
+
+
+resList <- list()
+
+levelList <- list()
+
+resList$strain <- c("escherichia", "shigella", "Salmonella")
+resList$species <- c("Acinetobacter", "Altermonas", "Enterobacter", "escherichia-shigella", "Klebsiella", "serratia", "xanthomonas")
+resList$genus <- c("escherichia-shigella-salmonella", "enterobacter-klebsiella", "xanthomonas-lysobacter", "escherichia-shigella-salmonella-enterobacter-klebsiella")
+resList$family <- c("escherichia-shigella-salmonella-enterobacter-klebsiella-serratia")
+resList$order <- c( "escherichia-shigella-salmonella-enterobacter-klebsiella-serratia-xanthomonas-lysobacter")
+conservationDataFrame <- function(resList, random = F){
+if(random){
+  filePath <- "~/phd/RNASeq/combined_gff_files_random/version_8/"
+}else{
+  filePath <- "~/phd/RNASeq/combined_gff_files/version_8/"
+}
+
+resDat <- data.frame(id = NA,
+                     fitch = NA,
+                    prop = NA,
+                    score = NA,
+                     file.name = NA,
+                    feature_match = NA,
+                    new_feature = NA,
+                    feature = NA,
+                     category = NA,
+                    score = NA,
+                    stringsAsFactors = F)
+resDat <- resDat %>% mutate_all(as.character)
+
+i <- resList$species[3]
+for(i in resList$species){
+  dat <- read.table(paste(filePath, i, "_merged.gff", sep =""), sep = "\t", header = T, fill = T, as.is = T)
+
+  if(grepl(".prop", colnames(dat)[ncol(dat)]) == F){
+  
+    dat <- dat %>% mutate(prop = ifelse(set_val == "1", "2-2", "1-2"))
+    
+  tmp <- data.frame(id = dat$id,
+                     fitch = dat$set_val,
+                     prop = dat$prop,
+                    score = dat$prop_overlap,
+                     file.name = i,
+                    feature_match = dat$feature_match,
+                    new_feature = dat$new_feature,
+                    feature = dat$feature,
+                    category = "species")
+        tmp <- tmp %>%  mutate_all(as.character) 
+
+  resDat <- resDat %>% bind_rows(tmp)
+  }else{
+      tmp <- data.frame(id = dat$id,
+                    fitch = dat[,(ncol(dat) - 1)],
+                     prop = dat[,ncol(dat)],
+                     score = dat$prop_overlap,
+                     file.name = i,
+                    feature_match = dat$feature_match,
+                    new_feature = dat$new_feature,
+                    feature = dat$feature,
+                     category = "species")
+
+        tmp <- tmp %>%  mutate_all(as.character) 
+
+  resDat <- resDat %>% bind_rows(tmp)
+  }
+  
+  }
+
+for(i in resList$strain){
+  dat <- read.table(paste(filePath, i, "_merged.gff", sep =""), sep = "\t", header = T, fill = T, as.is = T)
+
+  if(grepl(".prop", colnames(dat)[ncol(dat)]) == F){
+  
+    dat <- dat %>% mutate(prop = ifelse(set_val == "1", "2-2", "1-2"))
+    
+  tmp <- data.frame(id = dat$id,
+                     fitch = dat$set_val,
+                     prop = dat$prop,
+                    score = dat$prop_overlap,
+                     file.name = i,
+                    feature_match = dat$feature_match,
+                    new_feature = dat$new_feature,
+                    feature = dat$feature,
+                    category = "strain")
+        tmp <- tmp %>% mutate_all(as.character) 
+
+  resDat <- resDat %>% bind_rows(tmp)
+  }else{
+      tmp <- data.frame(id = dat$id,
+                   fitch = dat[,(ncol(dat) - 1)],
+                     prop = dat[,ncol(dat)],
+                     score = dat$prop_overlap,
+                     file.name = i,
+                    feature_match = dat$feature_match,
+                    new_feature = dat$new_feature,
+                    feature = dat$feature,
+                     category = "strain")
+        tmp <- tmp %>%  mutate_all(as.character)
+
+  resDat <- resDat %>% bind_rows(tmp)
+  }
+  
+  }
+
+for(i in resList$genus){
+  dat <- read.table(paste(filePath, i, "_merged.gff", sep =""), sep = "\t", header = T, fill = T, as.is = T)
+
+  if(grepl(".prop", colnames(dat)[ncol(dat)]) == F){
+  
+    dat <- dat %>% mutate(prop = ifelse(set_val == "1", "2-2", "1-2"))
+    
+  tmp <- data.frame(id = dat$id,
+                     fitch = dat$set_val,
+                     prop = dat$prop,
+                    score = dat$prop_overlap,
+                     file.name = i,
+                    feature_match = dat$feature_match,
+                    new_feature = dat$new_feature,
+                    feature = dat$feature,
+                    category = "genus")
+        tmp <- tmp  %>% mutate_all(as.character) 
+
+  resDat <- resDat %>% bind_rows(tmp)
+  }else{
+      tmp <- data.frame(id = dat$id,
+                   fitch = dat[,(ncol(dat) - 1)],
+                     prop = dat[,ncol(dat)],
+                     score = dat$prop_overlap,
+                     file.name = i,
+                    feature_match = dat$feature_match,
+                    new_feature = dat$new_feature,
+                    feature = dat$feature,
+                     category = "genus")
+        tmp <- tmp %>%  mutate_all(as.character) 
+
+  resDat <- resDat %>% bind_rows(tmp)
+  }
+  
+}
+
+for(i in resList$family){
+  dat <- read.table(paste(filePath, i, "_merged.gff", sep =""), sep = "\t", header = T, fill = T, as.is = T)
+
+
+      tmp <- data.frame(id = dat$id,
+                   fitch = dat[,(ncol(dat) - 1)],
+                     prop = dat[,ncol(dat)],
+                     score = dat$prop_overlap,
+                     file.name = i,
+                    feature_match = dat$feature_match,
+                    new_feature = dat$new_feature,
+                    feature = dat$feature,
+                     category = "family")
+        tmp <- tmp %>% mutate_all(as.character)
+
+  resDat <- resDat %>% bind_rows(tmp)
+  }
+
+for(i in resList$order){
+  dat <- read.table(paste(filePath, i, "_merged.gff", sep =""), sep = "\t", header = T, fill = T, as.is = T)
+
+
+      tmp <- data.frame(id = dat$id,
+                   fitch = dat[,(ncol(dat) - 1)],
+                     prop = dat[,ncol(dat)],
+                     score = dat$prop_overlap,
+                     file.name = i,
+                    feature_match = dat$feature_match,
+                    new_feature = dat$new_feature,
+                    feature = dat$feature,
+                     category = "order")
+        tmp <- tmp %>%  mutate_all(as.character)
+
+  resDat <- resDat %>% bind_rows(tmp)
+  }
+
+return(resDat)
+}
+
+
+resDatReal <- conservationDataFrame(resList = resList, random = F)
+resDatRandom <- conservationDataFrame(resList = resList, random = T)
+
+
+resDatReal <- resDatReal %>% mutate(score = ifelse(feature_match == F, 1000, score))
+resDatRandom <- resDatRandom %>% mutate(score = ifelse(feature_match == F, 1000, score))
+
+resDatReal <- resDatReal %>% separate(col = prop, into = c("count", "total"), remove = F)
+resDatRandom <- resDatRandom %>% separate(col = prop, into = c("count", "total"), remove = F)
+positiveControlsList <- c("rRNA", "tRNA", "riboswitch", "tmRNA", "SRP_RNA", "antisense")
+negativeControlsist <- c("CDS", "intergenic")
+resDatReal <- resDatReal %>% mutate(positive_control = ifelse(feature %in% positiveControlsList, T, F))
+
+     realFitch <- resDatReal%>% filter(fitch != "0") %>% 
+    group_by(positive_control, category) %>%
+    summarise(count = n()) %>% arrange(positive_control, category) %>% 
+       dplyr::rename(level = category, category = positive_control) %>% 
+       ungroup() %>% 
+       mutate(category = ifelse(category == T, "Positive Control", "Predicted sRNAs"))
+    
+     realCount <- realFitch %>% group_by(category) %>% summarise(count = sum(count))
+     randomCount <- randomFitch %>% group_by(category) %>% summarise(count = sum(count))
+     
+    randomFitch <- resDatRandom%>% filter(fitch != "0", feature %in% negativeControlsist) %>% 
+    group_by(feature, category) %>%
+    summarise(count = n()) %>% arrange(feature, category) %>% 
+       ungroup() %>% 
+       dplyr::rename(level = category, category = feature) %>% 
+       mutate(category = ifelse(category == "CDS", "Negative Control (CDS)", "Negative Control (Intergenic)"))
+
+    dat <- realFitch %>% bind_rows(randomFitch)
+     
+    tmp <- data.frame(category = c("Negative Control (CDS)", "Negative Control (Intergenic)", "Positive Control", "Predicted sRNAs"),
+                      level = "all", count = c(16217, 1168, 1489, 17282))
+  
+  dat <- dat %>% bind_rows(tmp) 
+    
+dat$level <- factor(x = dat$level, levels = c("all","strain", "species", "genus", "family", "order"))
+
+dat <- dat %>% arrange(level)
+
+dat <- dat %>% group_by(category) %>% mutate(prop = count/ sum(count), total = sum(count))
+
+p <- ggplot(data = dat, aes(y = prop, x = level, group = category, colour = category) ) +
+  geom_point()+
+  geom_path() +
+  scale_y_continuous(trans = 'log10')
+
+p
+ggsave(filename = "~/phd/RNASeq/figures/number_of_sras_conserved_version_8.svg", plot = p)
+
+```
+
+
+
+```{r comparison_of_shuffled_and_shifted, eva = F}
+shifted <- read.table("~/phd/RNASeq/combined_gff_files_random/version_8/escherichia_merged.gff", sep = "\t", header = T, fill = T)
+shuffled <- read.table("~/phd/RNASeq/combined_gff_files_random/version_7/escherichia_merged.gff", sep = "\t", header = T, fill = T)
+
+resDat <- data.frame(id = NA,
+                     fitch = NA,
+                     prop = NA,
+                    score = NA,
+                    feature_match = NA,
+                    category = NA,
+                    stringsAsFactors = F)
+
+tmp <- shifted %>% select(id, escherichia.fitch, escherichia.prop, prop_overlap, feature_match) %>% 
+  dplyr::rename(fitch = escherichia.fitch, prop = escherichia.prop, score = prop_overlap) %>% 
+  mutate(category = "shifted")
+
+resDat <- resDat %>% bind_rows(tmp)
+
+tmp <- shuffled %>% select(id, escherichia.fitch, escherichia.prop, prop_overlap, feature_match) %>% 
+  dplyr::rename(fitch = escherichia.fitch, prop = escherichia.prop, score = prop_overlap) %>% 
+  mutate(category = "shuffled")
+
+resDat <- resDat %>% bind_rows(tmp)
+resDat <- resDat %>% mutate(score = ifelse(feature_match == F, 1000, score))
+
+ggplot() +
+  geom_freqpoly(data = resDat, aes(x = log10(as.numeric(score)), group = category, colour = category), binwidth = 0.1)+
+  scale_y_continuous(trans = 'log10')
+
+resDat %>% 
+    group_by(fitch, category) %>%
+    summarise(count = n())
+
+resDat <- resDat %>% separate(col = prop, into = c("count", "total"), remove = F)
+
+ggplot() +
+  geom_freqpoly(data = resDat, aes(x = as.numeric(count), group = category, colour = category), binwidth = 1)+
+  scale_y_continuous(trans = 'log10')
+
+```
+
+
+
+```{r get_score_values, eval=F}
+#setwd("~/bin/r_git/R/")
+load("allMerged_version_8.Rda") 
+load("allRandom_version_8.Rda") 
+load("allReadDepths.Rda")  
+
+allMerged <- allMerged %>% filter(!is.na(id))
+allRandomMerged <- allRandom%>% filter(!is.na(id))
+i <- 2
+idList <- list()
+for(i in 1:nrow(allMerged)){
+  printRemaining(i = i, length = nrow(allMerged))
+  idList[i] <-  strsplit(allMerged$id[i], "-")
+  names(idList)[i] <- allMerged$id[i]
+}
+
+allScores <- allMerged %>% mutate(score_2 = 0,
+                                  group = "")
+i <- 6542
+for(i in 1:length(idList)){
+  printRemaining(i = i, length = length(idList))
+
+  idIndividual <- idList[[i]]
+  idAll <- names(idList)[[i]]
+  lines <- match(idIndividual, allReadDepths$id)
+  lines <- lines[!is.na(lines)]
+  if(length(lines) < 1){
+    next
+  }
+  allScores$score_2[allScores$id == idAll] <- allReadDepths$score_2[lines]
+  allScores$group[allScores$id == idAll] <-allReadDepths$group[lines]
+}
+
+
+idListRandom <- list()
+for(i in 1:nrow(allRandomMerged)){
+    printRemaining(i = i, length = nrow(allRandomMerged))
+
+  idListRandom[i] <-  strsplit(allRandomMerged$id[i], "-")
+  names(idListRandom)[i] <- allRandomMerged$id[i]
+}
+
+allRandomScores <- allRandomMerged %>% mutate(score_2 = 0, 
+                                              group = "")
+i <- 9
+for(i in 1:length(idListRandom)){
+    printRemaining(i = i, length = length(idListRandom))
+
+  idIndividual <- idListRandom[[i]]
+  idAll <- names(idListRandom)[[i]]
+  lines <- match(idIndividual, allReadDepths$id)
+  lines <- lines[!is.na(lines)]
+    if(length(lines) < 1){
+    next
+  }
+  allRandomScores$score_2[allRandomScores$id == idAll] <-allReadDepths$score_2[lines]
+  allRandomScores$group[allRandomScores$id == idAll] <-allReadDepths$group[lines]
+
+}
+
+
+
+save(allRandomScores, file = "allRandomScores_version_8.Rda")
+save(allScores, file = "allScores_version_8.Rda")
+
+
+  d1 <- allScores %>%filter(group == "Known SRA predicted") %>% select(group, score_2, id, fitch)
+  d2 <- allScores%>% filter(group == "Novel SRA") %>% select(group, score_2, id, fitch)
+  d3 <- allRandomScores %>% select(group, score_2, id, fitch) %>% mutate(group = "Random Data")
+#  d4 <- allScores %>%filter(group == "Known SRA not predicted") %>% select(group, score_2, id, set_val)
+    d5 <- allScores %>%filter(set_val != "0", group != "Known SRA not predicted") %>% mutate(group = "Conserved") %>% select(group, score_2, id, fitch)
+   d6 <- allScores %>%filter(set_val == "0", group != "Known SRA not predicted") %>% mutate(group = "Not Conserved") %>% select(group, score_2, id, fitch)  
+   
+    allData <- d1 %>% bind_rows(d2) %>% bind_rows(d3) 
+
+    
+   p <- ggplot() +
+  geom_freqpoly(data = allData  , aes(x = score_2, y = ..density.., group = group, colour = group), binwidth = 0.025) +
+  xlim(c(0,0.1)) +
+     geom_vline(xintercept = 0.035) +
+  scale_y_continuous(trans = 'log10')
+   p
+  ggsave(file="~/phd/RNASeq/figures/read_depths__noise_version_8.svg", plot=p)
+
+  allData %>% mutate(noise = ifelse(score_2 <= 0.05, T, F)) %>% group_by(noise, group) %>% summarise(count = n())
+
+  
+    
+```
+
+```{r get_sequences, eval = F}
+getSequencesFast <- function(ids_lookup, fasta){
+  tmp <- ids_lookup
+  tmp <- tmp%>%mutate(sequence = "")
+
+  for(i in 1:nrow(tmp)){
+    printRemaining(i = i, length = nrow(tmp), increment = 5)
+    # x <- system(command = paste("sed -n '", (as.numeric(tmp[i, 2]) + 1), "p'",
+    #                             " ~/phd/RNASeq/new_calls/",
+    #                             tmp[i, 3],
+    #                             "_new_calls.txt", sep = ""), intern = T)
+    # x <- unlist(strsplit(as.character(x), split = "\t"))
+    #print(x[3:4])
+
+
+    try( tmp[i, ncol(tmp)] <- substr(fasta, ids_lookup[i,1], ids_lookup[i,2]))
+
+  }
+
+  return(tmp)
+}
+getSequences <- function(ids_lookup){
+    tmp <- ids_lookup
+  tmp <- tmp%>%mutate(sequence = "")
+
+  for(i in 1:nrow(tmp)){
+    printRemaining(i = i, length = nrow(tmp), increment = 5)
+    # x <- system(command = paste("sed -n '", (as.numeric(tmp[i, 2]) + 1), "p'",
+    #                             " ~/phd/RNASeq/new_calls/",
+    #                             tmp[i, 3],
+    #                             "_new_calls.txt", sep = ""), intern = T)
+    # x <- unlist(strsplit(as.character(x), split = "\t"))
+    #print(x[3:4])
+
+
+   try( tmp[i, ncol(tmp)] <- system(paste("test_string=`grep -v ^'>' ~/phd/RNASeq/sequences/",
+                                      "GCA_000017765.1",
+                                      ".fna | tr -d '\n'`; echo ${test_string:",
+                                      ids_lookup[i,1], ":", as.numeric(ids_lookup[i,2]) - as.numeric(ids_lookup[i,1]),
+                                      "}", sep = ""), intern = T))
+  }
+
+  return(tmp)
+}
+
+
+
+
+if(random_data){
+  load("allRandom_version_8.Rda")
+#    dat <-  read.table("~/phd/RNASeq/combined_gff_files/escherichia-shigella-salmonella-enterobacter-klebsiella-serratia_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
+  dat <- allRandom
+  
+  dat[dat == "1-0"] <- "0-1"
+
+dat <- dat %>% separate(prop, into = c("count", "total"), sep = "-", remove = F) %>% 
+  filter(feature == "intergenic") %>% 
+  mutate(count = as.numeric(count),
+         total = as.numeric(total),
+         density = count/total) %>% 
+  arrange(-density) %>% 
+  arrange(fitch) 
+}else if(known_predicted){
+
+  #load data
+  load("allMerged_version_8.Rda")
+#    dat <-  read.table("~/phd/RNASeq/combined_gff_files/escherichia-shigella-salmonella-enterobacter-klebsiella-serratia_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
+  dat <- allMerged
+  
+  dat[dat == "1-0"] <- "0-1"
+
+
+  #dat <- reLabelFitch(dat)
+  #dat <- assignConservationLevel(dat)
+##select some data 
+dat <- dat %>% separate(prop, into = c("count", "total"), sep = "-", remove = F) %>% 
+  mutate(count = as.numeric(count),
+         total = as.numeric(total)) %>% 
+  filter(category != "strain",
+         !is.na(category),
+         positive_control == T, 
+         fitch == 1) 
+
+
+}else if(not_conserved){
+    #load data
+  load("allMerged_version_8.Rda")
+  dat <- allMerged
+  dat[dat == "1-0"] <- "0-1"
+##select some data 
+dat <- dat %>% separate(prop, into = c("count", "total"), sep = "-", remove = F) %>% 
+  mutate(count = as.numeric(count),
+         total = as.numeric(total)) %>% 
+  filter(count == 1, 
+         positive_control == F,
+         fitch == "0") 
+
+
+}else{
+  load("allMerged_version_8.Rda")
+  dat <- allMerged
+  dat[dat == "1-0"] <- "0-1"
+  
+  #dat <- reLabelFitch(dat)
+  #dat <- assignConservationLevel(dat)
+##select some data 
+dat <- dat %>% separate(prop, into = c("count", "total"), sep = "-", remove = F) %>% 
+  mutate(count = as.numeric(count),
+         total = as.numeric(total)) %>% 
+  filter(category != "strain",
+         !is.na(category),
+         positive_control == F,
+         count != 1) 
+
+
+}
+
+
+dat_files <- unique(unlist(strsplit(dat$file_id, "-")))
+dat_ids <- dat$id
+
+ids_lookup <- matrix(nrow = length(dat_ids), ncol = (length(dat_files)+ 1))
+colnames(ids_lookup) <- c("id", dat_files)
+ids_lookup[,1] <- dat_ids
+#ids <- as.data.frame(ids)
+i <- 1
+j <- 1
+loop_length <- 200 #nrow(ids_seq)
+
+for(i in 1:loop_length){
+    printRemaining(length = loop_length, i = i)
+
+  uid <- ids_lookup[i,1]
+  uid <- unlist(strsplit(uid, "-"))
+  for(j in 1:length(uid)){
+    x <- paste(unlist(strsplit(uid[j], "_"))[1:(length(unlist(strsplit(uid[j], "_")))-1)], collapse = "_")
+    y <- unlist(strsplit(uid[j], "_"))[length(unlist(strsplit(uid[j], "_")))] ##need to change this to 5 fro random and 3 for real
+    if(y != "0"){
+      val <- match(x , colnames(ids_lookup))
+      ids_lookup[i, val] <- y
+    }
+
+  }
+}
+
+
+ids_lookup[is.na(ids_lookup)] <- ""
+
+ids_lookup <- as.data.frame(ids_lookup)
+
+for(i in 2:ncol(ids_lookup)){
+  ids_lookup[,i] <- as.character(ids_lookup[,i])
+}
+
+i <- 1
+j <- 2
+ids_seq <- ids_lookup%>%left_join(dat%>%select(fitch, category, id), by = "id") 
+
+
+
+
+ids_DataList <- ids_lookup%>%full_join(dat%>%select(fitch, category, id), by = "id")#%>%filter(set_val != "0")
+
+i <- 1
+j <- 34
+for(i in 1:loop_length){
+  printRemaining(length = loop_length, i = i)
+  print(i)
+  for(j in 2:(ncol(ids_seq) - 2)){
+  print(paste(i, j))
+
+    if(ids_seq[i,j] != ""){
+      if(ids_seq[i,j] == "0"){next}
+      #print(j)
+      x <- system(command = paste("sed -n '", (as.numeric(ids_seq[i, j]) + 1), "p'",
+                         " ~/phd/RNASeq/new_calls/",
+                         colnames(ids_seq)[j],
+                         "_new_calls.txt", sep = ""), intern = T)
+      ids_DataList[i,j] <- x
+      x <- unlist(strsplit(as.character(x), split = "\t"))
+      #print(x[3:4])
+      if(abs(as.numeric(x[4]) - as.numeric(x[3])) > 500){
+        ids_seq[i,j] <- ""
+        next
+      }else{
+      if(as.numeric(x[4]) - as.numeric(x[3]) > 0){ 
+
+      ids_seq[i, j] <- system(paste("test_string=`grep -v ^'>' ~/phd/RNASeq/sequences/",
+                         colnames(ids_seq)[j],
+                         ".fna | tr -d '\n'`; echo ${test_string:",
+                         x[3], ":", as.numeric(x[4]) - as.numeric(x[3]),
+                         "}", sep = ""), intern = T)
+      }else{
+        ids_seq[i, j] <- system(paste("test_string=`grep -v ^'>' ~/phd/RNASeq/sequences/",
+                         colnames(ids_seq)[j],
+                         ".fna | tr -d '\n'`; echo ${test_string:",
+                         x[4], ":", as.numeric(x[3]) - as.numeric(x[4]),
+                         "}", sep = ""), intern = T)
+}
+}
+    }
+  }
+}
+
+ids_seq <- ids_seq%>%mutate(ids_short = paste("sra_enterics-serratia_not_conserved_version_8_", row_number(), sep = ""))
+
+for(i in 1:loop_length){
+  for(j in 2:(ncol(ids_seq) -  2)){
+    if(ids_seq[i, j] != ""){
+      mat <- matrix(ncol = 1, nrow = 2)
+      mat[1,1] <- paste(">", colnames(ids_seq)[j], sep = "")
+      mat[2,1] <- ids_seq[i,j]
+      write.table(mat, file = paste("~/phd/RNASeq/srna_all/version_8/not_conserved/", ids_seq[i, ncol(ids_seq)], ".fasta", sep = ""),
+                  row.names = F, col.names = F, quote = F, sep = "\t", append = T)
+
+    }
+  }
+}
+idsSeq_not_conserved <- ids_seq
+save(idsSeq_not_conserved, file = "idsSeq_not_conserved_version_8.Rda")
+#write.table(ids_seq, "~/phd/RNASeq/srna_all/random/intergenic/id_list", sep = "\t", row.names = F, col.names = T, quote = F)
+
+```
+
+```{r rmfam, eval=F}
+realDat <- read.table("~/phd/RNASeq/srna_all/real_rmfam_all", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T)
+randomDat <- read.table("~/phd/RNASeq/srna_all/random_rmfam_all", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T)
+intergenicDat <- read.table("~/phd/RNASeq/srna_all/intergenic_rmfam_all", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T)
+
+cols <- c("target_name",	"accession1", "query_name",	"accession2", "mdl", "mdl_from",	"mdl_to", "seq_from",	"seq_to", "strand", "trunc_pass",	"gc",	"bias",	"score",	"E.value", "inc", "description_of_target")
+
+colnames(realDat) <- cols
+colnames(randomDat) <- cols
+colnames(intergenicDat) <- cols
+
+realDat <- realDat %>% mutate(group = "real")
+randomDat <- randomDat %>% mutate(group = "random")
+intergenicDat <- randomDat %>% mutate(group = "intergenic")
+
+dat <- realDat %>% bind_rows(randomDat) 
+
+p <- ggplot() +
+  geom_freqpoly(data = dat, aes(x = score, y = ..density.., group = group, colour = group),binwidth = 20)+
+  scale_y_continuous(trans = 'log10')
+p
+  ggsave(file="~/phd/RNASeq/figures/rmfam_version_8.svg", plot=p)
+
+```
+
+```{r alifold, eval=F}
+alifoldSRNA <- read.table("~/phd/RNASeq/srna_all/version_8/alifold_predicted_all", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T, 
+                      col.names = c( "From",      "To",    "Strand",    "Native.MFE",    "Mean.MFE",     "STDV",      "Z"))
+alifoldIntergenic<- read.table("~/phd/RNASeq/srna_all/version_8/alifold_random_all", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T, 
+                      col.names = c( "From",      "To",    "Strand",    "Native.MFE",    "Mean.MFE",     "STDV",      "Z"))
+alifoldNotConseved <- read.table("~/phd/RNASeq/srna_all/version_8/alifold_not_conserved_all", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T, 
+                      col.names = c( "From",      "To",    "Strand",    "Native.MFE",    "Mean.MFE",     "STDV",      "Z"))
+alifoldConseved <- read.table("~/phd/RNASeq/srna_all/version_8/alifold_known_all", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T, 
+                      col.names = c( "From",      "To",    "Strand",    "Native.MFE",    "Mean.MFE",     "STDV",      "Z"))
+
+intergenicAli <- alifoldIntergenic %>% mutate(Z = ifelse(is.na(Z), 10, Z)) %>% select(-Strand) %>% mutate_all(as.numeric) 
+realAli <- alifoldSRNA %>% mutate(Z = ifelse(is.na(Z), 10, Z)) %>% select(-Strand) %>% mutate_all(as.numeric) 
+notCAli <- alifoldNotConseved %>% mutate(Z = ifelse(is.na(Z), 10, Z)) %>% select(-Strand) %>% mutate_all(as.numeric) 
+cAli <- alifoldConseved %>% mutate(Z = ifelse(is.na(Z), 10, Z)) %>% select(-Strand) %>% mutate_all(as.numeric) 
+
+realAli[is.na(realAli)] <- 0
+intergenicAli[is.na(intergenicAli)] <- 0
+notCAli[is.na(notCAli)] <- 0
+cAli[is.na(cAli)] <- 0
+
+realAli <- realAli %>% mutate(group = "cpredicted sRNA")
+intergenicAli <- intergenicAli %>% mutate(group = "Rintergenic (random)")
+notCAli <- notCAli %>% mutate(group = "nsRNA not conserved")
+cAli <- cAli %>% mutate(group = "known sRNA") 
+
+ali <- realAli%>% bind_rows(notCAli) %>% bind_rows(cAli) %>% bind_rows(intergenicAli) 
+
+
+
+p <- ggplot() +
+  geom_freqpoly(data = ali, aes(x = Z, y = ..density.., group = group, colour = group), binwidth = 1) +
+  geom_vline(aes(xintercept = -3))
+p
+  ggsave(file="~/phd/RNASeq/figures/secondary_structure_alifoldz_scores_version_8.svg", plot=p)
+
+
+ali %>% mutate(real = ifelse(Z < -3, T, F)) %>% group_by(group, real) %>% summarise(count = n())
+  
+  
+  
+  
+  
+  ggplot() +
+  geom_histogram(data = ali, aes(x = Native.MFE, y = ..density.., group = group, fill = group), position = "dodge", binwidth = 4)+
+  ylim(c(0, 0.03))
+  
+  
+  rocAli <- ali %>% mutate(response = ifelse(group == "Rintergenic (random)", 0, ifelse(group == "known sRNA", 1, NA))) %>% filter(!is.na(response)) %>% mutate(score_2 = -Z)
+  
+
+  svg(filename="~/phd/RNASeq/figures/roc_curve_alifold_version_8.svg", 
+     width=15, 
+     height=15, 
+     pointsize=20)
+  roc.curve(response = rocAli$response, predicted  = rocAli$score_2, 
+          main="ROC curve for AlifoldZ")
+
+dev.off()
+
+ali %>% mutate(threshold_1 = ifelse(Z <= -1.5, 1, 0)) %>% group_by(threshold_1, group) %>% summarise(count = n())
+
+```
+
+```{r roc_curve, eval = F}
+load("allReadDepths.Rda")
+
+
+rocData <- allReadDepths %>% mutate(response = ifelse(group == "Random Data", 0, ifelse(group == "Known SRA predicted", 1, NA))) %>% 
+  filter(!is.na(response))
+
+predictedData <- allReadDepths %>% mutate(response = ifelse(group == "Random Data", 0, ifelse(group == "Known SRA predicted", 1, NA))) %>% 
+  filter(is.na(response))
+
+thresholdData <- rocData %>% mutate(threshold_1 = ifelse(score_2 > 0.035, 1, 0)) %>% group_by(threshold_1, group) %>% summarise(count = n())
+thresholdData
+
+allReadDepths %>% mutate(threshold_1 = ifelse(score_2 > 0.035, 1, 0)) %>% group_by(threshold_1, group) %>% summarise(count = n())
+
+
+  svg(filename="~/phd/RNASeq/figures/roc_curve_max_version_8.svg", 
+     width=15, 
+     height=15, 
+     pointsize=20)
+roc.curve(response = rocData$response, predicted = rocData$score_2, 
+          main="ROC curve for Read Depths Scores")
+
+dev.off()
+
+```
+
 
 ##Scripts
 
@@ -4526,422 +5138,8 @@ sum(calls$length_cds)
 
 Dont use the known_predicted section
 
-```{r get_sequences, eval = F}
-getSequencesFast <- function(ids_lookup, fasta){
-  tmp <- ids_lookup
-  tmp <- tmp%>%mutate(sequence = "")
 
-  for(i in 1:nrow(tmp)){
-    printRemaining(i = i, length = nrow(tmp), increment = 5)
-    # x <- system(command = paste("sed -n '", (as.numeric(tmp[i, 2]) + 1), "p'",
-    #                             " ~/phd/RNASeq/new_calls/",
-    #                             tmp[i, 3],
-    #                             "_new_calls.txt", sep = ""), intern = T)
-    # x <- unlist(strsplit(as.character(x), split = "\t"))
-    #print(x[3:4])
 
-
-    try( tmp[i, ncol(tmp)] <- substr(fasta, ids_lookup[i,1], ids_lookup[i,2]))
-
-  }
-
-  return(tmp)
-}
-getSequences <- function(ids_lookup){
-    tmp <- ids_lookup
-  tmp <- tmp%>%mutate(sequence = "")
-
-  for(i in 1:nrow(tmp)){
-    printRemaining(i = i, length = nrow(tmp), increment = 5)
-    # x <- system(command = paste("sed -n '", (as.numeric(tmp[i, 2]) + 1), "p'",
-    #                             " ~/phd/RNASeq/new_calls/",
-    #                             tmp[i, 3],
-    #                             "_new_calls.txt", sep = ""), intern = T)
-    # x <- unlist(strsplit(as.character(x), split = "\t"))
-    #print(x[3:4])
-
-
-   try( tmp[i, ncol(tmp)] <- system(paste("test_string=`grep -v ^'>' ~/phd/RNASeq/sequences/",
-                                      "GCA_000017765.1",
-                                      ".fna | tr -d '\n'`; echo ${test_string:",
-                                      ids_lookup[i,1], ":", as.numeric(ids_lookup[i,2]) - as.numeric(ids_lookup[i,1]),
-                                      "}", sep = ""), intern = T))
-  }
-
-  return(tmp)
-}
-
-reLabelFitch <- function(dat){
-  escherichiaMerged <- dat
-escherichiaMerged <- escherichiaMerged %>% mutate(escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.fitch = ifelse(escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.fitch == "0-1", 
-                                                                                      ifelse(escherichia.shigella.salmonella.enterobacter.klebsiella.fitch == "0-1", 
-                                                                                             ifelse(serratia.fitch == "0-1",
-                                                                                                    "1",
-                                                                                                    "0-1"), 
-                                                                                             "0-1"),
-                                                                                      escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.fitch))
-
-
-
-escherichiaMerged <- escherichiaMerged %>% mutate(escherichia.shigella.salmonella.enterobacter.klebsiella.fitch = ifelse(escherichia.shigella.salmonella.enterobacter.klebsiella.fitch == "0-1", 
-                                                                                      ifelse(escherichia.shigella.salmonella.fitch == "0-1", 
-                                                                                             ifelse(enterobacter.klebsiella.fitch == "0-1",
-                                                                                                    "1",
-                                                                                                    "0-1"), 
-                                                                                             "0-1"),
-                                                                                      escherichia.shigella.salmonella.enterobacter.klebsiella.fitch))
-
-
-escherichiaMerged <- escherichiaMerged %>% mutate(escherichia.shigella.salmonella.fitch = ifelse(escherichia.shigella.salmonella.fitch == "0-1", 
-                                                                                      ifelse(escherichia.shigella.fitch == "0-1", 
-                                                                                             ifelse(salmonella.fitch == "0-1",
-                                                                                                    "1",
-                                                                                                    "0-1"), 
-                                                                                             "0-1"),
-                                                                                      escherichia.shigella.salmonella.fitch))
-
-escherichiaMerged <- escherichiaMerged %>% mutate(escherichia.shigella.fitch = ifelse(escherichia.shigella.fitch == "0-1", 
-                                                                                      ifelse(escherichia.fitch == "0-1", 
-                                                                                             ifelse(shigella.fitch == "0-1",
-                                                                                                    "1",
-                                                                                                    "0-1"), 
-                                                                                             "0-1"),
-                                                                                      escherichia.shigella.fitch))
-
-escherichiaMerged <- escherichiaMerged %>% mutate(enterobacter.klebsiella.fitch = ifelse(enterobacter.klebsiella.fitch == "0-1", 
-                                                                                      ifelse(enterobacter == "0-1", 
-                                                                                             ifelse(klebsiella == "0-1",
-                                                                                                    "1",
-                                                                                                    "0-1"), 
-                                                                                             "0-1"),
-                                                                                      enterobacter.klebsiella.fitch))
-return(escherichiaMerged)
-}
-assignConservationLevel <- function(dat){
-  escherichiaMerged <- dat
-  ##group 1
-escherichiaMerged <- escherichiaMerged %>% mutate(group = ifelse(escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.fitch == 1, "family_2", NA))
-
-escherichiaMerged <- escherichiaMerged %>% mutate(group = ifelse(is.na(group), ifelse(escherichia.shigella.salmonella.enterobacter.klebsiella.fitch == 1, "family", NA) , group))
-
-escherichiaMerged <- escherichiaMerged %>% mutate(group = ifelse(is.na(group), ifelse(escherichia.shigella.salmonella.fitch == 1, "genus", NA) , group))
-escherichiaMerged <- escherichiaMerged %>% mutate(group = ifelse(is.na(group), ifelse(enterobacter.klebsiella.fitch == 1, "genus", NA) , group))
-
-escherichiaMerged <- escherichiaMerged %>% mutate(group = ifelse(is.na(group), ifelse(escherichia.shigella.fitch == 1, "species", NA) , group))
-escherichiaMerged <- escherichiaMerged %>% mutate(group = ifelse(is.na(group), ifelse(enterobacter == 1, "species", NA) , group))
-escherichiaMerged <- escherichiaMerged %>% mutate(group = ifelse(is.na(group), ifelse(klebsiella == 1, "species", NA) , group))
-escherichiaMerged <- escherichiaMerged %>% mutate(group = ifelse(is.na(group), ifelse(salmonella.fitch == 1, "species", NA) , group))
-escherichiaMerged <- escherichiaMerged %>% mutate(group = ifelse(is.na(group), ifelse(serratia.fitch == 1, "species", NA) , group))
-
-escherichiaMerged %>% group_by(group) %>% summarise(count = n())
-
-
-##group 2
-escherichiaMerged <- escherichiaMerged %>% mutate(group_2 = ifelse(escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.fitch == "0-1", "family_2", NA))
-
-escherichiaMerged <- escherichiaMerged %>% mutate(group_2 = ifelse(is.na(group_2), ifelse(escherichia.shigella.salmonella.enterobacter.klebsiella.fitch == "0-1", "family", NA) , group_2))
-
-escherichiaMerged <- escherichiaMerged %>% mutate(group_2 = ifelse(is.na(group_2), ifelse(escherichia.shigella.salmonella.fitch == "0-1", "genus", NA) , group_2))
-escherichiaMerged <- escherichiaMerged %>% mutate(group_2 = ifelse(is.na(group_2), ifelse(enterobacter.klebsiella.fitch == "0-1", "genus", NA) , group_2))
-
-escherichiaMerged <- escherichiaMerged %>% mutate(group_2 = ifelse(is.na(group_2), ifelse(escherichia.shigella.fitch == "0-1", "species", NA) , group_2))
-escherichiaMerged <- escherichiaMerged %>% mutate(group_2 = ifelse(is.na(group_2), ifelse(enterobacter == "0-1", "species", NA) , group_2))
-escherichiaMerged <- escherichiaMerged %>% mutate(group_2 = ifelse(is.na(group_2), ifelse(klebsiella == "0-1", "species", NA) , group_2))
-escherichiaMerged <- escherichiaMerged %>% mutate(group_2 = ifelse(is.na(group_2), ifelse(salmonella.fitch == "0-1", "species", NA) , group_2))
-escherichiaMerged <- escherichiaMerged %>% mutate(group_2 = ifelse(is.na(group_2), ifelse(serratia.fitch == "0-1", "species", NA) , group_2))
-
-escherichiaMerged %>% group_by(group_2) %>% summarise(count = n())
-return(escherichiaMerged)
-}
-
-
-
-if(random_data){
-dat <-  read.table("~/phd/RNASeq/combined_gff_files_random/escherichia-shigella-salmonella-enterobacter-klebsiella-serratia_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
-dat[dat == "1-0"] <- "0-1"
-
-dat <- dat %>% separate(escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.prop, into = c("count", "total"), sep = "-", remove = F) %>% 
-  filter(feature == "intergenic") %>% 
-  mutate(count = as.numeric(count),
-         total = as.numeric(total),
-         density = count/total) %>% 
-  arrange(-density) %>% 
-  arrange(set_val) %>% 
-  top_n(n = 100)
-}else if(known_predicted){
-
-  #load data
-  load("allMerged.Rda")
-#    dat <-  read.table("~/phd/RNASeq/combined_gff_files/escherichia-shigella-salmonella-enterobacter-klebsiella-serratia_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
-  dat <- allMerged
-  
-  dat[dat == "1-0"] <- "0-1"
-
-
-  dat <- reLabelFitch(dat)
-  dat <- assignConservationLevel(dat)
-##select some data 
-dat <- dat %>% separate(escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.prop, into = c("count", "total"), sep = "-", remove = F) %>% 
-  mutate(count = as.numeric(count),
-         total = as.numeric(total)) %>% 
-  filter(group != "species",
-         !is.na(group),
-         new_feature == T) 
-
-
-}else if(not_conserved){
-    #load data
-  load("allMerged.Rda")
-  dat <- allMerged
-  dat[dat == "1-0"] <- "0-1"
-##select some data 
-dat <- dat %>% separate(escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.prop, into = c("count", "total"), sep = "-", remove = F) %>% 
-  mutate(count = as.numeric(count),
-         total = as.numeric(total)) %>% 
-  filter(count == 1, 
-         new_feature == T) 
-##assign to groups of size 100
-groupAssignLength <- nrow(dat)/100
-
-groupAssign <- round(runif(n = nrow(dat), min = 1, max = groupAssignLength), 0)
-
-dat$groupAssign <- groupAssign
-dat <- dat %>% filter(groupAssign == 2)
-
-}else{
-   load("allMerged.Rda")
-  dat <- allMerged
-  dat[dat == "1-0"] <- "0-1"
-  
-  dat <- reLabelFitch(dat)
-  dat <- assignConservationLevel(dat)
-##select some data 
-dat <- dat %>% separate(escherichia.shigella.salmonella.enterobacter.klebsiella.serratia.prop, into = c("count", "total"), sep = "-", remove = F) %>% 
-  mutate(count = as.numeric(count),
-         total = as.numeric(total)) %>% 
-  filter(group != "species",
-         !is.na(group),
-         new_feature == F) 
-
-
-}
-
-##get list of files and individual ids
-dat_files <- unlist(strsplit(dat$file_id[1], "-"))
-dat_ids <- dat$id
-
-##create matrix listing all ids in rows and the files for columns
-ids <- matrix(nrow = length(dat_ids), ncol = (length(dat_files)+ 1))
-colnames(ids) <- c("id", dat_files)
-ids[,1] <- dat_ids
-#ids <- as.data.frame(ids)
-i <- 1
-j <- 3
-
-##test yes/no (1/NA) if an ID was found in a file
-for(i in 1:nrow(ids)){
-printRemaining(length = nrow(ids),i = i)
-print(i)
-      uid <- ids[i,1]
-  uid <- unlist(strsplit(uid, "-"))
-  for(j in 1:length(uid)){
-#  print(j)
-    x <- paste(unlist(strsplit(uid[j], "_"))[1:length(unlist(strsplit(uid[j], "_"))) - 1], collapse = "_")
-    y <- unlist(strsplit(uid[j], "_"))[length(unlist(strsplit(uid[j], "_")))]##need to change this to 5 fro random and 3 for real
-    if(y != "0"){
-    val <- match(x , colnames(ids))
-    ids[i, val] <- 1
-    }
-  }
-}
-
-ids[is.na(ids)] <- 0
-
-ids <- as.data.frame(ids)
-
-##set the values as numeric (as.data.frame messed this up)
-for(i in 2:ncol(ids)){
-  ids[,i] <- as.numeric(as.character(ids[,i]))
-}
-
-
-
-
-
-
-
-# dat <- read.table("~/phd/RNASeq/enterics-serratia_merged.gff", header = T, sep = "\t",
-#                   comment.char = "", quote = "", as.is = T )
-
-
-dat_files <- unique(unlist(strsplit(dat$file_id[1], "-")))
-dat_ids <- dat$id
-
-ids_lookup <- matrix(nrow = length(dat_ids), ncol = (length(dat_files)+ 1))
-colnames(ids_lookup) <- c("id", dat_files)
-ids_lookup[,1] <- dat_ids
-#ids <- as.data.frame(ids)
-i <- 1
-j <- 1
-for(i in 1:nrow(ids_lookup)){
-  uid <- ids_lookup[i,1]
-  uid <- unlist(strsplit(uid, "-"))
-  for(j in 1:length(uid)){
-    x <- paste(unlist(strsplit(uid[j], "_"))[1:length(unlist(strsplit(uid[j], "_")))-1], collapse = "_")
-    y <- unlist(strsplit(uid[j], "_"))[length(unlist(strsplit(uid[j], "_")))] ##need to change this to 5 fro random and 3 for real
-    if(y != "0"){
-      val <- match(x , colnames(ids_lookup))
-      ids_lookup[i, val] <- y
-    }
-
-  }
-}
-
-
-ids_lookup[is.na(ids_lookup)] <- ""
-
-ids_lookup <- as.data.frame(ids_lookup)
-
-for(i in 2:ncol(ids_lookup)){
-  ids_lookup[,i] <- as.character(ids_lookup[,i])
-}
-
-i <- 1
-j <- 2
-ids_seq <- ids_lookup%>%full_join(dat%>%select(set_val, id), by = "id")#%>%filter(set_val != "0")
-
-ids_DataList <- ids_lookup%>%full_join(dat%>%select(set_val, id), by = "id")#%>%filter(set_val != "0")
-
-
-for(i in 1:nrow(ids_seq)){
-  printRemaining(length = nrow(ids_seq), i = i)
-  print(i)
-  for(j in 2:(ncol(ids_seq) - 1)){
-#  print(j)
-
-    if(ids_seq[i,j] != ""){
-      x <- system(command = paste("sed -n '", (as.numeric(ids_seq[i, j]) + 1), "p'",
-                         " ~/phd/RNASeq/new_calls/",
-                         colnames(ids_seq)[j],
-                         "_new_calls.txt", sep = ""), intern = T)
-      ids_DataList[i,j] <- x
-      x <- unlist(strsplit(as.character(x), split = "\t"))
-      #print(x[3:4])
-      if(abs(as.numeric(x[4]) - as.numeric(x[3])) > 500){
-        ids_seq[i,j] <- ""
-        next
-      }else{
-      if(as.numeric(x[4]) - as.numeric(x[3]) > 0){ 
-
-      ids_seq[i, j] <- system(paste("test_string=`grep -v ^'>' ~/phd/RNASeq/sequences/",
-                         colnames(ids_seq)[j],
-                         ".fna | tr -d '\n'`; echo ${test_string:",
-                         x[3], ":", as.numeric(x[4]) - as.numeric(x[3]),
-                         "}", sep = ""), intern = T)
-      }else{
-        ids_seq[i, j] <- system(paste("test_string=`grep -v ^'>' ~/phd/RNASeq/sequences/",
-                         colnames(ids_seq)[j],
-                         ".fna | tr -d '\n'`; echo ${test_string:",
-                         x[4], ":", as.numeric(x[3]) - as.numeric(x[4]),
-                         "}", sep = ""), intern = T)
-}
-}
-    }
-  }
-}
-
-ids_seq <- ids_seq%>%mutate(ids_short = paste("sra_enterics-serratia_known_", row_number(), sep = ""))
-
-for(i in 1:nrow(ids_seq)){
-  for(j in 2:(ncol(ids_seq) -  2)){
-    if(ids_seq[i, j] != ""){
-      mat <- matrix(ncol = 1, nrow = 2)
-      mat[1,1] <- paste(">", colnames(ids_seq)[j], sep = "")
-      mat[2,1] <- ids_seq[i,j]
-      write.table(mat, file = paste("~/phd/RNASeq/srna_all/known/", ids_seq[i, ncol(ids_seq)], ".fasta", sep = ""),
-                  row.names = F, col.names = F, quote = F, sep = "\t", append = T)
-
-    }
-  }
-}
-idsSeqKnown <- ids_seq
-save(idsSeqKnown, file = "idsSeqKnown.Rda")
-#write.table(ids_seq, "~/phd/RNASeq/srna_all/random/intergenic/id_list", sep = "\t", row.names = F, col.names = T, quote = F)
-
-```
-
-
-```{r get_score_values, eval=F}
-setwd("~/phd/RNASeq/r_files/")
-load("allMerged.Rda") 
-load("alRandomMerged.Rda") 
-load("allReadDepths.Rda")  
-
-i <- 2
-idList <- list()
-for(i in 1:nrow(allMerged)){
-  idList[i] <-  strsplit(allMerged$id[i], "-")
-  names(idList)[i] <- allMerged$id[i]
-}
-
-allScores <- allMerged %>% mutate(score_2 = 0,
-                                  group = "")
-i <- 9
-for(i in 1:length(idList)){
-  idIndividual <- idList[[i]]
-  idAll <- names(idList)[[i]]
-  lines <- match(idIndividual, allReadDepths$id)
-  lines <- lines[!is.na(lines)]
-  allScores$score_2[allScores$id == idAll] <-allReadDepths$score_2[lines]
-  allScores$group[allScores$id == idAll] <-allReadDepths$group[lines]
-}
-
-
-idListRandom <- list()
-for(i in 1:nrow(allRandomMerged)){
-  idListRandom[i] <-  strsplit(allRandomMerged$id[i], "-")
-  names(idListRandom)[i] <- allRandomMerged$id[i]
-}
-
-allRandomScores <- allRandomMerged %>% mutate(score_2 = 0, 
-                                              group = "")
-i <- 9
-for(i in 1:length(idListRandom)){
-  idIndividual <- idListRandom[[i]]
-  idAll <- names(idListRandom)[[i]]
-  lines <- match(idIndividual, allReadDepths$id)
-  lines <- lines[!is.na(lines)]
-  allRandomScores$score_2[allRandomScores$id == idAll] <-allReadDepths$score_2[lines]
-  allRandomScores$group[allRandomScores$id == idAll] <-allReadDepths$group[lines]
-
-}
-
-
-
-save(allRandomScores, file = "allRandomScores.Rda")
-save(allScores, file = "allScores.Rda")
-
-
-  d1 <- allScores %>%filter(group == "Known SRA predicted") %>% select(group, score_2, id, set_val)
-  d2 <- allScores%>% filter(group == "Novel SRA") %>% select(group, score_2, id, set_val)
-  d3 <- allRandomScores %>% select(group, score_2, id, set_val)
-#  d4 <- allScores %>%filter(group == "Known SRA not predicted") %>% select(group, score_2, id, set_val)
-    d5 <- allScores %>%filter(set_val != "0", group != "Known SRA not predicted") %>% mutate(group = "Conserved") %>% select(group, score_2, id, set_val)
-  
-    allData <- d1 %>% bind_rows(d2) %>% bind_rows(d3)  %>%  bind_rows(d5)
-
-   p <- ggplot() +
-  geom_density(data = allData , aes(x = score_2, group = group, colour = group)) +
-  xlim(c(0,1)) +
-     geom_vline(xintercept = 0.035)
-   p
-  ggsave(file="~/phd/RNASeq/read_depths.svg", plot=p)
-
-  allData %>% mutate(noise = ifelse(score_2 <= 0.035, T, F)) %>% group_by(noise, group) %>% summarise(count = n())
-
-  
-    
-```
 
 ```{r combine_plot_files, eval=F}
 
@@ -4977,107 +5175,8 @@ write.table(dat, file = "~/phd/RNASeq/escherichia/GCA_000017745_data/all_plots.p
 
 ###results 
 
-```{r number_of_sRNAs_conserved, eval=F}
-dat <- data.frame(sras = c(16379, 7935, 316, 
-              114, 33, 
-              16379,8963, 172, 
-              14, 1))
-
-dat$sras <- c(16379,7935, 316, 
-              114, 33, 
-              16379,8963, 172, 
-              14, 1)
-
-dat$group <- c("sRNA","sRNA",
-               "sRNA","sRNA","sRNA", 
-               "Intergenic (random)", "Intergenic (random)", "Intergenic (random)", 
-               "Intergenic (random)", "Intergenic (random)")
-
-dat$level <- factor(x = c("All", "Strain", "Species", 
-                "Genus", "Family", 
-                "All","Strain", "Species", 
-                "Genus", "Family"), levels = c("All","Strain", "Species", "Genus", "Family"))
-
-p <- ggplot(data = dat, aes(y = sras, x = level, group = group, colour = group) ) +
-  geom_point()+
-  geom_path() +
-  scale_y_continuous(trans = 'log10')
-
-p
-ggsave(filename = "~/phd/RNASeq/figures/number_of_sras_conserved.svg", plot = p)
-
-```
-
-```{r rmfam, eval=F}
-realDat <- read.table("~/phd/RNASeq/srna_all/real_rmfam_all", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T)
-randomDat <- read.table("~/phd/RNASeq/srna_all/random_rmfam_all", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T)
-intergenicDat <- read.table("~/phd/RNASeq/srna_all/intergenic_rmfam_all", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T)
-
-cols <- c("target_name",	"accession1", "query_name",	"accession2", "mdl", "mdl_from",	"mdl_to", "seq_from",	"seq_to", "strand", "trunc_pass",	"gc",	"bias",	"score",	"E.value", "inc", "description_of_target")
-
-colnames(realDat) <- cols
-colnames(randomDat) <- cols
-colnames(intergenicDat) <- cols
-
-realDat <- realDat %>% mutate(group = "real")
-randomDat <- randomDat %>% mutate(group = "random")
-intergenicDat <- randomDat %>% mutate(group = "intergenic")
-
-dat <- realDat %>% bind_rows(randomDat) %>% bind_rows(intergenicDat)
-
-ggplot() +
-  geom_histogram(data = dat, aes(x = score, y = ..density.., group = group, fill = group), position = "dodge", binwidth = 5)
 
 
-```
-
-```{r alifold, eval=F}
-alifoldSRNA <- read.table("~/phd/RNASeq/srna_all/alifold_real_all", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T, 
-                      col.names = c( "From",      "To",    "Strand",    "Native.MFE",    "Mean.MFE",     "STDV",      "Z"))
-alifoldIntergenic<- read.table("~/phd/RNASeq/srna_all/alifold_intergenic_all", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T, 
-                      col.names = c( "From",      "To",    "Strand",    "Native.MFE",    "Mean.MFE",     "STDV",      "Z"))
-alifoldNotConseved <- read.table("~/phd/RNASeq/srna_all/alifold_not_conserved_all", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T, 
-                      col.names = c( "From",      "To",    "Strand",    "Native.MFE",    "Mean.MFE",     "STDV",      "Z"))
-alifoldConseved <- read.table("~/phd/RNASeq/srna_all/alifold_conserved_all", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T, 
-                      col.names = c( "From",      "To",    "Strand",    "Native.MFE",    "Mean.MFE",     "STDV",      "Z"))
-
-intergenicAli <- alifoldIntergenic %>% mutate(Z = ifelse(is.na(Z), 10, Z))
-realAli <- alifoldSRNA %>% mutate(Z = ifelse(is.na(Z), 10, Z))
-notCAli <- alifoldNotConseved %>% mutate(Z = ifelse(is.na(Z), 10, Z))
-cAli <- alifoldConseved %>% mutate(Z = ifelse(is.na(Z), 10, Z))
-
-realAli[is.na(realAli)] <- 0
-intergenicAli[is.na(intergenicAli)] <- 0
-notCAli[is.na(notCAli)] <- 0
-cAli[is.na(cAli)] <- 0
-
-realAli <- realAli %>% mutate(group = "conserved sRNA")
-intergenicAli <- intergenicAli %>% mutate(group = "Rintergenic (random)")
-notCAli <- notCAli %>% mutate(group = "nsRNA not conserved")
-cAli <- cAli %>% mutate(group = "known sRNA")
-
-ali <- realAli%>% bind_rows(notCAli) %>% bind_rows(cAli) %>% bind_rows(intergenicAli) 
-
-
-
-p <- ggplot() +
-  geom_density(data = ali, aes(x = Z, group = group, colour = group)) +
-  geom_vline(aes(xintercept = -3))
-p
-  ggsave(file="~/phd/RNASeq/secondary_structure_alifoldz_scores.svg", plot=p)
-
-
-ali %>% mutate(real = ifelse(Z < -3, T, F)) %>% group_by(group, real) %>% summarise(count = n())
-  
-  
-  
-  
-  
-  ggplot() +
-  geom_histogram(data = ali, aes(x = Native.MFE, y = ..density.., group = group, fill = group), position = "dodge", binwidth = 4)+
-  ylim(c(0, 0.03))
-
-```
 
 
 
