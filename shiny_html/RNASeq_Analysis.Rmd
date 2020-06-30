@@ -34,6 +34,7 @@ library(ggtree)
 library(treeio)
 library(geiger)
 library(ROSE)
+library("viridis") 
 #setwd("~/phd/RNASeq/r_files/")
 filePath <- "~/phd/RNASeq/r_files/"
 ```
@@ -587,10 +588,10 @@ resList <- list()
 levelList <- list()
 
 resList$strain <- c("escherichia", "shigella", "Salmonella")
-resList$species <- c("Acinetobacter", "Altermonas", "Enterobacter", "escherichia-shigella", "Klebsiella", "serratia", "xanthomonas")
-resList$genus <- c("escherichia-shigella-salmonella", "enterobacter-klebsiella", "xanthomonas-lysobacter", "escherichia-shigella-salmonella-enterobacter-klebsiella")
-resList$family <- c("escherichia-shigella-salmonella-enterobacter-klebsiella-serratia")
-resList$order <- c( "escherichia-shigella-salmonella-enterobacter-klebsiella-serratia-xanthomonas-lysobacter")
+resList$species <- c("Acinetobacter", "Altermonas", "Enterobacter", "escherichia-shigella", "Klebsiella", "serratia", "xanthomonas", "pseudomonas")
+resList$genus <- c("escherichia-shigella-salmonella", "enterobacter-klebsiella", "xanthomonas-lysobacter", "escherichia-shigella-salmonella-enterobacter-klebsiella", "acinetobacter-pseudomonas")
+resList$family <- c("escherichia-shigella-salmonella-enterobacter-klebsiella-serratia", "acinetobacter-pseudomonas-alteromonas")
+resList$order <- c( "escherichia-shigella-salmonella-enterobacter-klebsiella-serratia-xanthomonas-lysobacter", "all_2")
 conservationDataFrame <- function(resList, random = F){
 if(random){
   filePath <- "~/phd/RNASeq/combined_gff_files_random/version_8/"
@@ -788,8 +789,8 @@ resDatReal <- resDatReal %>% mutate(positive_control = ifelse(feature %in% posit
 allMerged <- resDatReal
 allRandom <- resDatRandom
 
-save(allMerged, file = "~/bin/r_git/R/allMerged_version_8.Rda")
-save(allRandom, file = "~/bin/r_git/R/allRandom_version_8.Rda")
+save(allMerged, file = "~/bin/r_git/R/allMerged_version_8b.Rda")
+save(allRandom, file = "~/bin/r_git/R/allRandom_version_8b.Rda")
 
  resDatReal%>% 
     group_by(fitch, category) %>%
@@ -1217,6 +1218,191 @@ for(i in 1:length(idListRandom)){
 
 save(allRandomScores, file = "allRandomScores_version_8.Rda")
 save(allScores, file = "allScores_version_8.Rda")
+load("allRandomScores_version_8.Rda")
+load("allScores_version_8.Rda")
+
+  d1 <- allScores %>%filter(group == "Known SRA predicted") %>% select(group, score_2, id, fitch)
+  d2 <- allScores%>% filter(group == "Novel SRA") %>% select(group, score_2, id, fitch)
+  d3 <- allRandomScores %>% select(group, score_2, id, fitch) %>% mutate(group = "Random Data")
+#  d4 <- allScores %>%filter(group == "Known SRA not predicted") %>% select(group, score_2, id, set_val)
+    d5 <- allScores %>%filter(fitch != "0", group != "Known SRA not predicted") %>% mutate(group = "Conserved") %>% select(group, score_2, id, fitch)
+   d6 <- allScores %>%filter(fitch == "0", group != "Known SRA not predicted") %>% mutate(group = "Not Conserved") %>% select(group, score_2, id, fitch)  
+   
+    allData <- d1 %>% bind_rows(d2) %>% bind_rows(d3)# %>% bind_rows(d5) %>% bind_rows(d6) 
+
+    
+   p <- ggplot() +
+  geom_freqpoly(data = allData  , aes(x = score_2, y = ..density.., group = group, colour = group), binwidth = 0.025) +
+  xlim(c(0,0.1)) +
+     geom_vline(xintercept = 0.035) +
+  scale_y_continuous(trans = 'log10')
+   p
+  ggsave(file="~/phd/RNASeq/figures/read_depths__noise_version_8.svg", plot=p)
+
+  allData %>% mutate(noise = ifelse(score_2 <= 0.05, T, F)) %>% group_by(noise, group) %>% summarise(count = n())
+
+  
+    
+```
+
+
+```{r scores_heatmap, eval=F}
+#setwd("~/bin/r_git/R/")
+load("allMerged_version_8b.Rda") 
+load("allRandom_version_8b.Rda") 
+load("allReadDepthValues.Rda")  
+load("allReadDepths.Rda") 
+
+
+
+
+allMerged <- allMerged %>% separate(col = prop, into = c("count.prop", "total.prop"), sep = "-", remove = F, extra = "merge")
+
+allMerged <- allMerged %>% filter(!is.na(id)) %>% filter(fitch == 1)
+
+
+#allRandomMerged <- allRandom%>% filter(!is.na(id))
+i <- 2
+
+
+
+idList <- list()
+for(i in 1:nrow(allMerged)){
+  printRemaining(i = i, length = nrow(allMerged))
+  idList[i] <-  strsplit(allMerged$id[i], "-")
+  names(idList)[i] <- allMerged$id[i]
+}
+
+allScores <- allMerged %>% mutate(score_2 = 0,
+                                  group = "", start = 0, end = 0)
+i <- 6542
+for(i in 1:length(idList)){
+  printRemaining(i = i, length = length(idList))
+
+  idIndividual <- idList[[i]]
+  idAll <- names(idList)[[i]]
+  lines <- match(idIndividual, allReadDepths$id)
+  lines <- lines[!is.na(lines)]
+  if(length(lines) < 1){
+    next
+  }
+  allScores$score_2[allScores$id == idAll] <- allReadDepths$score_2[lines]
+  allScores$group[allScores$id == idAll] <-allReadDepths$group[lines]
+  allScores$start[allScores$id == idAll] <-allReadDepthValues$start[lines]
+  allScores$end[allScores$id == idAll] <-allReadDepthValues$end[lines]
+}
+
+sigScores <- allScores %>% filter(fitch == 1, score_2 > 0) %>% arrange(-as.numeric(count)) 
+
+
+
+ggplot() +
+  geom_density(data = sigScores %>% filter(score_2 > 0, score_2 < 10), aes(x = score_2, group = group, color = group))
+
+
+predictedScores <- sigScores %>% filter(group != "Known SRA not predicted")
+predictedScores <- predictedScores[1:20,]
+
+
+idList <- list()
+for(i in 1:nrow(predictedScores)){
+  printRemaining(i = i, length = nrow(predictedScores))
+  idList[i] <-  strsplit(predictedScores$id[i], "-")
+  names(idList)[i] <- predictedScores$id[i]
+}
+
+
+
+
+i <- 1
+for(i in 1:length(idList)){
+  
+  printRemaining(i = i, length = length(idList))
+
+  idIndividual <- idList[[i]]
+  idAll <- names(idList)[[i]]
+  lines <- match(idIndividual, allReadDepths$id)
+  lines <- lines[!is.na(lines)]
+  if(length(lines) < 1){
+    next
+  }
+  
+  
+  readCounts <- allReadDepthValues$score_2[lines]
+  maxCount <- 1
+  for(j in readCounts){
+    if(nchar(j) > maxCount){
+      maxCount <- nchar(j)
+    }
+  }
+  binwidth = 20
+  mat <- matrix(nrow = maxCount - binwidth + 1, ncol = length(readCounts))
+  for(j in 1:length(readCounts)){
+    vector <- unlist(strsplit(readCounts[j], ""))
+    lenV <- length(vector)
+    if(lenV < maxCount){
+      vector <- c(vector,rep(0, maxCount - lenV))
+    }
+    
+    vector <-  zoo::rollapply(as.numeric(vector), width = binwidth, by = 1, FUN = mean, align = "left")
+    
+    mat[,j] <- as.numeric(vector)
+  }
+  df <- as.data.frame(mat)
+  df <- df %>% mutate(pos = row_number())
+  coloursV <- viridis(ncol(df))
+  p <- ggplot() 
+  
+  for(j in 1:ncol(mat)){
+    p <- p + geom_line(data = df, aes_string(x = "pos", y = paste("V",j, sep = "")), colour = coloursV[j])
+  }
+  #print(names(idList)[i])
+  p <- p + ggtitle(names(idList)[i])
+
+  
+  
+  print(p)
+  
+  
+  
+  
+  #allScores$score_2[allScores$id == idAll] <- allReadDepthValues$score_2[lines]
+  #allScores$group[allScores$id == idAll] <-allReadDepthValues$group[lines]
+  #allScores$start[allScores$id == idAll] <-allReadDepthValues$start[lines]
+  #allScores$end[allScores$id == idAll] <-allReadDepthValues$end[lines]
+}
+
+
+idListRandom <- list()
+for(i in 1:nrow(allRandomMerged)){
+    printRemaining(i = i, length = nrow(allRandomMerged))
+
+  idListRandom[i] <-  strsplit(allRandomMerged$id[i], "-")
+  names(idListRandom)[i] <- allRandomMerged$id[i]
+}
+
+allRandomScores <- allRandomMerged %>% mutate(score_2 = 0, 
+                                              group = "")
+i <- 9
+for(i in 1:length(idListRandom)){
+    printRemaining(i = i, length = length(idListRandom))
+
+  idIndividual <- idListRandom[[i]]
+  idAll <- names(idListRandom)[[i]]
+  lines <- match(idIndividual, allReadDepths$id)
+  lines <- lines[!is.na(lines)]
+    if(length(lines) < 1){
+    next
+  }
+  allRandomScores$score_2[allRandomScores$id == idAll] <-allReadDepths$score_2[lines]
+  allRandomScores$group[allRandomScores$id == idAll] <-allReadDepths$group[lines]
+
+}
+
+
+
+save(allRandomScores, file = "allRandomScores_version_8.Rda")
+save(allScores, file = "allScores_version_8.Rda")
 
 
   d1 <- allScores %>%filter(group == "Known SRA predicted") %>% select(group, score_2, id, fitch)
@@ -1242,6 +1428,8 @@ save(allScores, file = "allScores_version_8.Rda")
   
     
 ```
+
+
 
 ```{r get_sequences, eval = F}
 getSequencesFast <- function(ids_lookup, fasta){
@@ -1324,7 +1512,7 @@ dat <- dat %>% separate(prop, into = c("count", "total"), sep = "-", remove = F)
   filter(category != "strain",
          !is.na(category),
          positive_control == T, 
-         fitch == 1) 
+         fitch = "1) 
 
 
 }else if(not_conserved){
@@ -1354,7 +1542,7 @@ dat <- dat %>% separate(prop, into = c("count", "total"), sep = "-", remove = F)
          total = as.numeric(total)) %>% 
   filter(category != "strain",
          !is.na(category),
-         positive_control == F,
+         new_feature == T,
          count != 1) 
 
 
@@ -1447,7 +1635,7 @@ for(i in 1:loop_length){
   }
 }
 
-ids_seq <- ids_seq%>%mutate(ids_short = paste("sra_enterics-serratia_not_conserved_version_8_", row_number(), sep = ""))
+ids_seq <- ids_seq%>%mutate(ids_short = paste("sra_enterics-serratia_predicted_version_8b_", row_number(), sep = ""))
 
 for(i in 1:loop_length){
   for(j in 2:(ncol(ids_seq) -  2)){
@@ -1455,14 +1643,14 @@ for(i in 1:loop_length){
       mat <- matrix(ncol = 1, nrow = 2)
       mat[1,1] <- paste(">", colnames(ids_seq)[j], sep = "")
       mat[2,1] <- ids_seq[i,j]
-      write.table(mat, file = paste("~/phd/RNASeq/srna_all/version_8/not_conserved/", ids_seq[i, ncol(ids_seq)], ".fasta", sep = ""),
+      write.table(mat, file = paste("~/phd/RNASeq/srna_all/version_8/predicted_b/", ids_seq[i, ncol(ids_seq)], ".fasta", sep = ""),
                   row.names = F, col.names = F, quote = F, sep = "\t", append = T)
 
     }
   }
 }
-idsSeq_not_conserved <- ids_seq
-save(idsSeq_not_conserved, file = "idsSeq_not_conserved_version_8.Rda")
+idsSeq_predicted <- ids_seq
+save(idsSeq_predicted, file = "idsSeq_predicted_8b.Rda")
 #write.table(ids_seq, "~/phd/RNASeq/srna_all/random/intergenic/id_list", sep = "\t", row.names = F, col.names = T, quote = F)
 
 ```
@@ -1517,12 +1705,12 @@ intergenicAli <- intergenicAli %>% mutate(group = "Rintergenic (random)")
 notCAli <- notCAli %>% mutate(group = "nsRNA not conserved")
 cAli <- cAli %>% mutate(group = "known sRNA") 
 
-ali <- realAli%>% bind_rows(notCAli) %>% bind_rows(cAli) %>% bind_rows(intergenicAli) 
+ali <- realAli %>% bind_rows(cAli) %>% bind_rows(intergenicAli) %>% bind_rows(notCAli)
 
 
 
 p <- ggplot() +
-  geom_freqpoly(data = ali, aes(x = Z, y = ..density.., group = group, colour = group), binwidth = 1) +
+  geom_freqpoly(data = ali, aes(x = Z, y = ..density.., group = group, colour = group), binwidth = 0.5) +
   geom_vline(aes(xintercept = -3))
 p
   ggsave(file="~/phd/RNASeq/figures/secondary_structure_alifoldz_scores_version_8.svg", plot=p)
@@ -3631,6 +3819,15 @@ write.table(x = gff, file = paste(filePath, "/", opt$out_name, "_random_sra.gff"
 
 ##Tests
 
+```{r sra_table_analysis}
+dat <- read.table("~/phd/RNASeq/SRA_bacteria_RNAseq.txt", sep = "\t", header = T, row.names = F)
+dat <- dat %>% separate(GE)
+
+
+
+```
+
+
 ```{r alignemnt_file_check, eval = F}
   reference <- read.table("~/phd/RNASeq/alignments/backbones/escherichia.backbone", header = T, as.is = T)
 
@@ -4378,7 +4575,7 @@ combinedCalls <- read.table("~/phd/RNASeq/escherichia/GCA_000017745_data/random_
 
 ```{r escherichia_merging_analysis, eval=F}
 
-escherichiaMerged <- read.table("~/phd/RNASeq/combined_gff_files/version_5/all_2_merged.gff", sep = "\t", header = T, fill = T)
+escherichiaMerged <- read.table("~/phd/RNASeq/combined_gff_files/version_8/all_2_merged.gff", sep = "\t", header = T, fill = T)
 escherichiaCalls <- read.table("~/phd/RNASeq/escherichia/escherichia_calls", header = T, sep = "\t", fill = T)
 
 randomMerged <- read.table("~/phd/RNASeq/combined_gff_files_random/version_5/all_2_merged.gff", sep = "\t", header = T, fill = T)
@@ -4928,9 +5125,9 @@ ggplot() +
 
 
 ##set to real or random as needed
-escherichiaMerged <- read.table("~/phd/RNASeq/combined_gff_files/version_5/all_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
+escherichiaMerged <- read.table("~/phd/RNASeq/combined_gff_files/version_8/all_2_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
 
-tab <- escherichiaMerged %>% group_by(all.prop) %>%  summarise(count = n())
+tab <- escherichiaMerged %>% group_by(all_2.prop) %>%  summarise(count = n())
 
 # serr <- read.table("~/phd/RNASeq/combined_gff_files_random/shigella_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
 # serr %>% group_by(shigella.prop) %>% summarise(count = n())
