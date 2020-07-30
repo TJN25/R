@@ -78,6 +78,11 @@ if(not_zero){
                      category = c("", "")
   )
 }
+
+
+
+
+
 assignConservationLevel <- function(ids_lookup, main_col = 7, genera_col, species_col, any_col = c(7:ncol(ids_lookup))){
   ids_lookup <- ids_lookup%>%mutate(type = "")
   for(i in 1:nrow(ids_lookup)){
