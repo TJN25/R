@@ -1471,7 +1471,7 @@ save(allScores, file = "allScores_version_8.Rda")
 
 
 
-```{r get_sequences, eval = F}
+```{r get_sequences_old, eval = F}
 getSequencesFast <- function(ids_lookup, fasta){
   tmp <- ids_lookup
   tmp <- tmp%>%mutate(sequence = "")
@@ -1492,37 +1492,14 @@ getSequencesFast <- function(ids_lookup, fasta){
 
   return(tmp)
 }
-getSequences <- function(ids_lookup){
-    tmp <- ids_lookup
-  tmp <- tmp%>%mutate(sequence = "")
-
-  for(i in 1:nrow(tmp)){
-    printRemaining(i = i, length = nrow(tmp), increment = 5)
-    # x <- system(command = paste("sed -n '", (as.numeric(tmp[i, 2]) + 1), "p'",
-    #                             " ~/phd/RNASeq/new_calls/",
-    #                             tmp[i, 3],
-    #                             "_new_calls.txt", sep = ""), intern = T)
-    # x <- unlist(strsplit(as.character(x), split = "\t"))
-    #print(x[3:4])
-
-
-   try( tmp[i, ncol(tmp)] <- system(paste("test_string=`grep -v ^'>' ~/phd/RNASeq/sequences/",
-                                      "GCA_000017765.1",
-                                      ".fna | tr -d '\n'`; echo ${test_string:",
-                                      ids_lookup[i,1], ":", as.numeric(ids_lookup[i,2]) - as.numeric(ids_lookup[i,1]),
-                                      "}", sep = ""), intern = T))
-  }
-
-  return(tmp)
-}
 
 
 
-random_data <- F
+random_data <- T
 if(random_data){
   load("allRandom_version_8.Rda")
 #    dat <-  read.table("~/phd/RNASeq/combined_gff_files/escherichia-shigella-salmonella-enterobacter-klebsiella-serratia_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
-  dat <- allRandom
+  dat <- allRandom %>% filter(category == "order")
   
   dat[dat == "1-0"] <- "0-1"
 
@@ -1538,7 +1515,7 @@ dat <- dat %>% separate(prop, into = c("count", "total"), sep = "-", remove = F)
   #load data
   load("allMerged_version_8.Rda")
 #    dat <-  read.table("~/phd/RNASeq/combined_gff_files/escherichia-shigella-salmonella-enterobacter-klebsiella-serratia_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
-  dat <- allMerged
+  dat <- allMerged %>% filter(category == "order")
   
   dat[dat == "1-0"] <- "0-1"
 
@@ -1549,11 +1526,7 @@ dat <- dat %>% separate(prop, into = c("count", "total"), sep = "-", remove = F)
 dat <- dat %>% separate(prop, into = c("count", "total"), sep = "-", remove = F) %>% 
   mutate(count = as.numeric(count),
          total = as.numeric(total)) %>% 
-  filter(category != "strain",
-         !is.na(category),
-         positive_control == T, 
-         fitch != "0",
-         as.numeric(count) > 1)
+  filter(!is.na(category))
 
 
 }else if(not_conserved){
@@ -1602,8 +1575,12 @@ j <- 3
 loop_length <- nrow(ids_lookup)
 
 for(i in 1:loop_length){
+  #print(i)
+  if(loop_length > 10000){
+    printRemaining(length = loop_length, i = i, increment = 1)
+  }else{
     printRemaining(length = loop_length, i = i)
-
+}
   uid <- ids_lookup[i,1]
   uid <- unlist(strsplit(uid, "-"))
   for(j in 1:length(uid)){
@@ -1691,7 +1668,9 @@ for(i in 1:loop_length){
   }
 }
 
-ids_seq <- ids_seq%>%mutate(ids_short = paste("sra_enterics-serratia_known_version_8c_", row_number(), sep = ""))
+ids_seq <- ids_seq%>%mutate(ids_short = paste("sra_enterics-serratia_negative_control_version_10_", row_number(), sep = ""))
+
+one_seq_per_file <- T
 
 i <- 1
 j <- 4
@@ -1702,6 +1681,16 @@ for(i in 1:loop_length){
   for(j in 2:(ncol(ids_seq) -  3)){
     if(ids_seq[i, j] != ""){
       mat <- matrix(ncol = 1, nrow = 2)
+      if(one_seq_per_file){
+        file_name <- paste(colnames(ids_seq)[j], "_", ids_seq[i, ncol(ids_seq)], "_", j, sep = "")
+      mat[1,1] <- paste(">", colnames(ids_seq)[j], "_", ids_seq[i, ncol(ids_seq)], "_", j, sep = "")
+      mat[2,1] <- ids_seq[i,j]
+      print(paste("~/phd/RNASeq/srna_all/version_10/predicted/", file_name, ".fasta", sep = ""))
+      write.table(mat, file = paste("~/phd/RNASeq/srna_all/version_10/predicted/", file_name, ".fasta", sep = ""),
+                  row.names = F, col.names = F, quote = F, sep = "\t", append = T)
+      }else{
+        
+      
       mat[1,1] <- paste(">", colnames(ids_seq)[j], "_", ids_seq[i, ncol(ids_seq)], "_", j, sep = "")
       mat[2,1] <- ids_seq[i,j]
       if(length(seqs) == 1){
@@ -1713,16 +1702,77 @@ for(i in 1:loop_length){
       write.table(mat, file = paste("~/phd/RNASeq/srna_all/version_8/known_c/multiple_seqs/", ids_seq[i, ncol(ids_seq)], ".fasta", sep = ""),
                   row.names = F, col.names = F, quote = F, sep = "\t", append = T)
       }
-      
+      }
 
     }
   }
 }
 idsSeq_predicted <- ids_seq
-save(idsSeq_predicted, file = "idsSeq_predicted_8c.Rda")
+save(idsSeq_predicted, file = "idsSeq_predicted_10.Rda")
 #write.table(ids_seq, "~/phd/RNASeq/srna_all/random/intergenic/id_list", sep = "\t", row.names = F, col.names = T, quote = F)
 
 ```
+
+```{r get_sequences, eval = F}
+
+load("allRandom_version_8.Rda")
+#    dat <-  read.table("~/phd/RNASeq/combined_gff_files/escherichia-shigella-salmonella-enterobacter-klebsiella-serratia_merged.gff", sep = "\t", header = T, fill = T, as.is = T)
+  dat <- allRandom %>% filter(category == "order")
+  
+  dat[dat == "1-0"] <- "0-1"
+
+dat <- dat %>% separate(prop, into = c("count", "total"), sep = "-", remove = F) %>% 
+  filter(grepl(x = feature, pattern = "RNA") == F,grepl(pattern = "sra", x = feature) ==F, feature != "riboswitch") %>% 
+  mutate(count = as.numeric(count),
+         total = as.numeric(total),
+         density = count/total) %>% 
+  arrange(-density) %>% 
+  arrange(fitch) 
+
+getSequences(dat = dat, random_data = T, write_location = "~/phd/RNASeq/srna_all/version_10/negative_control/", id_prefix = "sra_enterics-serratia_negative_control_version_10_", data_name = "id_seq_negative_control_10.Rda")
+
+
+
+
+
+
+
+  #load data
+  load("allMerged_version_8.Rda")
+
+  dat <- allMerged %>% filter(category == "order")
+  
+  dat[dat == "1-0"] <- "0-1"
+
+##select some data 
+dat <- dat %>% separate(prop, into = c("count", "total"), sep = "-", remove = F) %>% 
+  mutate(count = as.numeric(count),
+         total = as.numeric(total)) %>% 
+  filter(!is.na(category), positive_control == F, new_feature == F)
+
+
+getSequences(dat = dat, random_data = F, write_location = "~/phd/RNASeq/srna_all/version_10/positive_control/", id_prefix = "sra_enterics-serratia_positive_control_version_10_", data_name = "id_seq_positive_control_10.Rda")
+
+
+
+  #load data
+  load("allMerged_version_8.Rda")
+
+  dat <- allMerged %>% filter(category == "order")
+  
+
+##select some data 
+dat <- dat %>% separate(prop, into = c("count", "total"), sep = "-", remove = F) %>% 
+  mutate(count = as.numeric(count),
+         total = as.numeric(total)) %>% 
+  filter(!is.na(category))
+getSequences(dat = dat, random_data = F, write_location = "~/phd/RNASeq/srna_all/version_10/predicted/", id_prefix = "sra_enterics-serratia_predicted_version_10_", data_name = "id_seq_predicted_10.Rda")
+
+
+
+
+```
+
 
 ```{r rmfam, eval=F}
 realDat <- read.table("~/phd/RNASeq/srna_all/real_rmfam_all", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T)
@@ -1756,7 +1806,7 @@ alifoldIntergenic<- read.table("~/phd/RNASeq/srna_all/version_8/alifold_random_a
                       col.names = c( "From",      "To",    "Strand",    "Native.MFE",    "Mean.MFE",     "STDV",      "Z"))
 alifoldNotConseved <- read.table("~/phd/RNASeq/srna_all/version_8/alifold_not_conserved_all", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T, 
                       col.names = c( "From",      "To",    "Strand",    "Native.MFE",    "Mean.MFE",     "STDV",      "Z"))
-alifoldConseved <- read.table("~/phd/RNASeq/srna_all/version_8/alifold_known_b_all", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T, 
+alifoldConseved <- read.table("~/phd/RNASeq/srna_all/version_9/postive_control/output/alifold_positive", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T, 
                       col.names = c( "From",      "To",    "Strand",    "Native.MFE",    "Mean.MFE",     "STDV",      "Z"))
 
 intergenicAli <- alifoldIntergenic %>% mutate(Z = ifelse(is.na(Z), 10, Z)) %>% select(-Strand) %>% mutate_all(as.numeric) 
@@ -5955,8 +6005,8 @@ df <- df %>% select(names, sumrow)
 
 
 
-```{r nhmmer}
-dat <- read.table("~/phd/RNASeq/srna_all/version_8/known_c/multiple_seqs/nhmmer/alignments/output/all.out", comment.char = "#", fill = T, sep = "", header = F, quote = "", as.is = T)
+```{r nhmmer, eval = F}
+dat <- read.table("~/phd/RNASeq/srna_all/version_9/postive_control/output/all.out", comment.char = "#", fill = T, sep = "", header = F, quote = "", as.is = T)
 
 colnames(dat) <- c("target.name", "accession", "query.name", "accession.2", "hmmfrom", "hmmto", "alifrom", "alito", "envfrom", "envto", "sq.len", "strand", "E.value", "score", "bias", "description.of.target")
 
@@ -5970,17 +6020,32 @@ dat <- dat %>%
   separate(col = target.seq, into = c("t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9"), sep = "_", remove = F) 
 
 dat <- dat %>% mutate(target.genome = paste(t1, t2, sep = "_"),
-                      target.sra = paste(t3, t4, t5, t6, t7, t8, sep = "_")) %>% 
-              mutate(target.seq.id = paste(target.sra, t9, sep = "_")) %>% 
+                      target.sra = paste(t3, t4, t5, t6, t7, t8, sep = "_"),
+                      target.sra.id = t8) %>% 
+              mutate(target.seq.id = paste(t8, t9, sep = "_")) %>% 
         select(-t1, -t2, -t3, -t4, -t5, -t6, -t7, -t8, -t9)
-dat <- dat %>% separate(col = query.name, into = c("query.sra"), sep = "\\.", extra = "drop", remove = F)
+
+
+dat <- dat %>% 
+  separate(col = query.name, into = c("t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9"), sep = "_", remove = F) 
+
+dat <- dat %>% mutate(query.genome = paste(t1, t2, sep = "_"),
+                      query.sra = paste(t3, t4, t5, t6, t7, t8, sep = "_"),
+                      query.sra.id = t8) %>% 
+              mutate(query.seq.id = paste(t8, t9, sep = "_")) %>% 
+        select(-t1, -t2, -t3, -t4, -t5, -t6, -t7, -t8, -t9)
+
+
 
 
 dat %>% filter(target.sra != query.sra) %>% nrow()
 
 datSmall <- dat %>% filter(E.value < 1e-20)
 
-mat <- dcast( datSmall , target.sra~query.sra)
+ids <- datSmall %>% select(target.seq.id, query.seq.id) %>%  unique()
+
+
+mat <- dcast( datSmall , target.seq.id~query.seq.id)
 
 #mat[!is.na(mat)] <- 1
 #mat[is.na(mat)] <- 0
@@ -6006,8 +6071,182 @@ p <- ggplot(data = melted_cormat, aes(target.sra, variable, fill = value))+
 p
 
 
-datSummary <- datSmall %>% group_by(target.sra) %>% summarise(count = length(unique(query.sra)))
+datSummary <- datSmall %>% group_by(target.seq.id) %>% summarise(count = length(unique(query.seq.id)))
 
+tmp <- datSmall %>% filter(target.seq.id == "sra_enterics-serratia_known_version_9_1027_24")
+unique(tmp$query.seq.id)
+
+
+
+
+
+
+
+
+correctAlignments <- dat %>% 
+  filter(target.sra == query.sra, E.value < 1e-10) %>% 
+  group_by(target.sra) %>% 
+  summarise(count.correct.alignment = length(unique(query.seq.id)))
+
+allAlignments <- dat %>% 
+  filter(target.sra == query.sra) %>% 
+  group_by(target.sra) %>% 
+  summarise(count.all.alignment = length(unique(target.seq.id)))
+
+alignments <- allAlignments %>% 
+  full_join(correctAlignments, by = "target.sra") %>% 
+  mutate(all.aligned = ifelse(count.correct.alignment == count.all.alignment, T, F))
+
+dat <- dat %>% left_join(alignments, by = "target.sra")
+
+sraUnique <- dat %>% filter(all.aligned, E.value < 1e-20) %>% select(target.sra.id, query.sra.id) %>% unique()
+
+
+mat <- dcast( sraUnique , target.sra.id~query.sra.id)
+
+targets <- mat$target.sra.id
+
+#mat[!is.na(mat)] <- 1
+mat[is.na(mat)] <- 0
+mat[mat != 0] <- 1
+
+mat$target.sra.id <- targets
+
+mat <- mat %>% mutate_all(as.numeric) %>% mutate(target.sra.id = as.character(target.sra.id))
+
+
+
+
+str(mat)
+
+#row.names(mat) <- mat[,1]
+
+mat[1:20,1:20]
+
+#mat <- mat %>% select(-target.sra.id)
+
+#mat[mat != 0] <- 1
+
+str(mat)
+
+g <- graph.incidence(mat, weighted = T)
+g
+
+
+plot(g, edge.color="gray30", vertex.size = 5)
+
+
+
+
+ melted_cormat <- melt(mat)
+ #melted_cormat <- melted_cormat %>% mutate(value = ifelse(value == 0, 0, 1))
+ 
+ head(melted_cormat)
+ 
+p <- ggplot(data = melted_cormat, aes(target.sra.id, variable, fill = value))+
+ geom_tile(color = "white")+
+ scale_fill_gradient2(low = "blue", high = "red", mid = "white", space = "Lab") +
+  theme_minimal()+ 
+ theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+    size = 2, hjust = 1))
+
+p
+
+mat.2 <- mat
+row.names(mat.2) <- mat.2$target.sra.id
+mat.2 <- mat.2 %>% select(-target.sra.id)
+mat.2 <- as.matrix(mat.2)
+
+mat.2[1:20, 1:20]
+
+
+library(gplots)
+
+heatmap.2(x = mat.2, col=c("white", "white", "red"), scale = "none", sepcolor = NA, tracecol = NA)
+
+
+
+```
+
+
+```{r nhmmer_clusters, eval = F}
+dat <- read.table("~/phd/RNASeq/srna_all/version_9/postive_control/output/all.out", comment.char = "#", fill = T, sep = "", header = F, quote = "", as.is = T)
+
+colnames(dat) <- c("target.name", "accession", "query.name", "accession.2", "hmmfrom", "hmmto", "alifrom", "alito", "envfrom", "envto", "sq.len", "strand", "E.value", "score", "bias", "description.of.target")
+
+dat <- dat %>% separate(col = target.name, into = c("target.file", "target.seq"), remove = F, extra = "merge", sep =":")
+
+dat$target.file <- str_replace_all(dat$target.file, ".tbl", ".fasta")
+
+dat %>% filter(target.file != query.name) %>% nrow()
+
+dat <- dat %>% 
+  separate(col = target.seq, into = c("t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9"), sep = "_", remove = F) 
+
+dat <- dat %>% mutate(target.genome = paste(t1, t2, sep = "_"),
+                      target.sra = paste(t3, t4, t5, t6, t7, t8, sep = "_"),
+                      target.sra.id = t8) %>% 
+              mutate(target.seq.id = paste(t8, t9, sep = "_")) %>% 
+        select(-t1, -t2, -t3, -t4, -t5, -t6, -t7, -t8, -t9)
+
+
+dat <- dat %>% 
+  separate(col = query.name, into = c("t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9"), sep = "_", remove = F) 
+
+dat <- dat %>% mutate(query.genome = paste(t1, t2, sep = "_"),
+                      query.sra = paste(t3, t4, t5, t6, t7, t8, sep = "_"),
+                      query.sra.id = t8) %>% 
+              mutate(query.seq.id = paste(t8, t9, sep = "_")) %>% 
+        select(-t1, -t2, -t3, -t4, -t5, -t6, -t7, -t8, -t9)
+
+
+threshold <- 1e-5
+current_data <- dat %>% select(target.sra.id, target.seq.id, query.sra.id, query.seq.id, E.value) %>% arrange(E.value) %>% group_by(target.seq.id, query.seq.id) %>% top_n(n = 1, wt = -E.value)
+
+summaryCount <- current_data %>% group_by(target.seq.id) %>% summarise(count = n())
+
+id <- "1041_24"
+i <- 1
+single_id_data <- current_data %>% filter(query.seq.id == id) 
+
+mat <- matrix(nrow = length(single_id_data$target.seq.id), ncol = length(single_id_data$target.seq.id) + 2)
+
+colnames(mat) <- c("names",single_id_data$target.seq.id, "counts")
+mat[,1] <- single_id_data$target.seq.id
+i <- 3
+for(i in 1:nrow(mat)){
+  print(i)
+  name <- mat[i,1]
+  targets <- current_data$target.seq.id[current_data$query.seq.id == name]
+  matches <- match(targets, colnames(mat))
+  mat[i, matches] <- T
+  mat[i, "counts"] <- as.numeric(length(matches[!is.na(matches)]))
+  }
+df <- as.data.frame(mat)
+df$counts <- as.numeric(df$counts)
+
+
+###not sure if this is needed
+
+current_data <- current_data %>% full_join(summaryCount, by = "target.seq.id") %>% arrange(-count)
+loop_length <- length(unique(current_data$count))
+i <- 1
+
+for(i in 1:loop_length){
+  print(i)
+  value <- unique(current_data$count)[i]
+  tmp <- current_data %>% ungroup() %>% filter(count == value) %>% select(target.seq.id) %>% mutate(current = T) %>% unique() %>%  dplyr::rename(query.seq.id = target.seq.id)
+  tmp_data <- current_data %>% full_join(tmp, by = "query.seq.id") %>% filter(count != value) 
+  tmp_data$current[is.na(tmp_data$current)] <- F
+  if(nrow(tmp_data[tmp_data$current == T,]) > 0){
+  print(i)
+  print(nrow(tmp_data[tmp_data$current == T,]))
+  }
+}
+value <- 343
+tmp <- current_data %>% ungroup() %>% filter(count == value) %>% select(target.seq.id) %>% mutate(current = T) %>% unique()
+
+tmp_data <- current_data %>% full_join(tmp, by = "target.seq.id") %>% filter(count != value)
 
 ```
 
@@ -6015,10 +6254,54 @@ datSummary <- datSmall %>% group_by(target.sra) %>% summarise(count = length(uni
 
 
 
+```{r}
+load(file = "~/bin/r_git/R/allMerged_version_8b.Rda")
+load(file = "~/bin/r_git/R/allRandom_version_8b.Rda")
+
+dat <- read.table("~/phd/RNASeq/srna_all/version_10/positive_control/positive_control/random.tbl.out", comment.char = "#", fill = T, sep = "", header = F, quote = "", as.is = T)
+
+colnames(dat) <- c("target.name", "accession", "query.name", "accession.2", "hmmfrom", "hmmto", "alifrom", "alito", "envfrom", "envto", "sq.len", "strand", "E.value", "score", "bias", "description.of.target")
+
+# dat <- dat %>% separate(col = target.name, into = c("target.file", "target.seq"), remove = F, extra = "merge", sep =":")
+# 
+# dat$target.file <- str_replace_all(dat$target.file, ".tbl", ".fasta")
+
+dat %>% filter(target.name != query.name) %>% nrow()
+
+dat <- dat %>% 
+  separate(col = target.name, into = c("t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9"), sep = "_", remove = F) 
+
+dat <- dat %>% mutate(target.genome = paste(t1, t2, sep = "_"),
+                      target.sra = paste(t3, t4, t5, t6, t7, t8, sep = "_"),
+                      target.sra.id = t8) %>% 
+              mutate(target.seq.id = paste(t8, t9, sep = "_")) %>% 
+        select(-t1, -t2, -t3, -t4, -t5, -t6, -t7, -t8, -t9)
 
 
+dat <- dat %>% 
+  separate(col = query.name, into = c("t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9"), sep = "_", remove = F, extra = "merge") 
+
+dat <- dat %>% mutate(query.genome = paste(t1, t2, sep = "_"),
+                      query.sra = paste(t3, t4, t5, t6, t7, t8, sep = "_"),
+                      query.sra.id = t8) %>% 
+              mutate(query.seq.id = paste(t8, t9, sep = "_")) %>% 
+        select(-t1, -t2, -t3, -t4, -t5, -t6, -t7, -t8, -t9)
 
 
+threshold <- 1e-5
+current_data <- dat %>% select(target.sra.id, target.seq.id, query.sra.id, query.seq.id, E.value) %>% arrange(E.value) %>% group_by(target.seq.id, query.seq.id) %>% top_n(n = 1, wt = -E.value)
 
+summaryCount <- current_data %>% group_by(target.seq.id) %>% summarise(count = n())
+
+summaryCount <- summaryCount %>% group_by(count) %>% summarise(number.of.hits = n()) %>% mutate(unique.hits = number.of.hits/count)
+
+summaryAllMerged <- allMerged %>% filter(total > 25, count != "1")%>% group_by(count) %>% summarise(unique.hits = n())
+
+ggplot() +
+  geom_point(data = summaryCount, aes(x = as.numeric(count),y = log(unique.hits)), colour = "red")+
+  geom_point(data = summaryAllMerged, aes(x = as.numeric(count) ,y = log(unique.hits)), colour = "blue")
+allMerged$count <- as.numeric(allMerged$count)
+
+```
 
 
