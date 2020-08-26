@@ -27,74 +27,6 @@ library(igraph)
 library("viridis")
 
 
-random <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control.tbl")
-
-random <- random %>%
-  separate(V1, into = c("genome.1", "srna.1"), extra = "merge", remove = F, sep = "-")%>%
-  separate(V3, into = c("genome.2", "srna.2"), extra = "merge", remove = F, sep = "-")
-
-diffRandom <- random %>% filter(as.character(V1) != as.character(V3))
-
-randomVknwon <- read.table("~/phd/RNASeq/srna_all/version_10/negative_control/random_against_known/random.tbl.out")
-
-randomVknwon <- randomVknwon %>%
-  separate(V1, into = c("genome.1", "srna.1"), extra = "merge", remove = F, sep = "-")%>%
-  separate(V3, into = c("genome.2", "srna.2"), extra = "merge", remove = F, sep = "-")
-
-diffRandomVknown <- randomVknwon %>% filter(as.character(V1) != as.character(V3))
-
-
-predicted <- read.table("~/phd/RNASeq/srna_all/version_10/predicted/predicted/predicted.tbl.out")
-
-predicted <- predicted %>%
-  separate(V1, into = c("genome.1", "srna.1"), extra = "merge", remove = F, sep = "-")%>%
-  separate(V3, into = c("genome.2", "srna.2"), extra = "merge", remove = F, sep = "-")
-
-diffPredicted <- predicted %>% filter(genome.1 != genome.2)
-diffPredictedNovel <- predicted %>% filter(genome.1 != genome.2, known == F)
-
-predictedKnown <- read.table("~/phd/RNASeq/srna_all/version_10/predicted/predicted_known/predicted_known.tbl.out")
-
-predictedKnown <- predictedKnown %>%
-  separate(V1, into = c("genome.1", "srna.1"), extra = "merge", remove = F, sep = "-")%>%
-  separate(V3, into = c("genome.2", "srna.2"), extra = "merge", remove = F, sep = "-")
-
-diffPredictedKnown <- predictedKnown %>% filter(genome.1 != genome.2)
-
-
-
-known <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control.tbl")
-colnames(known) <- c("target.name", "accession", "query.name", "accession.2", "hmmfrom", "hmmto", "alifrom", "alito", "envfrom", "envto", "sq.len", "strand", "E.value", "score", "bias", "description.of.target")
-
-known <- known %>% filter(target.name != query.name)
-
-summaryCount <- known %>% group_by(query.name) %>% summarise(count = n())
-
-summaryCount <- summaryCount %>% group_by(count) %>% summarise(number.of.hits = n()) %>% mutate(unique.hits = number.of.hits/count)
-
-
-#known <- known %>%
-#  separate(V1, into = c("genome.1", "srna.1"), extra = "merge", remove = F, sep = "-")%>%
-#  separate(V3, into = c("genome.2", "srna.2"), extra = "merge", remove = F, sep = "-")
-
-diffKnown <- known %>% filter(genome.1 != genome.2)
-
-
-ggplot() +
-  geom_freqpoly(data = diffKnown %>% filter(V13 < 1e-5), aes(x = -log(V13), y = ..density..), binwidth = 1, colour = "red") +
-  geom_freqpoly(data = diffRandom%>% filter(V13 < 1e-5), aes(x = -log(V13), y = ..density..), binwidth = 1, colour = "blue")+
-  geom_freqpoly(data = diffPredictedKnown%>% filter(V13 < 1e-5), aes(x = -log(V13), y = ..density..), binwidth = 1, colour = "green")+
-  geom_freqpoly(data = diffPredictedNovel%>% filter(V13 < 1e-5), aes(x = -log(V13), y = ..density..), binwidth = 1, colour = "purple")
-
-
-
-tmp <- predictedKnown %>% select(V3) %>% unique() %>% mutate(known = T)
-
-predicted <- predicted %>% full_join(tmp, by = "V3")
-
-predicted <- predicted %>% mutate(known = ifelse(is.na(known), F, T))
-
-predicted %>% group_by(known) %>% summarise(count = n())
 
 ####
 
@@ -108,7 +40,7 @@ summaryCountsRNA <- function(dat){
   # 
   # dat$target.file <- str_replace_all(dat$target.file, ".tbl", ".fasta")
   
-  dat <- dat %>% filter(E.value < 0.001)
+ # dat <- dat %>% filter(E.value < 0.001)
   
   dat %>% filter(target.name != query.name) %>% nrow()
   
@@ -120,51 +52,72 @@ summaryCountsRNA <- function(dat){
   threshold <- 1e-5
   current_data <- dat %>% arrange(E.value) %>% group_by(target.name, query.name) %>% top_n(n = 1, wt = -E.value)
 
-  summaryCount <- current_data %>% group_by(query.name) %>% summarise(count = n())
+  summaryCount <- current_data %>% group_by(query.name) %>% select(query.name, target.name) %>% unique %>% summarise(count = n())
 
   summaryCount <- summaryCount %>% group_by(count) %>% summarise(number.of.hits = n()) %>% mutate(unique.hits = number.of.hits/count)
   return(summaryCount)
  
 }
+contigLookup <- read.table("~/phd/RNASeq/sequences/contig_ids.lookup")
+positiveLookup <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/single_seqs/srna_positive_ids.lookup")
+
+head(contigLookup)
+head(positiveLookup)
+
+
+colnames(contigLookup) <- c("target.name", "target.genome")
+colnames(positiveLookup) <- c("query.name", "query.description", "query.genome")
+
 
 
 datPositive <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control.tbl", comment.char = "#", fill = T, sep = "", header = F, quote = "", as.is = T)
 datPredicted <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted.tbl", comment.char = "#", fill = T, sep = "", header = F, quote = "", as.is = T)
-datPredictedKnown <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted_known.tbl", comment.char = "#", fill = T, sep = "", header = F, quote = "", as.is = T)
 datNegative <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control.tbl", comment.char = "#", fill = T, sep = "", header = F, quote = "", as.is = T)
-datNegativeKnown <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control_positive_control.tbl", comment.char = "#", fill = T, sep = "", header = F, quote = "", as.is = T)
+
+# datPredictedKnown <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted_known.tbl", comment.char = "#", fill = T, sep = "", header = F, quote = "", as.is = T)
+# datNegativeKnown <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control_positive_control.tbl", comment.char = "#", fill = T, sep = "", header = F, quote = "", as.is = T)
+
+datPositive <- datPositive %>% filter(V2 == "-")
+datPredicted <- datPredicted %>% filter(V2 == "-")
+datNegative <- datNegative %>% filter(V2 == "-")
+
+datPositive <- datPositive[,c(1:16)]
+datPredicted <- datPredicted[,c(1:16)]
+datNegative <- datNegative[,c(1:16)]
 
 colnames(datPositive) <- c("target.name", "accession", "query.name", "accession.2", "hmmfrom", "hmmto", "alifrom", "alito", "envfrom", "envto", "sq.len", "strand", "E.value", "score", "bias", "description.of.target")
 colnames(datPredicted) <- c("target.name", "accession", "query.name", "accession.2", "hmmfrom", "hmmto", "alifrom", "alito", "envfrom", "envto", "sq.len", "strand", "E.value", "score", "bias", "description.of.target")
-colnames(datPredictedKnown) <- c("target.name", "accession", "query.name", "accession.2", "hmmfrom", "hmmto", "alifrom", "alito", "envfrom", "envto", "sq.len", "strand", "E.value", "score", "bias", "description.of.target")
+# colnames(datPredictedKnown) <- c("target.name", "accession", "query.name", "accession.2", "hmmfrom", "hmmto", "alifrom", "alito", "envfrom", "envto", "sq.len", "strand", "E.value", "score", "bias", "description.of.target")
 colnames(datNegative) <- c("target.name", "accession", "query.name", "accession.2", "hmmfrom", "hmmto", "alifrom", "alito", "envfrom", "envto", "sq.len", "strand", "E.value", "score", "bias", "description.of.target")
-colnames(datNegativeKnown) <- c("target.name", "accession", "query.name", "accession.2", "hmmfrom", "hmmto", "alifrom", "alito", "envfrom", "envto", "sq.len", "strand", "E.value", "score", "bias", "description.of.target")
+# colnames(datNegativeKnown) <- c("target.name", "accession", "query.name", "accession.2", "hmmfrom", "hmmto", "alifrom", "alito", "envfrom", "envto", "sq.len", "strand", "E.value", "score", "bias", "description.of.target")
 
 summaryCountPositive <- summaryCountsRNA(dat = datPositive)
 summaryCountPredicted <- summaryCountsRNA(dat = datPredicted)
-summaryCountPredictedKnown <- summaryCountsRNA(dat = datPredictedKnown)
+# summaryCountPredictedKnown <- summaryCountsRNA(dat = datPredictedKnown)
 summaryCountNegative <-  summaryCountsRNA(dat = datNegative)
-summaryCountNegativeKnown <- summaryCountsRNA(dat = datNegativeKnown)
+# summaryCountNegativeKnown <- summaryCountsRNA(dat = datNegativeKnown)
 
 
 
 
 
-tmp <- datPredictedKnown %>% select(query.name) %>% unique() %>% mutate(known = T)
-datPredictedAll <- datPredicted %>% full_join(tmp, by = "query.name")
-datPredictedAll <- datPredictedAll %>% mutate(known = ifelse(is.na(known), F, T))
-datPredictedNovel <- datPredictedAll %>% filter(known == F) %>% select(-known)
-datPredictedKnown <- datPredictedAll %>% filter(known == T) %>% select(-known)
-summaryCountPredictedNovel <- summaryCountsRNA(dat = datPredictedNovel)
-summaryCountPredictedKnown <- summaryCountsRNA(dat = datPredictedKnown)
+# tmp <- datPredictedKnown %>% select(query.name) %>% unique() %>% mutate(known = T)
+# datPredictedAll <- datPredicted %>% full_join(tmp, by = "query.name")
+# datPredictedAll <- datPredictedAll %>% mutate(known = ifelse(is.na(known), F, T))
+# datPredictedNovel <- datPredictedAll %>% filter(known == F) %>% select(-known)
+# datPredictedKnown <- datPredictedAll %>% filter(known == T) %>% select(-known)
+# summaryCountPredictedNovel <- summaryCountsRNA(dat = datPredictedNovel)
+# summaryCountPredictedKnown <- summaryCountsRNA(dat = datPredictedKnown)
 
 
-datPositivencRNA <- datPositive %>% filter(grepl(pattern = "tRNA", query.name) == F, 
-                                           grepl(pattern = "repeat_region", query.name) == F, 
-                                           grepl(pattern = "tRNA", target.name) == F, 
-                                           grepl(pattern = "repeat_region", target.name) == F, 
-                                           grepl(pattern = "rRNA", target.name) == F, 
-                                           grepl(pattern = "rRNA", query.name) == F)
+datPositive <- datPositive %>% left_join(contigLookup, by = "target.name") %>% left_join(positiveLookup, by = "query.name")
+
+datPositivencRNA <- datPositive %>% filter(grepl(pattern = "tRNA", query.description) == F, 
+                                           grepl(pattern = "repeat_region", query.description) == F, 
+                                           grepl(pattern = "tRNA", query.description) == F, 
+                                           grepl(pattern = "repeat_region", query.description) == F, 
+                                           grepl(pattern = "rRNA", query.description) == F, 
+                                           grepl(pattern = "rRNA", query.description) == F)
 summaryCountPositivencRNA <- summaryCountsRNA(dat = datPositivencRNA)
 
 
@@ -190,13 +143,13 @@ summaryRandomMerged <- summaryRandomMerged %>% mutate(Group = "Negative Control 
 summaryCount <- summaryCountPositive %>% 
   bind_rows(summaryCountPositivencRNA)%>% 
   bind_rows(summaryCountNegative)%>% 
-  bind_rows(summaryCountPredicted)%>% 
-  bind_rows(summaryCountPredictedKnown)%>% 
-  bind_rows(summaryCountNegativeKnown)%>% 
-  bind_rows(summaryCountPredictedNovel)%>% 
-  bind_rows(summaryPredictedMerged)%>% 
-  bind_rows(summaryPositiveControlMerged)%>% 
-  bind_rows(summaryRandomMerged)
+  bind_rows(summaryCountPredicted)#%>% 
+  # bind_rows(summaryCountPredictedKnown)%>% 
+  # bind_rows(summaryCountNegativeKnown)%>% 
+  # bind_rows(summaryCountPredictedNovel)%>% 
+  # bind_rows(summaryPredictedMerged)%>% 
+  # bind_rows(summaryPositiveControlMerged)%>% 
+  # bind_rows(summaryRandomMerged)
 
 ggplot() +
   geom_point(data = summaryCount %>% filter(Group == "Positive Control" | Group == "Negative Control" | Group == "Predicted sRNA" | Group == "Negative Control" | Group == "Positive Control (whole genome alignment)") , aes(x = as.numeric(count),y = log(unique.hits), group = Group, fill = Group, colour = Group)) +

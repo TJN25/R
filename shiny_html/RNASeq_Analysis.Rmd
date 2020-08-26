@@ -841,8 +841,8 @@ resDatRandom%>%
 
 
 
-    group_by(fitch, category) %>%
-    summarise(count = n()) %>% arrange(category, fitch)
+   # group_by(fitch, category) %>%
+  #  summarise(count = n()) %>% arrange(category, fitch)
 
    resDatReal%>% 
     group_by(fitch, new_feature) %>%
@@ -866,14 +866,14 @@ resDatRandom%>%
   scale_y_continuous(trans = 'log10')
 p
   
-ggsave(filename = "~/phd/RNASeq/figures/scores_version_8.svg", plot = p, device = "svg")
+#ggsave(filename = "~/phd/RNASeq/figures/scores_version_8.svg", plot = p, device = "svg")
   
 p <- ggplot() +
   geom_freqpoly(data = resDatReal%>% filter(fitch != "0", category == "genus"), aes(x = as.numeric(count), y = ..density.., group = positive_control, colour = positive_control), binwidth = 1)+
   geom_freqpoly(data = resDatRandom%>% filter(fitch != "0",  category == "genus"), aes(x = as.numeric(count), y = ..density..), binwidth = 1)+
   scale_y_continuous(trans = 'log10')
 
-ggsave(filename = "~/phd/RNASeq/figures/counts_version_8.svg", plot = p, device = "svg")
+#ggsave(filename = "~/phd/RNASeq/figures/counts_version_8.svg", plot = p, device = "svg")
 
 
 
@@ -883,7 +883,7 @@ tmp <- resDatReal%>% filter( as.numeric(score) >= 0, as.numeric(score) < 1, cate
 
 
 
-tree <- read.tree("~/phd/RNASeq/alignments/all_alignments/all.guide_tree")
+tree <- read.tree("~/phd/RNASeq/alignments/all_alignments/genera_11.guide_tree")
 
 nodes <- data.frame(tree$edge)
 
@@ -910,6 +910,8 @@ for(i in tree$tip.label){
 
 
 ```
+
+
 
 ```{r individual_conserved_files, eval = F}
 dat <- read.table("~/phd/RNASeq/combined_gff_files_random/version_6/all_2_merged.gff", sep = "\t", header = T, fill = T)
@@ -1884,6 +1886,63 @@ dev.off()
 
 ali %>% mutate(threshold_1 = ifelse(Z <= -1.5, 1, 0)) %>% group_by(threshold_1, group) %>% summarise(count = n())
 
+
+
+
+
+
+aliPC <- read.table("~/phd/RNASeq/srna_seqs/version_1/alifold_positive", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T, 
+                      col.names = c( "From",      "To",    "Strand",    "Native.MFE",    "Mean.MFE",     "STDV",      "Z"))
+
+
+aliNC <- read.table("~/phd/RNASeq/srna_seqs/version_1/alifold_negative", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T, 
+                      col.names = c( "From",      "To",    "Strand",    "Native.MFE",    "Mean.MFE",     "STDV",      "Z"))
+
+aliPred <- read.table("~/phd/RNASeq/srna_seqs/version_1/alifold_predicted", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T, 
+                      col.names = c( "From",      "To",    "Strand",    "Native.MFE",    "Mean.MFE",     "STDV",      "Z"))
+
+
+
+aliPC <- aliPC %>% mutate(Z = ifelse(is.na(Z), 10, Z)) %>% select(-Strand) %>% mutate_all(as.numeric)
+aliPC[is.na(aliPC)] <- 0
+aliPC <- aliPC %>% mutate(group = "Positive Control") 
+
+aliNC <- aliNC %>% mutate(Z = ifelse(is.na(Z), 10, Z)) %>% select(-Strand) %>% mutate_all(as.numeric)
+aliNC[is.na(aliNC)] <- 0
+aliNC <- aliNC %>% mutate(group = "Negative Control") 
+
+aliPred <- aliPred %>% mutate(Z = ifelse(is.na(Z), 10, Z)) %>% select(-Strand) %>% mutate_all(as.numeric)
+aliPred[is.na(aliPred)] <- 0
+aliPred <- aliPred %>% mutate(group = "Predicted sRNA") 
+
+
+
+
+ali <- aliPC %>% bind_rows(aliNC) %>% bind_rows(aliPred) %>% filter(Z != 10)
+
+
+
+p <- ggplot() +
+  geom_freqpoly(data = ali, aes(x = Z, y = ..density.., group = group, colour = group), binwidth = 0.5) +
+  geom_vline(aes(xintercept = -3))
+
+p
+
+  rocAli <- ali %>% mutate(response = ifelse(group == "Negative Control", 0, ifelse(group == "Predicted sRNA", 1, NA))) %>% filter(!is.na(response)) %>% mutate(score_2 = -Z)
+
+
+  
+  svg(filename="~/phd/RNASeq/figures/roc_curve_alifold_local_alignment.svg", 
+     width=15, 
+     height=15, 
+     pointsize=20)
+  roc.curve(response = rocAli$response, predicted  = rocAli$score_2, 
+          main="ROC curve for AlifoldZ")
+
+dev.off()
+  
+  
+  
 ```
 
 ```{r roc_curve, eval = F}
@@ -1927,6 +1986,59 @@ roc.curve(response = rocData2$response, predicted = rocData2$score_2,
           main="ROC curve for Read Depths Scores")
 
 dev.off()
+
+
+ncDat <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_read_depths.txt", header = T, sep = "\t")
+pcDat <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control_read_depths.txt", header = T, sep = "\t")
+predictedDat <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted_read_depths.txt", header = T, sep = "\t")
+
+ncDat <- ncDat %>% mutate(group = "nc")
+pcDat <- pcDat %>% mutate(group = "pc")
+predictedDat <- predictedDat %>% mutate(group = "predicted")
+
+rocDat <- pcDat %>% bind_rows(ncDat) %>% mutate(response = ifelse(group == "nc", 0, 1)) 
+
+rocDat[rocDat == "nan"] <- "0"
+
+rocDat[is.na(rocDat)] <- 0
+
+drawROCcurve <- function(rocDat, datatype, writeFile = F){
+
+   colNum <- match(datatype, colnames(rocDat))
+  if(is.na(colNum)){
+    cat(paste("Column name:", datatype, "not found", "\n"))
+    return()
+  }
+   if(writeFile){
+    svg(filename=paste("~/phd/RNASeq/figures/roc_curve_", datatype,".svg", sep = ""), 
+     width=15, 
+     height=15, 
+     pointsize=20)
+  
+
+ 
+ cat(paste("Writing to: ~/phd/RNASeq/figures/roc_curve_", datatype,".svg\n", sep = ""))
+   }
+roc.curve(response = rocDat$response, predicted = rocDat[,colNum], 
+          main=paste("ROC curve for Read Depths Scores: ", datatype, sep = "")
+          )
+
+if(writeFile){
+dev.off()
+}
+}
+
+
+drawROCcurve(rocDat = rocDat, datatype = "mean_mean")
+drawROCcurve(rocDat = rocDat, datatype = "mean_median")
+drawROCcurve(rocDat = rocDat, datatype = "mean_max")
+drawROCcurve(rocDat = rocDat, datatype = "median_mean")
+drawROCcurve(rocDat = rocDat, datatype = "median_median")
+drawROCcurve(rocDat = rocDat, datatype = "median_max")
+drawROCcurve(rocDat = rocDat, datatype = "max_mean")
+drawROCcurve(rocDat = rocDat, datatype = "max_median")
+drawROCcurve(rocDat = rocDat, datatype = "max_max")
+
 
 ```
 
@@ -6259,7 +6371,7 @@ tmp_data <- current_data %>% full_join(tmp, by = "target.seq.id") %>% filter(cou
 
 
 
-```{r}
+```{r, eval = F}
 load(file = "~/bin/r_git/R/allMerged_version_8b.Rda")
 load(file = "~/bin/r_git/R/allRandom_version_8b.Rda")
 
@@ -6309,4 +6421,73 @@ allMerged$count <- as.numeric(allMerged$count)
 
 ```
 
+```{r rscape, eval = F}
+dat <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/positive_control.rscape.cov", comment.char = "#", fill = T)
 
+randomDat <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/negative_control.rscape.out", comment.char = "#", fill = T, sep = "\t")
+
+
+colnames(dat) <- c("V1", "left_pos", "right_pos", "score", "e.value", "substitutions", "power")
+colnames(randomDat) <- c("V1")
+
+dat$score[dat$V1 == "no"] <- 0
+dat$e.value[dat$V1 == "no"] <- 10
+dat$power[dat$V1 == "no"] <- 0
+dat$substitutions[dat$V1 == "no"] <- 0
+
+dat$left_pos[dat$V1 == "no"] <- "-"
+dat$right_pos[dat$V1 == "no"] <- "-"
+dat$V1[dat$V1 == "no"] <- "-"
+
+randomDat$score <- 0
+randomDat$e.value <- 10
+randomDat$power <- 0
+randomDat$substitutions<- 0
+
+
+
+ggplot() +
+  geom_freqpoly(data = dat, aes(x = score, y = log(..count..)), binwidth = 5) +
+  geom_freqpoly(data = randomDat, aes(x = score, y = log(..count..)), binwidth = 5, colour = "blue")
+
+dat <- dat %>% mutate(response = 1)
+randomDat <- randomDat %>% mutate(response = 0)
+
+rocData <- dat %>% bind_rows(randomDat)
+
+
+
+
+
+  svg(filename="~/phd/RNASeq/figures/roc_curve_covariation.svg", 
+     width=15, 
+     height=15, 
+     pointsize=20)
+roc.curve(response = rocData$response, predicted = rocData$score, 
+          main="ROC curve for Covariation Scores")
+
+dev.off()
+
+
+```
+
+
+```{r evolutionary_distance, eval = F}
+
+
+generaTree <- read.tree("~/phd/RNASeq/alignments/all_alignments/genera_11.guide_tree")
+pseudomonasTree <- read.tree("~/phd/RNASeq/alignments/all_alignments/pseudomonas.guide_tree")
+eschTree <- read.tree("~/phd/RNASeq/alignments/all_alignments/escherichia.guide_tree")
+
+
+generaMat <- cophenetic.phylo(x = generaTree)
+
+pseudomonasMat <- cophenetic.phylo(x = pseudomonasTree)
+
+eschMat <- cophenetic.phylo(x = eschTree)
+
+
+eschMat
+pseudomonasMat
+
+```
