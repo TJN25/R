@@ -132,13 +132,13 @@ summaryCountPositive <- summaryCountPositive %>% mutate(Group = "Positive Contro
 summaryCountPositivencRNA <- summaryCountPositivencRNA %>% mutate(Group = "Positive Control (tRNA removed)") %>% mutate(count = as.numeric(count))
 summaryCountNegative <-summaryCountNegative %>% mutate(Group = "Negative Control")%>% mutate(count = as.numeric(count))
 summaryCountPredicted <- summaryCountPredicted %>% mutate(Group = "Predicted sRNA")%>% mutate(count = as.numeric(count))
-summaryCountPredictedKnown <- summaryCountPredictedKnown %>% mutate(Group = "Predicted sRNA (matching known sRNA)")%>% mutate(count = as.numeric(count))
-summaryCountNegativeKnown <-summaryCountNegativeKnown %>% mutate(Group = "Negative Control (matching known sRNA)")%>% mutate(count = as.numeric(count))
-summaryCountPredictedNovel <- summaryCountPredictedNovel %>% mutate(Group = "Predicted sRNA (not matching known sRNA)")%>% mutate(count = as.numeric(count))
-summaryPredictedMerged <- summaryPredictedMerged %>% mutate(Group = "Positive Control (whole genome alignment)")%>% mutate(count = as.numeric(count))
-summaryPositiveControlMerged <- summaryPositiveControlMerged %>% mutate(Group = "Predicted sRNA (whole genome alignment)")%>% mutate(count = as.numeric(count))
-summaryRandomMerged <- summaryRandomMerged %>% mutate(Group = "Negative Control (whole genome alignment)")%>% mutate(count = as.numeric(count))
-
+#summaryCountPredictedKnown <- summaryCountPredictedKnown %>% mutate(Group = "Predicted sRNA (matching known sRNA)")%>% mutate(count = as.numeric(count))
+#summaryCountNegativeKnown <-summaryCountNegativeKnown %>% mutate(Group = "Negative Control (matching known sRNA)")%>% mutate(count = as.numeric(count))
+#summaryCountPredictedNovel <- summaryCountPredictedNovel %>% mutate(Group = "Predicted sRNA (not matching known sRNA)")%>% mutate(count = as.numeric(count))
+# summaryPredictedMerged <- summaryPredictedMerged %>% mutate(Group = "Positive Control (whole genome alignment)")%>% mutate(count = as.numeric(count))
+# summaryPositiveControlMerged <- summaryPositiveControlMerged %>% mutate(Group = "Predicted sRNA (whole genome alignment)")%>% mutate(count = as.numeric(count))
+# summaryRandomMerged <- summaryRandomMerged %>% mutate(Group = "Negative Control (whole genome alignment)")%>% mutate(count = as.numeric(count))
+# 
 
 summaryCount <- summaryCountPositive %>% 
   bind_rows(summaryCountPositivencRNA)%>% 
