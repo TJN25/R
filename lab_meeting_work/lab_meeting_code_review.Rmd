@@ -87,6 +87,10 @@ filePath <- "~/phd/RNASeq/r_files/"
 ```{bash run_sRNA_nhmmer.sh, eval = F}
 #!/bin/bash
 
+##-----------------------------------------------------------------##
+##--------------------------- Setup Variables ---------------------##
+##-----------------------------------------------------------------##
+
 usage(){
     echo "run_sRNA_nhmmer.sh is a script for running nhmmer and sorting the results.  
 Usage:
@@ -112,6 +116,11 @@ extension=""
 missing=""
 exitTrue="F"
 evalue="1e-5"
+
+##-----------------------------------------------------------------##
+##------------------------ User Input Options ---------------------##
+##-----------------------------------------------------------------##
+
 while getopts "d:f:E:e:ch" arg; do
 case $arg in
 	d) 
@@ -132,6 +141,10 @@ case $arg in
 	echo "Unknown option: -${OPTARG}" >&2; exit 1;;
     esac
 done
+
+##-----------------------------------------------------------------##
+##-------------------------- Tests For Inputs ---------------------##
+##-----------------------------------------------------------------##
 
 if [[ $database == "" ]]; then
 	missing="$missing -d <database> "
@@ -179,42 +192,42 @@ if [[ $check_seq_lengths == "T" ]]; then
 
 fi
 
+##-----------------------------------------------------------------##
+##---------------------- Set up folders/files ---------------------##
+##-----------------------------------------------------------------##
+
 echo "making directories in `pwd`"
 mkdir -p alignments
 mkdir -p hmm
 mkdir -p output
+
+
+##-----------------------------------------------------------------##
+##--------------------------- Run nhmmer --------------------------##
+##-----------------------------------------------------------------##
 
 echo "running nhmmer"
 let "fileNum = 0"
 for file in $folder/*.$extension
 
 do
+  echo $file
+  outname=`basename $file`
 
-echo $file
-outname=`basename $file`
+  if [ -f "output/$outname.res" ]; then
+	  echo "Already exists: $file"
+	  continue
+  fi
 
-if [ -f "output/$outname.res" ]; then
-	echo "Already exists: $file"
-	continue
-fi
-
-nhmmer -E $evalue --tblout output/$outname.tbl -A alignments/tmp.stk --tformat FASTA  $file $database > output/$outname.res
-
-lines=`wc -l < alignments/tmp.stk`
-
-
-if (( $lines > 0 )); then
-
-esl-alimanip   --detrunc  60  alignments/tmp.stk > alignments/$outname.stk
-
-hmmbuild hmm/$outname.hmm alignments/$outname.stk
-
-else
-
-echo "No hits found for $outname"
-
-fi
-
+  nhmmer -E $evalue --tblout output/$outname.tbl -A alignments/tmp.stk --tformat FASTA  $file $database > output/$outname.res
+  lines=`wc -l < alignments/tmp.stk`
+  
+  if (( $lines > 0 )); then
+    esl-alimanip   --detrunc  60  alignments/tmp.stk > alignments/$outname.stk
+    hmmbuild hmm/$outname.hmm alignments/$outname.stk
+  else
+    echo "No hits found for $outname"
+  fi
 done
 
 ```
@@ -225,8 +238,9 @@ done
 ```{bash run_RNAAlifold.sh, eval=F}
 #!/bin/bash
 
-##makes alignments and running alifoldz and r-scape
-##GCA accession number.
+##-----------------------------------------------------------------##
+##--------------------------- Setup Variables ---------------------##
+##-----------------------------------------------------------------##
 
 usage(){
     echo "run_RNAAlifold.sh is a script for running RNAAlifold over alignments.  
@@ -243,6 +257,10 @@ Input
 "
 }
 
+##-----------------------------------------------------------------##
+##------------------------ User Input Options ---------------------##
+##-----------------------------------------------------------------##
+
 while getopts "i:o:h" arg; do
 case $arg in
 	i) 
@@ -258,64 +276,71 @@ case $arg in
     esac
 done
 
+##-----------------------------------------------------------------##
+##-------------------------- Tests For Inputs ---------------------##
+##-----------------------------------------------------------------##
+
 if [ -z ${FOLDER} ]; then
 	FOLDER="./"
 fi
 
+##-----------------------------------------------------------------##
+##---------------------- Set up folders/files ---------------------##
+##-----------------------------------------------------------------##
+
 mkdir -p "$FOLDER/alifold/post_script"
 mkdir -p "$FOLDER/RNAAlifold"
 
+##-----------------------------------------------------------------##
+##------------------------- Run RNAAlifold ------------------------##
+##-----------------------------------------------------------------##
 
 let "fileNum = 0"
 for file in alignments/*.stk
-
 do
-lines=`wc -l < $file`
-if (( $lines < 1));then
-continue
-fi
-
-outname=`basename $file`
-
-
-if [ -f "$FOLDER/RNAAlifold/$outname.rnaalifold" ]; then
-	echo "Already exists: $file"
-	continue
-fi
-
-echo "Running on: $file"
-
-start=`grep "GCA" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f1`
-end=`grep "GCA" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f2`
-
-if [[ $start == "" ]]; then
-	start=`grep "NC_" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f1`
-	end=`grep "NC_" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f2`
-
-fi
-
-if [[ $start == "" ]]; then
-	start=`grep "NZ_" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f1`
-	end=`grep "NZ_" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f2`
-
-fi
-
-if [[ $start == "" ]]; then
-	head $file
-fi
-
-length=`expr $end - $start`
-
-if (( $length < 0 )); then
-	length=$(( -1 * $length ))
-fi
-
-if (( $length < 500 )); then
-esl-reformat  clustal $file  | RNAalifold --aln-stk=${file} >> ./RNAAlifold/$outname.rnaalifold
-cat alirna.ps > ./alifold/post_script/$outname.ps      
-else
-	echo "Skipping: $file"
-fi
+  
+  lines=`wc -l < $file`
+  if (( $lines < 1));then
+    continue
+  fi
+  
+  outname=`basename $file`
+  
+  if [ -f "$FOLDER/RNAAlifold/$outname.rnaalifold" ]; then
+  	echo "Already exists: $file"
+  	continue
+  fi
+  
+  echo "Running on: $file"
+  start=`grep "GCA" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f1`
+  end=`grep "GCA" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f2`
+  
+  if [[ $start == "" ]]; then
+  	start=`grep "NC_" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f1`
+  	end=`grep "NC_" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f2`
+  fi
+  
+  if [[ $start == "" ]]; then
+  	start=`grep "NZ_" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f1`
+  	end=`grep "NZ_" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f2`
+  fi
+  
+  if [[ $start == "" ]]; then
+  	head $file
+  	#>> I think there should be a `continue` here!!!
+  fi
+  
+  length=`expr $end - $start`
+  if (( $length < 0 )); then
+  	length=$(( -1 * $length ))
+  fi
+  
+  if (( $length < 500 )); then
+    esl-reformat  clustal $file  | RNAalifold --aln-stk=${file} >> ./RNAAlifold/$outname.rnaalifold
+    cat alirna.ps > ./alifold/post_script/$outname.ps      
+  else
+  	echo "Skipping: $file"
+  fi
 
 done
 ```
@@ -328,9 +353,11 @@ load( file = "~/bin/r_git/R/maxDistsPC.Rda")
 load(file = "~/bin/r_git/R/maxDistsPred.Rda")
 load(file = "~/bin/r_git/R/maxDistsNC.Rda")
 load(file = "~/bin/r_git/R/distsCumulativeCount.Rda")
-dists <- distsPositive %>% bind_rows(distsPredicted, distsNegative)
+dists <- distsPositive %>% bind_rows(distsPredicted, distsNegative) %>% select(-query.name)
 
-  ggplot()+
+head(dists)
+  
+ggplot()+
   geom_line(data = distsCumulativeCount, aes(x = max_dist, y = cumulative_prop, group = group, colour = group))
 
 rocData <- dists %>% filter(group != "Predicted") %>% mutate(response = ifelse(group == "Positive Control", 1, 0))
@@ -342,6 +369,7 @@ roc.curve(response = rocData$response, predicted = rocData$max_dist,
 
 ```{r UpSet_Plot, echo = T, eval=T}
 load("~/bin/r_git/R/nhmmerGeneraUpsetR.Rda") #nhmmerGeneraUpsetR
+head(nhmmerGeneraUpsetR)
 UpSetR::upset(nhmmerGeneraUpsetR, sets = colnames(nhmmerGeneraUpsetR)[2:ncol(nhmmerGeneraUpsetR)], mb.ratio = c(0.55, 0.45), order.by = "freq")
 ```
 
@@ -639,6 +667,8 @@ load("~/bin/r_git/R/pcCovariation.Rda")
 load("~/bin/r_git/R/ncCovariation.Rda")
 load("~/bin/r_git/R/predCovariation.Rda")
 
+head(pcCov)
+
 ggplot() +
   geom_freqpoly(data = pcCov, aes(x = mean_score, y = log(..count..)), binwidth = 25) +
   geom_freqpoly(data = ncCov, aes(x = mean_score, y = log(..count..)), binwidth = 25, colour = "blue") 
@@ -722,9 +752,14 @@ save(predCov, file = "predCovariation.Rda")
 
 ###GC Content
 
+This might be from an older version!!!
+It shouldn't have any effect on the results as the positive controls are still the known sRNAs and the negative controls are random intergenic regions but still needs chcecking!!!
+
 ```{r gc_content, eval = T}
 pcGC <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control.gc", sep = "\t", comment.char = "#", as.is = T, header = F, fill = T)
 ncGC <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control_no_shuffle.gc", sep = "\t", comment.char = "#", as.is = T, header = F, fill = T)
+
+head(pcGC)
 
 pcGC <- pcGC %>% mutate(response = 1)
 ncGC <- ncGC %>% mutate(response = 0)
@@ -742,6 +777,9 @@ roc.curve(response = rocData$response, predicted = rocData$V2,
 ```{r alifold, eval = T}
 load("~/bin/r_git/R/pcAlifold.Rda")
 load("~/bin/r_git/R/ncAlifold.Rda")
+
+head(pcAlifold)
+
 pcAlifold <- pcAlifold %>% mutate(response = 1)
 ncAlifold <- ncAlifold %>% mutate(response = 0)
 
@@ -760,6 +798,7 @@ roc.curve(response = rocData$response, predicted = rocData$z_mean,
 pcMFE <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/positive_control.rnaalifold", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
 ncMFE <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/negative_control.rnaalifold", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
 
+head(pcMFE)
 
 pcMFE <- pcMFE %>% mutate(response = 1)
 ncMFE <- ncMFE %>% mutate(response = 0)
@@ -803,7 +842,8 @@ save(ncAlifold, file = "~/bin/r_git/R/ncAlifold.Rda")
 
 load("~/bin/r_git/R/pcMotif.Rda")
 load("~/bin/r_git/R/ncMotif.Rda")
-load("~/bin/r_git/R/predMotif.Rda")
+
+head(pcMotif)
 
 ncMotif <- ncMotif %>% mutate(response = 0)
 pcMotif <- pcMotif %>% mutate(response = 1)
@@ -849,9 +889,11 @@ save(predMotif, file = "~/bin/r_git/R/predMotif.Rda")
 
 ##Read Depths
 
-```{r read_depths, eval = F}
+```{r read_depths, eval = T}
 ncDat <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_read_depths.txt", header = T, sep = "\t")
 pcDat <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control_read_depths.txt", header = T, sep = "\t")
+
+head(pcDat)
 
 ncDat <- ncDat %>% mutate(group = "nc")
 pcDat <- pcDat %>% mutate(group = "pc")
@@ -982,7 +1024,3 @@ p <- ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
 p
 
 ```
-
-
-
-
