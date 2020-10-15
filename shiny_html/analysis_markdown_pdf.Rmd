@@ -2,7 +2,12 @@
 title: "Comparative RNASeq Analysis"
 author: "Thomas Nicholson"
 date: "14/09/2020"
-output: pdf_document
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: inline
 ---
 
 ```{r setup, include=FALSE}
@@ -41,6 +46,7 @@ library(corrplot)
 #setwd("~/phd/RNASeq/r_files/")
 filePath <- "~/phd/RNASeq/r_files/"
 ```
+
 ```{r functions, include=F}
 plotKnownvsConserved <- function(dat, columns, not_zero = F){
   dat <- dat%>%mutate(conserved = F)
@@ -116,46 +122,63 @@ firstup <- function(x) {
 
 ```
 
+##Overview of sRNA RNAs play a critical role in a wide range of biological functions such as:
 
+-   Transcription/Translation
 
-##Overview of sRNA
-RNAs play a critical role in a wide range of biological functions such as: 
+    -   rRNA, tRNA, 6sRNA etc.
 
+-   Immune response
 
-* Transcription/Translation 
-    + rRNA, tRNA, 6sRNA etc.
-* Immune response
-    + CRISPR-cas
-* Gene regulation
-    + Riboswitches, sRNAs binding to mRNA etc.
-* Virulence
+    -   CRISPR-cas
+
+-   Gene regulation
+
+    -   Riboswitches, sRNAs binding to mRNA etc.
+
+-   Virulence
 
 ![Figure 1. Examples of ncRNAs in bacteria](sRNA_examples.png)
 
-
 ##Overview of Methods
 
+-   Take RNASeq data from multiple genomes
 
-* Take RNASeq data from multiple genomes
-    + 21 strain
-    + 11 genera
-    + 6 families
-* Predict sRNAs based on expressed regions in RNASeq data
-   + Use multiple RNASeq datasets for each genome
-* Consider a number of different approaches for evaluating the predicted regions
-    + Conservation of transcription
-    + Conservation of sequence (nhmmer search across genomes from the analysed clade).
-    + GC content
-    + Covariation observed in sequence alignments (using R-scape)
-    + Secondary structure (minimum free energy from RNAAlifold and the Z score of the MFE from alifoldz)
-    + Presence of ncRNA motifs (using the rmfam dataset)
-* Two control groups will be used
-    + Previously annotated sRNAs will be used as a positive control
-    + random intergenic sequences of the same lengths as the predicted sRNAs will be used as a negative control
-  
+    -   21 strain
+    -   11 genera
+    -   6 families
+
+-   Predict sRNAs based on expressed regions in RNASeq data
+
+    -   Use multiple RNASeq datasets for each genome
+
+-   Consider a number of different approaches for evaluating the predicted regions
+
+    -   Conservation of transcription
+    -   Conservation of sequence (nhmmer search across genomes from the analysed clade).
+    -   GC content
+    -   Covariation observed in sequence alignments (using R-scape)
+    -   Secondary structure (minimum free energy from RNAAlifold and the Z score of the MFE from alifoldz)
+    -   Presence of ncRNA motifs (using the rmfam dataset)
+
+-   Two control groups will be used
+
+    -   Previously annotated sRNAs will be used as a positive control
+    -   random intergenic sequences of the same lengths as the predicted sRNAs will be used as a negative control
+
 ![Figure 4. Workflow of methods](method_scripts_workflow.png)
 
+##Current Figures
 
+![Figure 1. Maximum conserved evolutionary distance per sRNA (cumulative))](max_conservation_distance.png)
+
+![Figure 2. Upset plot for the genera for each sRNA](upsetR_plot_genera.png)
+
+![Figure 3. ROC Curves](roc_curve_all_ccombinations.png)
+
+![Figure 4. Correlation Matrix for features](features_spearman_correlation.png)
+
+![Figure 4. Random forest importance plot](random_forest_importance_plot.png)
 
 ####Summary of strains used
 
@@ -167,31 +190,41 @@ accession_info <- accession_info %>%
 accession_info[1:20,]
 ```
 
-
-
 ###Download data and map reads
 
-__Scripts involved for each Accession__
+**Scripts involved for each Accession**
 
-* [ _callPeaksforGenome.sh_ ](#section-callpeaksforgenome.sh) _-g_ _\<GCA Accession\>_
-    + Only accessions with >4 RNASeq files are analysed
-    + [ _fetch\_genomes\_from\_GCA.sh_ ](#section-fetch_genomes_from_gca.sh) _-r_ _\<GCA Accession\>_ _-g_
-        + The genome and gff files are downloaded from ncbi using the GCA acession
-        + _-g_ flag is for downloading GFF file
-    + The RNASeq data is downloaded using _fasterq-dump_ with a given accession
-        + these are selected from a file (shown below) containing a list of RNASeq experiment IDs for each strain. 
-        + filtered for paired ends, Illumina HiSeq
-    + [_sra2plot.1.0.3.sh_](#section-sra2plot.1.0.3.sh) _-s_ _\<SRA Accession\>_ _-r_ _\<GCA Accession\>_ _-d_ _-n_ _\<Number of CPUs\>_
-        + Maps the reads
-        + _-d_ turns off the downloading function of the script as this is being done separately
-    + [_removeProteinCodingRNA.R_](#section-removeproteincodingrna.r) _-f_ _\<SRA Accession\>_ _-g_ _\<GCA Accession\>_
-    + [_run\_rnaPeakCalling.R_](#section-run_rnapeakcalling.r) _-f_ _\<SRA Accession\>_ _-g_ _\<GCA Accession\>_
-    + [_rfamscan_](#section-rfamscan) _\<GCA Accession\>_
-        + Searches the given genome for rFam models and reformats output into GFF format
-        + [ _cmscanToGffWrapper.R_ ](#section-cmscantogffwrapper.r) _-f_ _\<GCA Accession\>\.tblout_ _-g_ _\<GCA Accession\>_
-    + [_combine\_gff\_files.R_](#section-combine_gff_files.r) -f _./gff\_files/_ _-o_ _\<GCA Accession\>_
-        
-***
+-   [*callPeaksforGenome.sh*](#section-callpeaksforgenome.sh) *-g* *\<GCA Accession\>*
+
+    -   Only accessions with \>4 RNASeq files are analysed
+
+    -   [*fetch_genomes_from_GCA.sh*](#section-fetch_genomes_from_gca.sh) *-r* *\<GCA Accession\>* *-g*
+
+        -   The genome and gff files are downloaded from ncbi using the GCA acession
+        -   *-g* flag is for downloading GFF file
+
+    -   The RNASeq data is downloaded using *fasterq-dump* with a given accession
+
+        -   these are selected from a file (shown below) containing a list of RNASeq experiment IDs for each strain.
+        -   filtered for paired ends, Illumina HiSeq
+
+    -   [*sra2plot.1.0.3.sh*](#section-sra2plot.1.0.3.sh) *-s* *\<SRA Accession\>* *-r* *\<GCA Accession\>* *-d* *-n* *\<Number of CPUs\>*
+
+        -   Maps the reads
+        -   *-d* turns off the downloading function of the script as this is being done separately
+
+    -   [*removeProteinCodingRNA.R*](#section-removeproteincodingrna.r) *-f* *\<SRA Accession\>* *-g* *\<GCA Accession\>*
+
+    -   [*run_rnaPeakCalling.R*](#section-run_rnapeakcalling.r) *-f* *\<SRA Accession\>* *-g* *\<GCA Accession\>*
+
+    -   [*rfamscan*](#section-rfamscan) *\<GCA Accession\>*
+
+        -   Searches the given genome for rFam models and reformats output into GFF format
+        -   [*cmscanToGffWrapper.R*](#section-cmscantogffwrapper.r) *-f* *\<GCA Accession\>.tblout* *-g* *\<GCA Accession\>*
+
+    -   [*combine_gff_files.R*](#section-combine_gff_files.r) -f *./gff_files/* *-o* *\<GCA Accession\>*
+
+------------------------------------------------------------------------
 
 ```{r find_available_data, echo = T, eval = T}
 load("~/bin/r_git/R/r_files/sra_rnaseq_files.Rda")
@@ -199,17 +232,17 @@ sra_rnaseq_files <- sra_rnaseq_files %>% select(GENOME_ACCESSION, ACCESSION, SPE
 sra_rnaseq_files[1:10,]
 ```
 
-
-
-
-
 ###Call peaks on individual RNASeq experiments
 
-* A plot file is produced. This contains a number for each nucleotide that indicates read depth.
-* The read depth gets set to 0 for all coding regions of the file
-    + This is done as identifying ncRNAs inside coding regions is a much more challenging problem than simply peak calling
-* For the remaining positions, the read depth is normalised and any region where the read depth is above a threshold for >50 nt is called a peak.
-    + Threshold is set to the equivalent of ~15 nt read depth before normalisation
+-   A plot file is produced. This contains a number for each nucleotide that indicates read depth.
+
+-   The read depth gets set to 0 for all coding regions of the file
+
+    -   This is done as identifying ncRNAs inside coding regions is a much more challenging problem than simply peak calling
+
+-   For the remaining positions, the read depth is normalised and any region where the read depth is above a threshold for \>50 nt is called a peak.
+
+    -   Threshold is set to the equivalent of \~15 nt read depth before normalisation
 
 ###callPeaksforGenome.sh
 
@@ -1079,7 +1112,6 @@ write.table(x = gff, file = paste(opt$file_path, "/",opt$output, "_ncRNA.gff", s
 
 ```
 
-
 ###combine_gff_files.R
 
 ```{r combine_gff_files.R, eval=F}
@@ -1319,13 +1351,10 @@ write.table(x = mergedDat, file = paste(file_path, "/", opt$out_name, "_new_call
 
 ```
 
-
-
-
 ###Genome Alignments and Combining Files
 
-* All genomes within a genus were aligned.
-* One genome from each genus was used as an alignment against the other genomes
+-   All genomes within a genus were aligned.
+-   One genome from each genus was used as an alignment against the other genomes
 
 ```{r tree_viewer, echo=T, include=T, eval=T}
   tree <- read.tree("~/phd/RNASeq/alignments/all_alignments/genera_11.guide_tree")
@@ -1334,8 +1363,6 @@ write.table(x = mergedDat, file = paste(file_path, "/", opt$out_name, "_new_call
   xlim(0,0.8)
   p
 ```
-
-
 
 ###Summary of Output Data
 
@@ -1466,33 +1493,34 @@ combined_random <-combinedListRandom[["all_2_merged.gff"]]$number_of_features
 
 ```
 
-* From 21 strains and 11 genera, there were 292 RNASeq files. 
-    + _Escherichia_ and _Shigella_ are separated in the pyhlogenetic tree for this data
-* This resulted in 53,485 expressed regions being predicted.
-* There were 8335 known ncRNAs included in the analysis.
+-   From 21 strains and 11 genera, there were 292 RNASeq files.
 
-***
+    -   *Escherichia* and *Shigella* are separated in the pyhlogenetic tree for this data
 
+-   This resulted in 53,485 expressed regions being predicted.
+
+-   There were 8335 known ncRNAs included in the analysis.
+
+------------------------------------------------------------------------
 
 ###Combining GFF file
 
-At this stage each individual RNASeq file has a corresponding gff file of SRA calls. There is also the original GFF file containing ncRNAs (along with CDS). 
-Predictions of ncRNAs are made using rfam models and the output is made into a GFF file. 
-There are 2 GFF files containing _known_ ncRNAs and a number of GFF files containing predicted SRAs.
+At this stage each individual RNASeq file has a corresponding gff file of SRA calls. There is also the original GFF file containing ncRNAs (along with CDS). Predictions of ncRNAs are made using rfam models and the output is made into a GFF file. There are 2 GFF files containing *known* ncRNAs and a number of GFF files containing predicted SRAs.
 
-* feature files (.gff) files were all combined into a single _ACCESSION_\_new\_calls.txt file.
-    + _[combine_gff_files.r](#section-combine_gff_files.r) (done in gff\_files folder)_
-* After combining all the individual calls for each genome there were a total of 8906 putative sRNAs.
+-   feature files (.gff) files were all combined into a single *ACCESSION*_new_calls.txt file.
 
+    -   [*combine_gff_files.r*](#section-combine_gff_files.r) *(done in gff_files folder)*
 
+-   After combining all the individual calls for each genome there were a total of 8906 putative sRNAs.
 
+-   For each sRNA that was predicted, a random intergenic region was selected.
 
-* For each sRNA that was predicted, a random intergenic region was selected.
-    + _[get_random_srna_sequences.py](#section-get_random_srna_sequences.py) -a GCA\_002208745.1_
-    + the file containing new calls for a given genome was used.
-    + this was done by randomly selecting a start site and taking the sequence from that location (for the same length as the orignial predicted sRNA).
-    + coding regions were removed
-* There were 15,072 random regions chosen
+    -   [*get_random_srna_sequences.py*](#section-get_random_srna_sequences.py) *-a GCA_002208745.1*
+    -   the file containing new calls for a given genome was used.
+    -   this was done by randomly selecting a start site and taking the sequence from that location (for the same length as the orignial predicted sRNA).
+    -   coding regions were removed
+
+-   There were 15,072 random regions chosen
 
 ###get_random_srna_sequences.py
 
@@ -1598,36 +1626,381 @@ if __name__ == "__main__":
 
 ```
 
-
-
 For each genome there is now a single file containing all the SRA calls and whether they were previously found/predicted.
 
 At this point genome alignments are done using MAUVE.
 
-*progressiveMauve  --output=NAME.xmfa --output-guide-tree=NAME.tree --backbone-output=NAME.backbone GENOME_1 GENOME_2*
+*progressiveMauve --output=NAME.xmfa --output-guide-tree=NAME.tree --backbone-output=NAME.backbone GENOME_1 GENOME_2*
 
-##Results
+##Remove redundancy
+
+```{r redundancy_check, eval = F}
+dat <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/overlapping_models/overlapping_models_ids.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
+colnames(dat) <- c("target.id", "query.id")
+
+tbl <- table(dat[,c('target.id','query.id')])
+idsDat <- as.data.frame(as.matrix(tbl))
+
+
+idsDat$target.id <- as.character(idsDat$target.id)
+idsDat$query.id <- as.character(idsDat$query.id)
+idsDat <- idsDat %>% filter(Freq > 0)
+
+queryCounts <- idsDat %>% group_by(query.id) %>% summarise(query.count = n()) %>% dplyr::rename(target = query.id)
+
+
+
+i <- unique(idsDat$query.id)[1]
+for(i in unique(idsDat$query.id)){
+# query <- idsDat$query.id[1]
+targets <- idsDat$target.id[idsDat$query.id == i]
+print(length(targets))
+}
+targetsMat <- matrix(ncol = length(targets) + 1, nrow = length(targets))
+
+targetsMat[,1] <- targets
+colnames(targetsMat) <- c("targets", targets)
+
+i <- 57
+for(i in 1:length(targets)){
+  targets2 <- idsDat$target.id[idsDat$query.id == targets[i]]
+  matchVals <- match(table = targets, x = targets2)
+  matchVals <- matchVals[!is.na(matchVals)]
+  targetsMat[matchVals,(i + 1)] <- 1
+}
+
+targetsMat[is.na(targetsMat)] <- 0
+targetsDat <- as.data.frame(targetsMat[,c(2:nrow(targetsMat))])
+targetsDat <- targetsDat %>% mutate_all(as.character) %>% mutate_all(as.numeric)
+counts <- colSums(targetsDat)
+targetCounts <- data.frame(count = counts)
+targetCounts$target <- rownames(targetCounts)
+rownames(targetCounts) <- c(1:nrow(targetCounts))
+
+targetCounts <- targetCounts %>% left_join(queryCounts, by = "target")
+
+targetCounts$query.count[is.na(targetCounts$query.count)] <- 0
+
+targetCounts <- targetCounts %>% mutate(percentage = round(count/query.count*100))
+
+targetCounts$percentage[is.na(targetCounts$percentage)] <- 100
+
+
+
+align_1 <- targetCounts %>% filter(percentage > 85)
+
+
+targets <- idsDat$target.id[idsDat$query.id == unique(idsDat$query.id)[1]]
+i <- 0
+
+while (i < length(targets)) {
+  i <- i + 1
+  print(paste("i = ", i, ", length =  ", length(targets), sep = ""))
+# for(i in 1:50){  
+  # if(align_1$percentage[i] == 100){
+  #   next
+  # }
+  targets2 <- idsDat$target.id[idsDat$query.id == targets[i]]
+  matchVals <- match(table = targets, x = targets2)
+  matchVals <- matchVals[!is.na(matchVals)]
+  total <- queryCounts$query.count[queryCounts$target == targets[i]]
+  matching <- length(matchVals)
+    if(length(total) == 0){
+    total <- 1
+    matching <- 1
+  }else{
+  print(paste(round(matching/total*100), "% matched (", matching, " of ", total, ")", sep = ""))
+  }
+  
+  if(round(matching/total*100) > 95){
+    new.targets <- targets2[ ! targets2 %in% targets]
+    targets <- c(targets, new.targets)
+  }else if(round(matching/total*100) < 85){
+    i <- i - 1
+    targets <- targets[! targets  %in% targets[i]]
+  }
+}
+
+
+df <- data.frame(query.name = targets)
+
+df <- df %>% mutate(group = 1)
+
+#
+
+
+
+
+
+
+
+
+
+
+
+
+
+aa <- idsDat$target.id[idsDat$query.id == "GCA_002072655.1_111"]
+bb <- idsDat$target.id[idsDat$query.id == "GCA_000006765.1_116"]
+
+aa <- aa[! aa %in% bb]
+
+aa[1]
+#
+
+
+
+tmp <- matrix(c(1,2,3,1,2,3,1,2,3), nrow = 3)
+
+colSums(tmp)
+
+rowSums(tmp)
+
+# mat <- reshape2::acast(df, formula = target.id ~ query.id)
+# g <- graph.incidence(mat, weighted = T)
+# g
+# 
+# svg(filename="~/phd/RNASeq/figures/pc_models.svg", 
+#      width=100, 
+#      height=100, 
+#      pointsize=20)
+# V(g)$color <- V(g)$type
+# V(g)$color=gsub("FALSE","red",V(g)$color)
+# V(g)$color=gsub("TRUE","blue",V(g)$color)
+# plot(g, edge.color="gray30", vertex.size = 5)
+# dev.off()
+# 
+# p <- ggplot(data = df, aes(target.id, query.id, fill = Freq))+
+#  geom_tile(color = "white")+
+#  scale_fill_gradient2(low = "white", high = "red", mid = "white", space = "Lab") +
+#   theme_minimal()+ 
+#  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+#     size = 12, hjust = 1))
+# p
+# 
+
+```
+
+
+```{r combine_models, eval=F}
+oriDat <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/original_stats_2.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
+oriDat <- oriDat %>% filter(V3 != "")
+colnames(oriDat) <- c("ori.descr", "ori.value", "ori.file")
+
+newDat <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/new_stats_2.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
+newDat <- newDat %>% filter(V3 != "")
+colnames(newDat) <- c("new.descr", "new.value", "new.file")
+
+
+oriDat <- oriDat %>% mutate(ID = paste(ori.descr, ori.file))
+newDat <- newDat %>% mutate(ID = paste(new.descr, new.file))
+
+dat <- oriDat %>% left_join(newDat, by = "ID")
+
+dat <- dat %>% filter(ori.descr != "Alignment_number:",
+                      ori.descr != "Format:_")
+
+dat <- dat %>% mutate(percent.diff = round(as.numeric(new.value)/as.numeric(ori.value)*100), higher = ifelse(as.numeric(new.value) >= as.numeric(ori.value),1 , 0))
+dat <- dat %>% mutate(higher = ifelse(is.na(higher), 0, higher))
+summary <- dat %>% group_by(ori.file) %>% summarise(count = sum(higher))
+  
+dat <- dat %>% left_join(summary, by = "ori.file")
+  
+
+cormat <- reshape2::dcast(data = dat, formula = ori.file ~ ori.descr, value.var = "percent.diff")
+
+cormat[is.na(cormat)] <- 0
+
+colnames(cormat) <- c("ori.file", "alignment.length", "average.identity", "average.length", "largest", "number.of.sequences", "smallest")
+
+cormat <- cormat %>% mutate(keep = ifelse(number.of.sequences >= 100 & average.identity >= 100, 1, 
+                                          ifelse(number.of.sequences >= 100 & average.identity >= 50 & average.length >= 100, 1, 
+                                                 ifelse(number.of.sequences >= 150 & average.identity >= 50, 1, 
+                                                        ifelse(number.of.sequences > 100 & average.identity >= 80, 1, NA)))))
+
+# cormat1 <- cormat
+
+write.table(x = cormat %>% filter(is.na(keep)) %>% select(ori.file), file = "~/phd/RNASeq/srna_seqs/version_1/predicted/ids_worse_after_merge.txt", quote = F, row.names = F, col.names = F)
+```
+
+
+```{r combine_models_old, eval = F}
+genomicCoorinates <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/predicted_genomic_sequence_matches.txt", sep = "", comment.char = "", as.is = T, header = F, fill = T)
+head(genomicCoorinates)
+colnames(genomicCoorinates) <- c("t1", "detail", "t2", "query.id")
+
+genomicCoorinates <- genomicCoorinates %>% separate(col = detail, into = c("target.contig", "target.coord"), sep = "/", remove = F)
+
+genomicCoorinates <- genomicCoorinates %>% select(query.id, target.contig, target.coord) %>% 
+  separate(col = target.coord, into = c("target.start", "target.stop"), sep = "-", remove = F) %>% 
+  unique()
+
+targetContigSet <- unique(genomicCoorinates$target.contig)
+queryGenomeSet <- unique(genomicCoorinates$query.id)
+
+genomicCoorinates <- genomicCoorinates %>% mutate(target.start = as.numeric(target.start),
+                                                  target.stop = as.numeric(target.stop)) %>% 
+  arrange(target.start, target.stop)
+subDat <- genomicCoorinates %>% filter(target.contig == "NC_004578.1")
+overlaps <- c()
+get_overlap_values <- function(subDat, overlaps){
+    overlapping_ids <- c()
+    lengths = c()
+    start_val <- 0
+    end_val <- 0
+    i <- 1
+    for (i in 1:nrow(subDat)){
+        query_val = subDat$query.id[i]  
+        new_start_val = min(subDat$target.start[i], subDat$target.stop[i])
+        new_end_val = max(subDat$target.start[i], subDat$target.stop[i])
+    #     print(query_val)
+    #     print(new_start_val)
+    #     print(new_end_val)    
+        if (end_val > new_start_val){
+            overlapping_ids <- c(overlapping_ids, query_val)
+            len_1 = end_val - start_val
+            len_2 = new_end_val - new_start_val
+            shortest_seq = min(c(len_1, len_2))
+            overlap_start = max(c(start_val, new_start_val))
+            overlap_end = min(c(end_val, new_end_val))
+            overlap = (overlap_end - overlap_start)/shortest_seq
+            overlaps <- c(overlaps, overlap)
+    #         print(overlap)
+        }else{
+            end_val <- new_end_val
+            start_val <- new_start_val
+            overlapping_ids <- query_val
+        }
+    }
+    return(overlaps)
+}
+overlaps <- c()
+for(contig in targetContigSet){
+  print(contig)
+  subDat <- genomicCoorinates %>% filter(target.contig == contig)
+  overlaps <- get_overlap_values(subDat, overlaps)
+}
+
+
+overlaps[1:20]
+
+p <- ggplot() +
+  geom_freqpoly(aes(x = overlaps), binwidth = 0.05)
+
+p
+
+# ggsave(filename = "~/phd/RNASeq/figures/model_overlap_freq.svg", plot = p, device = "svg")
+
+
+
+
+get_overlap_list <- function(subDat){
+    overlapping_ids <- c()
+    overlap_list <- c()
+    lengths = c()
+    start_val <- 0
+    end_val <- 0
+    shortest_seq <- max(subDat$target.stop)
+    i <- 1
+    for (i in 1:nrow(subDat)){
+        query_val = subDat$query.id[i]  
+        new_start_val = min(subDat$target.start[i], subDat$target.stop[i])
+        new_end_val = max(subDat$target.start[i], subDat$target.stop[i])
+    #     print(query_val)
+    #     print(new_start_val)
+    #     print(new_end_val)    
+        if (end_val > new_start_val){
+            len_2 = new_end_val - new_start_val
+            shortest_seq = min(c(shortest_seq, len_2))
+            overlap_start = max(c(start_val, new_start_val))
+            overlap_end = min(c(end_val, new_end_val))
+            overlap = (overlap_end - overlap_start)/shortest_seq
+            if(overlap >= 0.5){
+              overlapping_ids <- c(overlapping_ids, query_val)
+              end_val <- max(end_val,new_end_val)
+            }else{
+              overlap_list <- c(overlap_list, paste(overlapping_ids, collapse = ","))
+              shortest_seq <- max(subDat$target.stop)
+              end_val <- new_end_val
+              start_val <- new_start_val
+              overlapping_ids <- query_val
+            }
+            
+    #         print(overlap)
+        }else{
+              overlap_list <- c(overlap_list, paste(overlapping_ids, collapse = "_"))
+              shortest_seq <- max(subDat$target.stop)
+              end_val <- new_end_val
+              start_val <- new_start_val
+              overlapping_ids <- query_val
+        }
+    }
+    return(overlap_list)
+}
+
+subDat <- genomicCoorinates %>% filter(target.contig == "NC_004578.1")
+overlap_list <- get_overlap_list(subDat = subDat)
+
+df <- data.frame(ids = overlap_list)
+
+
+
+
+
+
+t1 <- genomicCoorinates %>% filter(query.id == "GCA_000017745.1_1104")
+t2 <- genomicCoorinates %>% filter(query.id == "GCA_000017765.1_281")
+
+tmp <- t1 %>% bind_rows(t2) %>% group_by(target.contig) %>% arrange(target.start)
+
+write.csv(x = tmp, file = "~/phd/RNASeq/foobar.csv", quote = F, row.names = F)
+
+```
+
+##Results 
 ###Evolutionary Distance
 ```{r max_conservation_distance, eval = T}
 load( file = "~/bin/r_git/R/maxDistsPC.Rda")
 load(file = "~/bin/r_git/R/maxDistsPred.Rda")
 load(file = "~/bin/r_git/R/maxDistsNC.Rda")
 load(file = "~/bin/r_git/R/distsCumulativeCount.Rda")
+
+load( file = "~/bin/r_git/R/groupSizePositive.Rda")
+load(file = "~/bin/r_git/R/groupSizeNegative.Rda")
+
 dists <- distsPositive %>% bind_rows(distsPredicted, distsNegative)
+groupSizes <- groupSizePositive %>% bind_rows(groupSizeNegative)
 
-  ggplot()+
-  geom_line(data = distsCumulativeCount, aes(x = max_dist, y = cumulative_prop, group = group, colour = group))
+head(dists)
+head(groupSizes)
 
+dists <- dists %>% mutate(ID = paste(query.name, group))
+groupSizes <- groupSizes %>% mutate(ID = paste(query.name, group)) %>% select(-query.name, -group)
+
+dists <- dists %>% full_join(groupSizes, by = "ID")
+
+dists <- dists %>% mutate(score = max_dist*group_size)
+
+p <-  ggplot()+
+  geom_line(data = distsCumulativeCount %>% filter(group != "Predicted"), aes(x = max_dist, y = cumulative_prop, group = group, colour = group))
+
+p
+ggsave(filename = "~/phd/RNASeq/figures/max_conservation_distance_2.svg", plot = p)
 rocData <- dists %>% filter(group != "Predicted") %>% mutate(response = ifelse(group == "Positive Control", 1, 0))
 roc.curve(response = rocData$response, predicted = rocData$max_dist,
           main="ROC curve for Maximum Phylogenetic Distance")
 
+roc.curve(response = rocData$response, predicted = rocData$score,
+          main="ROC curve for Maximum Phylogenetic Distance", add.roc = T)
 
 ```
 
 ```{r UpSet_Plot, echo = T, eval=T}
 load("~/bin/r_git/R/nhmmerGeneraUpsetR.Rda") #nhmmerGeneraUpsetR
-UpSetR::upset(nhmmerGeneraUpsetR, sets = colnames(nhmmerGeneraUpsetR)[2:ncol(nhmmerGeneraUpsetR)], mb.ratio = c(0.55, 0.45), order.by = "freq")
+
+nhmmerGeneraUpsetR <- nhmmerGeneraUpsetR %>% select(name, Salmonella, Escherichia, Shigella, Enterobacter, Klebsiella, Serratia, Acinetobacter, Pseudomonas, Lysobacter, Xanthomonas, Alteromonas)
+
+UpSetR::upset(nhmmerGeneraUpsetR, sets = colnames(nhmmerGeneraUpsetR)[2:ncol(nhmmerGeneraUpsetR)], mb.ratio = c(0.55, 0.45), order.by = "freq", nintersects = 15, keep.order = T)
 ```
 
 ```{r evolutionary_distance, eval = F, echo=T}
@@ -1763,11 +2136,41 @@ colnames(contigLookup) <- c("target.genome", "target.genome.accession")
 load(file = "~/bin/r_git/R/phyloDistMatrix.Rda")
 
 
-# write.table(x = datNegative, file = "~/phd/RNASeq/srna_seqs/version_1/negative_control_no_shuffle_CORRECT_I_THINK.tbl", quote = F, row.names = F, col.names = T)
 
 datPositive <- nhmmerDataframeSetup(dat = datPositive, contigLookup = contigLookup)
 datPredicted <- nhmmerDataframeSetup(datPredicted, contigLookup = contigLookup)
 datNegative <- nhmmerDataframeSetup(datNegative, contigLookup = contigLookup)
+
+pcDuplicates <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/duplicate_list_positive_control.txt", sep = "\t", comment.char = "#", as.is = T, header = F, fill = T)
+ncDuplicates <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/duplicate_list_negative_control.txt", sep = "\t", comment.char = "#", as.is = T, header = F, fill = T)
+
+pcDuplicates <- pcDuplicates %>% mutate(keep.row = F)
+ncDuplicates <- ncDuplicates %>% mutate(keep.row = F)
+
+pcDuplicates <- pcDuplicates  %>% dplyr::rename(query.name = V1)
+ncDuplicates <- ncDuplicates  %>% dplyr::rename(query.name = V1) %>% mutate(query.name = paste(query.name, ".fna", sep = ""))
+
+
+datPositive <- datPositive %>% left_join(pcDuplicates, by = "query.name")
+datNegative <- datNegative %>% left_join(ncDuplicates, by = "query.name")
+
+datPositive <- datPositive %>% mutate(keep.row = ifelse(is.na(keep.row), T, F)) 
+datNegative <- datNegative %>% mutate(keep.row = ifelse(is.na(keep.row), T, F)) 
+
+datPositiveNew <- datPositive %>% filter(keep.row)
+datNegativeNew <- datNegative %>% filter(keep.row)
+
+datPositiveNew <- datPositiveNew %>% select(-keep.row)
+datNegativeNew <- datNegativeNew %>% select(-keep.row)
+
+
+datPositiveNew <- genomeCombinations(dat = datPositiveNew, phyloDistMat = phyloDistMat)
+datNegativeNew <- genomeCombinations(dat = datNegativeNew, phyloDistMat = phyloDistMat)
+
+datNegative2 <- datNegativeNew %>% filter(E.value < 1e-5)
+datPositive2 <- datPositiveNew %>% filter(E.value < 1e-5)
+
+
 
 datPositive <- genomeCombinations(dat = datPositive, phyloDistMat = phyloDistMat)
 datPredicted <- genomeCombinations(dat = datPredicted, phyloDistMat = phyloDistMat)
@@ -1775,6 +2178,9 @@ datNegative <- genomeCombinations(dat = datNegative, phyloDistMat = phyloDistMat
 datNegative2 <- datNegative %>% filter(E.value < 1e-5)
 datPredicted2 <- datPredicted %>% filter(E.value < 1e-5)
 datPositive2 <- datPositive %>% filter(E.value < 1e-5)
+
+
+
 
 max_val <- max(c(max(datPositive2$distance, na.rm = T), max(datNegative2$distance, na.rm = T)))
 min_val <- min(c(min(datPositive2$distance, na.rm = T), min(datNegative2$distance, na.rm = T)))
@@ -1784,14 +2190,28 @@ distsPositive <- datPositive2 %>% filter(!is.na(distance)) %>% group_by(query.na
 distsPredicted <- datPredicted2 %>% filter(!is.na(distance)) %>% group_by(query.name) %>% summarise(max_dist = max(distance, na.rm = T))
 distsNegative <- datNegative2 %>% filter(!is.na(distance)) %>% group_by(query.name) %>% summarise(max_dist = max(distance, na.rm = T))
 
+groupSizePositive <- datPositive2 %>% filter(!is.na(distance)) %>% group_by(query.name) %>% summarise(group_size = n())
+groupSizePredicted <- datPredicted2 %>% filter(!is.na(distance)) %>% group_by(query.name) %>% summarise(group_size = n())
+groupSizeNegative <- datNegative2 %>% filter(!is.na(distance)) %>% group_by(query.name) %>% summarise(group_size = n())
+
+
+
 distsPositive <- distsPositive %>% mutate(group = "Positive Control")
 distsPredicted <- distsPredicted %>% mutate(group = "Predicted")
 distsNegative <- distsNegative %>% mutate(group = "Negative Control")
+
+
+groupSizePositive <- groupSizePositive %>% mutate(group = "Positive Control")
+groupSizePredicted <- groupSizePredicted %>% mutate(group = "Predicted")
+groupSizeNegative <- groupSizeNegative %>% mutate(group = "Negative Control")
 
 save(distsPositive, file = "maxDistsPC.Rda")
 save(distsPredicted, file = "maxDistsPred.Rda")
 save(distsNegative, file = "maxDistsNC.Rda")
 
+save(groupSizePositive, file = "groupSizePositive.Rda")
+save(groupSizePredicted, file = "groupSizePredicted.Rda")
+save(groupSizeNegative, file = "groupSizeNegative.Rda")
 
 cumulativeCounts <- function(dists, smooth = T){
 
@@ -1870,7 +2290,7 @@ colnames(contigLookup) <- c("target.genome", "target.genome.accession")
 load(file = "~/bin/r_git/R/phyloDistMatrix.Rda")
 
 
-# write.table(x = datNegative, file = "~/phd/RNASeq/srna_seqs/version_1/negative_control_no_shuffle_CORRECT_I_THINK.tbl", quote = F, row.names = F, col.names = T)
+
 
 datPositive <- nhmmerDataframeSetup(dat = datPositive, contigLookup = contigLookup)
 datPositive <- genomeCombinations(dat = datPositive, phyloDistMat = phyloDistMat)
@@ -1909,13 +2329,22 @@ for (i in 1:nrow(upsetDat)) {
 upsetDat[is.na(upsetDat)] <-  0
 
 nhmmerGeneraUpsetR <- upsetDat
+
+pcDuplicates <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/duplicate_list_positive_control.txt", sep = "\t", comment.char = "#", as.is = T, header = F, fill = T)
+
+pcDuplicates <- pcDuplicates %>% mutate(remove.row = T)
+
+duplicates <- pcDuplicates  %>%  dplyr::rename(name = V1)
+
+nhmmerGeneraUpsetR <- nhmmerGeneraUpsetR %>% left_join(duplicates, by = "name") %>% filter(is.na(remove.row)) 
+
+nhmmerGeneraUpsetR <- nhmmerGeneraUpsetR %>% select(-remove.row)
+
 save(nhmmerGeneraUpsetR, file = "nhmmerGeneraUpsetR.Rda")
 UpSetR::upset(upsetDat, sets = colnames(upsetDat)[2:ncol(upsetDat)], mb.ratio = c(0.55, 0.45), order.by = "freq")
 
 
-
 ```
-
 
 ###Covariation
 
@@ -1923,6 +2352,31 @@ UpSetR::upset(upsetDat, sets = colnames(upsetDat)[2:ncol(upsetDat)], mb.ratio = 
 load("~/bin/r_git/R/pcCovariation.Rda")
 load("~/bin/r_git/R/ncCovariation.Rda")
 load("~/bin/r_git/R/predCovariation.Rda")
+
+
+
+load("~/bin/r_git/R/pcDuplicates.Rda")
+load("~/bin/r_git/R/ncDuplicates.Rda")
+
+pcDuplicates <- pcDuplicates %>% mutate(keep.row = F)
+ncDuplicates <- ncDuplicates %>% mutate(keep.row = F)
+
+pcDuplicates <- pcDuplicates  %>% dplyr::rename(ID = V1)
+ncDuplicates <- ncDuplicates  %>% dplyr::rename(ID = V1) %>% mutate(ID = paste(ID, ".fna", sep = ""))
+
+
+pcCov <- pcCov %>% left_join(pcDuplicates, by = "ID")
+ncCov <- ncCov %>% left_join(ncDuplicates, by = "ID")
+
+pcCov <- pcCov %>% mutate(keep.row = ifelse(is.na(keep.row), T, F)) 
+ncCov <- ncCov %>% mutate(keep.row = ifelse(is.na(keep.row), T, F)) 
+
+pcCov <- pcCov %>% filter(keep.row)
+ncCov <- ncCov %>% filter(keep.row)
+
+pcCov <- pcCov %>% select(-keep.row)
+ncCov <- ncCov %>% select(-keep.row)
+
 
 ggplot() +
   geom_freqpoly(data = pcCov, aes(x = mean_score, y = log(..count..)), binwidth = 25) +
@@ -2012,6 +2466,32 @@ pcGC <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control.gc", sep =
 ncGC <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control_no_shuffle.gc", sep = "\t", comment.char = "#", as.is = T, header = F, fill = T)
 predGC <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted.gc", sep = "\t", comment.char = "#", as.is = T, header = F, fill = T)
 
+pcGC <- pcGC %>% separate(col = V1, into = "ID", extra = "drop", sep = "\\[")
+ncGC <- ncGC %>% separate(col = V1, into = "ID", extra = "drop", sep = "\\[")
+
+load("~/bin/r_git/R/pcDuplicates.Rda")
+load("~/bin/r_git/R/ncDuplicates.Rda")
+
+pcDuplicates <- pcDuplicates %>% mutate(keep.row = F)
+ncDuplicates <- ncDuplicates %>% mutate(keep.row = F)
+
+pcDuplicates <- pcDuplicates  %>% dplyr::rename(ID = V1)
+ncDuplicates <- ncDuplicates  %>% dplyr::rename(ID = V1)
+
+
+pcGC <- pcGC %>% left_join(pcDuplicates, by = "ID")
+ncGC <- ncGC %>% left_join(ncDuplicates, by = "ID")
+
+pcGC <- pcGC %>% mutate(keep.row = ifelse(is.na(keep.row), T, F)) 
+ncGC <- ncGC %>% mutate(keep.row = ifelse(is.na(keep.row), T, F)) 
+
+pcGC <- pcGC %>% filter(keep.row)
+ncGC <- ncGC %>% filter(keep.row)
+
+pcGC <- pcGC %>% select(-keep.row)
+ncGC <- ncGC %>% select(-keep.row)
+
+
 pcGC <- pcGC %>% mutate(response = 1)
 ncGC <- ncGC %>% mutate(response = 0)
 
@@ -2024,11 +2504,38 @@ roc.curve(response = rocData$response, predicted = rocData$V2,
 ```
 
 ###Secondary Structure
+
 ```{r alifold, eval = T}
 load("~/bin/r_git/R/pcAlifold.Rda")
 load("~/bin/r_git/R/ncAlifold.Rda")
+
+
+load("~/bin/r_git/R/pcDuplicates.Rda")
+load("~/bin/r_git/R/ncDuplicates.Rda")
+
+pcDuplicates <- pcDuplicates %>% mutate(keep.row = F)
+ncDuplicates <- ncDuplicates %>% mutate(keep.row = F)
+
+pcDuplicates <- pcDuplicates  %>% dplyr::rename(ID = V1)
+ncDuplicates <- ncDuplicates  %>% dplyr::rename(ID = V1)
+
+
+pcAlifold <- pcAlifold %>% left_join(pcDuplicates, by = "ID")
+ncAlifold <- ncAlifold %>% left_join(ncDuplicates, by = "ID")
+
+pcAlifold <- pcAlifold %>% mutate(keep.row = ifelse(is.na(keep.row), T, F)) 
+ncAlifold <- ncAlifold %>% mutate(keep.row = ifelse(is.na(keep.row), T, F)) 
+
+pcAlifold <- pcAlifold %>% filter(keep.row)
+ncAlifold <- ncAlifold %>% filter(keep.row)
+
+pcAlifold <- pcAlifold %>% select(-keep.row)
+ncAlifold <- ncAlifold %>% select(-keep.row)
+
 pcAlifold <- pcAlifold %>% mutate(response = 1)
 ncAlifold <- ncAlifold %>% mutate(response = 0)
+
+
 
 rocData <- pcAlifold %>% bind_rows(ncAlifold)
 rocData$z_mean[is.na(rocData$z_mean)] <- 10
@@ -2043,11 +2550,14 @@ roc.curve(response = rocData$response, predicted = rocData$z_mean,
 
 ```{r MFE, eval = F, echo=F}
 pcMFE <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/positive_control.rnaalifold", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
-ncMFE <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control_no_shuffle/negative_control.rnaalifold", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
+ncMFE <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/negative_control.rnaalifold", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
 predMFE <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/predicted.rnaalifold", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
 
-pcMFE <- pcMFE %>% filter(V1 != "From", grepl(pattern = "-", x = V1) ==F, V1 != "ERROR", V7 != "nan")
-ncMFE <- ncMFE %>% filter(V1 != "From", grepl(pattern = "-", x = V1) ==F, V1 != "ERROR", V7 != "nan")
+pcMFE <- pcMFE %>% filter(V1 != "From", grepl(pattern = "-", x = V1) ==F, V1 != "ERROR")
+ncMFE <- ncMFE %>% filter(V1 != "From", grepl(pattern = "-", x = V1) ==F, V1 != "ERROR")
+
+
+
 pcMFE <- pcMFE %>% mutate(response = 1)
 ncMFE <- ncMFE %>% mutate(response = 0)
 rocData <- pcMFE %>% bind_rows(ncMFE) 
@@ -2083,6 +2593,7 @@ save(ncAlifold, file = "~/bin/r_git/R/ncAlifold.Rda")
 
 
 ```
+
 ###ncRNA motifs
 
 ```{r motifs, eval = T}
@@ -2090,6 +2601,28 @@ save(ncAlifold, file = "~/bin/r_git/R/ncAlifold.Rda")
 load("~/bin/r_git/R/pcMotif.Rda")
 load("~/bin/r_git/R/ncMotif.Rda")
 load("~/bin/r_git/R/predMotif.Rda")
+
+load("~/bin/r_git/R/pcDuplicates.Rda")
+load("~/bin/r_git/R/ncDuplicates.Rda")
+
+pcDuplicates <- pcDuplicates %>% mutate(keep.row = F)
+ncDuplicates <- ncDuplicates %>% mutate(keep.row = F)
+
+pcDuplicates <- pcDuplicates  %>% dplyr::rename(ID = V1)
+ncDuplicates <- ncDuplicates  %>% dplyr::rename(ID = V1)
+
+
+pcMotif <- pcMotif %>% left_join(pcDuplicates, by = "ID")
+ncMotif <- ncMotif %>% left_join(ncDuplicates, by = "ID")
+
+pcMotif <- pcMotif %>% mutate(keep.row = ifelse(is.na(keep.row), T, F)) 
+ncMotif <- ncMotif %>% mutate(keep.row = ifelse(is.na(keep.row), T, F)) 
+
+pcMotif <- pcMotif %>% filter(keep.row)
+ncMotif <- ncMotif %>% filter(keep.row)
+
+pcMotif <- pcMotif %>% select(-keep.row)
+ncMotif <- ncMotif %>% select(-keep.row)
 
 ncMotif <- ncMotif %>% mutate(response = 0)
 pcMotif <- pcMotif %>% mutate(response = 1)
@@ -2151,6 +2684,9 @@ ncGC <- ncGC %>% group_by(V1) %>% summarise(gc_score = mean(V2)) %>% separate(V1
 load("maxDistsPC.Rda") #variablename: distsPositive
 load("maxDistsNC.Rda") #variablename: distsNegative
 
+distsPositive <- distsPositive %>% dplyr::rename(ID = query.name)
+distsNegative <- distsNegative %>% dplyr::rename(ID = query.name)
+
 ncReadDepths <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_read_depths.txt", header = T, sep = "\t")
 pcReadDepths <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control_read_depths.txt", header = T, sep = "\t")
 
@@ -2190,9 +2726,9 @@ ncDat <- ncMFE %>%
 
 
 dat <- pcDat %>% bind_rows(ncDat)%>% 
-  select(-mean_median, -mean_max, -median_mean, -median_median, -median_max, -max_mean, -max_median, -ID_2, -ID)
+  select(-mean_median, -mean_max, -median_mean, -median_median, -median_max, -max_mean, -max_median, -ID_2)
 
-dat <- dat[,c(4, 1:3, 5:12)]
+dat <- dat[,c(5, 1:4, 6:13)]
 
 dat$mfe_score[is.na(dat$mfe_score)] <- 0
 dat$gc_score[is.na(dat$gc_score)] <- 50
@@ -2205,6 +2741,31 @@ dat$mean_motif[is.na(dat$mean_motif)] <- 0
 dat$max_motif[is.na(dat$max_motif)] <- 0
 dat$z_mean[is.na(dat$z_mean)] <- 10
 dat$z_max[is.na(dat$z_max)] <- 10
+
+
+
+
+load("~/bin/r_git/R/pcDuplicates.Rda")
+load("~/bin/r_git/R/ncDuplicates.Rda")
+
+pcDuplicates <- pcDuplicates %>% mutate(keep.row = F)
+ncDuplicates <- ncDuplicates %>% mutate(keep.row = F)
+
+pcDuplicates <- pcDuplicates  %>% dplyr::rename(ID = V1)
+ncDuplicates <- ncDuplicates  %>% dplyr::rename(ID = V1)
+
+duplicates <- pcDuplicates %>% bind_rows(ncDuplicates)
+
+dat <- dat %>% left_join(duplicates, by = "ID")
+
+dat <- dat %>% mutate(keep.row = ifelse(is.na(keep.row), T, F)) 
+
+dat <- dat %>% filter(keep.row)
+
+dat <- dat %>% select(-keep.row)
+
+dat <- dat %>% select(-ID)
+set.seed(101)
 randomNum <- runif(n = nrow(dat), min = 0, max = 1)
 
 dat$random <- randomNum
@@ -2250,7 +2811,3 @@ p <- ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
 p
 
 ```
-
-
-
-
