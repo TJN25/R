@@ -12,7 +12,7 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-suppressMessages(library(comparativeSRA))
+# suppressMessages(library(comparativeSRA))
 library(tidyverse)
 library(VennDiagram)
 library(shiny)
@@ -33,8 +33,8 @@ library(genoPlotR)
 library(drake)
 library(ape)
 library(Biostrings)
-library(ggtree)
-library(treeio)
+# library(ggtree)
+# library(treeio)
 library(geiger)
 library(ROSE)
 library(reshape2)
@@ -44,7 +44,7 @@ library(randomForest)
 library(ROCR)
 library(corrplot)
 #setwd("~/phd/RNASeq/r_files/")
-filePath <- "~/phd/RNASeq/r_files/"
+# filePath <- "~/phd/RNASeq/r_files/"
 ```
 
 ```{r functions, include=F}
@@ -183,7 +183,8 @@ firstup <- function(x) {
 ####Summary of strains used
 
 ```{r summary_of_strains, echo = T, eval = T}
-load("~/bin/r_git/R/r_files/accession_info.Rda")
+getwd()
+load("../r_files/accession_info.Rda")
 accession_info <- accession_info %>% 
   mutate(strain_short = substr(Strain, start = 1, stop = 30)) %>% 
   select(Accession, RNASeq.file.counts, strain_short)
