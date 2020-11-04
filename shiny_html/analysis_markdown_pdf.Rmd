@@ -1822,17 +1822,55 @@ write.table(x = cormat %>% filter(is.na(keep)) %>% select(ori.file), file = "~/p
 ```
 
 ```{r view_overlap_values, eval = T}
-overlaps <- read.csv("~/phd/RNASeq/srna_seqs/version_1/predicted/overlap_values.csv", comment.char = "#", as.is = T, header = T, fill = T)
+overlaps_2 <- read.csv("~/phd/RNASeq/srna_seqs/version_1/predicted/overlap_values_3.csv", 
+                       comment.char = "#", as.is = T, header = T, fill = T)
 
-overlaps <- overlaps %>% mutate(percentage = ifelse(percentage > 1, 100, percentage*100))
+rep_ids <- read.csv("~/phd/RNASeq/srna_seqs/version_1/predicted/representative_ids.csv", 
+                       comment.char = "#", as.is = T, header = T, fill = T)
+
+overlaps_2 <- overlaps_2 %>% 
+  mutate(percentage = ifelse(percentage > 1, percentage*100, percentage*100))
+
+overlaps_2 <- overlaps_2 %>% 
+  separate(col = id, into = c("a", "b", "c", "id2"), sep = "_", extra = "merge", remove = F) %>%
+  mutate(id1 = paste(a, b, c, sep = "_")) %>% 
+  select(id, id1, id2, percentage, total, count)
+
+rep_ids <- overlaps_2 %>% full_join(rep_ids, by = "id1")
+
+rep_ids <- rep_ids %>% filter(!is.na(id_count))
 
 
 
-ggplot(data = overlaps) +
-  geom_freqpoly(aes(x = total), binwidth = 2) +
-  geom_freqpoly(aes(x = percentage), colour = "blue", binwidth = 2) +
-  geom_freqpoly(aes(x = count), colour = "red", binwidth = 2) +
-  xlim(min = 2, max = 300)
+
+sum1 <- overlaps_2 %>% group_by(id1) %>% summarise(id1_count = n())
+sum2 <- overlaps_2 %>% group_by(id2) %>% summarise(id2_count = n())
+
+overlaps_unique1 <- overlaps_2 %>% select(id1, percentage, total, count) %>% unique() %>% 
+  dplyr::rename(id = id1, percentage1 = percentage, count1 = count, total1 = total)
+overlaps_unique2 <- overlaps_2 %>% select(id2, percentage, total, count) %>% unique() %>% 
+  dplyr::rename(id = id2, percentage2 = percentage, count2 = count, total2 = total)
+
+overlaps_unique <- overlaps_unique1 %>% full_join(overlaps_unique2)
+
+
+ggplot(data = overlaps_unique) +
+#  geom_freqpoly(aes(x = total), binwidth = 2) +
+  geom_freqpoly(aes(x = percentage), colour = "blue", binwidth = 1) +
+#  geom_freqpoly(aes(x = count), colour = "red", binwidth = 2) +
+  xlim(min = 0, max = 100)
+
+# df <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/original_stats_all.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
+# 
+# df <- df %>% filter(V1 == "Number_of_sequences:")
+# 
+# 
+# ggplot(data = df) +
+# #  geom_freqpoly(aes(x = total), binwidth = 2) +
+#   geom_freqpoly(aes(x = as.numeric(V2)), colour = "blue", binwidth = 1) +
+#   xlim(min = 0, max = 50)
+
+
 
 
 
