@@ -2444,18 +2444,25 @@ if run_all == True:
     number_of_ids_overlapping = {}
     for key, value in all_overlaps.items():
         number_of_ids_overlapping[key] = [len(value)]
-    df = pd.DataFrame(number_of_ids_overlapping)
-    df = df.T
-    df.columns = ['id_count']
-    df.index.name = 'id1'
-    df.reset_index(inplace=True)
-    df.to_csv('/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/representative_ids.csv', index=False)
+    
+    representative_ids = pd.DataFrame(number_of_ids_overlapping)
+    representative_ids = representative_ids.T
+    representative_ids.columns = ['id_count']
+    representative_ids.index.name = 'id1'
+    representative_ids.reset_index(inplace=True)
+    representative_ids.to_csv('/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/representative_ids.csv', index=False)
+    
+    df = pd.DataFrame.from_dict(query_counts, orient='index', columns = ['percentage', 'total', 'count'])
+    df.index.name = 'id'
+    df.reset_index(inplace=True)    
+    df.to_csv('/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/overlap_values_3.csv', index=False)
 else:
     with open('/Users/thomasnicholson/phd/RNASeq/python_files/dict.json', 'r') as read_file:
         d = json.load(read_file)
     with open('/Users/thomasnicholson/phd/RNASeq/python_files/all_overlaps.json', 'r') as read_file:
         all_overlaps = json.load(read_file)    
-    df = read_csv('/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/representative_ids.csv')
+    representative_ids = read_csv('/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/representative_ids.csv')
+    
 ```
 
 ```{r combine_models, eval=F, include=F}
