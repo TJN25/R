@@ -2421,7 +2421,34 @@ if run_all == True:
     json_data = json.dumps(d)
     file = open('/Users/thomasnicholson/phd/RNASeq/python_files/dict.json', 'w')
     file.write(json_data)
-    file.c lose()
+    file.close()
+    query_matches = {}
+    query_counts = {}
+    overlap_percentages = []
+    threshold = 0
+    for i in range(0, len(query_ids) -1):
+        for j in range(i + 1, len(query_ids)):
+            ids =[query_ids[i], query_ids[j]]
+            ids.sort()
+            current_id = "_".join(ids)
+            count = min([target_counts['count'][query_ids[i]], target_counts['count'][query_ids[j]]])
+            count = int(count)
+            if current_id in d:
+                if d[current_id]/count < 1 and d[current_id]/count > threshold:
+                    overlap_percentages.append(d[current_id]/count)
+                else:
+                    overlap_percentages.append(1)
+                if d[current_id]/count > threshold:
+                    query_matches[current_id] = d[current_id]/count
+                    query_counts[current_id] = [d[current_id]/count, count, d[current_id]]
+    json_query_matches = json.dumps(query_matches)
+    file = open('/Users/thomasnicholson/phd/RNASeq/python_files/query_matches.json', 'w')
+    file.write(json_query_matches)
+    file.close()
+    json_query_counts = json.dumps(query_counts)
+    file = open('/Users/thomasnicholson/phd/RNASeq/python_files/query_counts.json', 'w')
+    file.write(json_query_counts)
+    file.close()
     
     all_overlaps = {}
     ids_checked = []
@@ -2459,9 +2486,11 @@ if run_all == True:
 else:
     with open('/Users/thomasnicholson/phd/RNASeq/python_files/dict.json', 'r') as read_file:
         d = json.load(read_file)
+    with open('/Users/thomasnicholson/phd/RNASeq/python_files/query_counts.json', 'r') as read_file:
+        query_counts = json.load(read_file)
     with open('/Users/thomasnicholson/phd/RNASeq/python_files/all_overlaps.json', 'r') as read_file:
         all_overlaps = json.load(read_file)    
-    representative_ids = read_csv('/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/representative_ids.csv')
+    representative_ids = pd.read_csv('/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/representative_ids.csv')
     
 ```
 
