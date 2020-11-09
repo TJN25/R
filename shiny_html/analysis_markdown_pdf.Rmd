@@ -1,5 +1,5 @@
 ---
-title: "Comparative RNASeq Analysis"
+title: "Comparative RNA-Seq Analysis"
 author: "Thomas Nicholson"
 date: "14/09/2020"
 output: 
@@ -137,7 +137,7 @@ import numpy as np
 from pylab import savefig
 from matplotlib.pyplot import figure
 import json
-
+run_all = False
 ```
 
 ```{python py_functions, include=F}
@@ -690,16 +690,6 @@ def combined_alignments(query, combined_d, ids_checked, query_matches):
 ```
 
 
-```{python test}
-package_test()
-run_all = False
-print("Hello World!")
-d = {}
-d['a'] = [1, 2, 3]
-d['b'] =[1, 4, 9]
-print(d)
-```
-
 ##Overview of sRNA RNAs play a critical role in a wide range of biological functions such as:
 
 -   Transcription/Translation
@@ -720,15 +710,15 @@ print(d)
 
 ##Overview of Methods
 
--   Take RNASeq data from multiple genomes
+-   Take RNA-Seq data from multiple genomes
 
     -   21 strain
     -   11 genera
     -   6 families
 
--   Predict sRNAs based on expressed regions in RNASeq data
+-   Predict sRNAs based on expressed regions in RNA-Seq data
 
-    -   Use multiple RNASeq datasets for each genome
+    -   Use multiple RNA-Seq datasets for each genome
 
 -   Consider a number of different approaches for evaluating the predicted regions
 
@@ -774,16 +764,16 @@ accession_info[1:20,]
 
 -   [*callPeaksforGenome.sh*](#section-callpeaksforgenome.sh) *-g* *\<GCA Accession\>*
 
-    -   Only accessions with \>4 RNASeq files are analysed
+    -   Only accessions with \>4 RNA-Seq files are analysed
 
     -   [*fetch_genomes_from_GCA.sh*](#section-fetch_genomes_from_gca.sh) *-r* *\<GCA Accession\>* *-g*
 
         -   The genome and gff files are downloaded from ncbi using the GCA acession
         -   *-g* flag is for downloading GFF file
 
-    -   The RNASeq data is downloaded using *fasterq-dump* with a given accession
+    -   The RNA-Seq data is downloaded using *fasterq-dump* with a given accession
 
-        -   these are selected from a file (shown below) containing a list of RNASeq experiment IDs for each strain.
+        -   these are selected from a file (shown below) containing a list of RNA-Seq experiment IDs for each strain.
         -   filtered for paired ends, Illumina HiSeq
 
     -   [*sra2plot.1.0.3.sh*](#section-sra2plot.1.0.3.sh) *-s* *\<SRA Accession\>* *-r* *\<GCA Accession\>* *-d* *-n* *\<Number of CPUs\>*
@@ -804,13 +794,7 @@ accession_info[1:20,]
 
 ------------------------------------------------------------------------
 
-```{r find_available_data, echo = T, eval = T}
-load("~/bin/r_git/R/r_files/sra_rnaseq_files.Rda")
-sra_rnaseq_files <- sra_rnaseq_files %>% select(GENOME_ACCESSION, ACCESSION, SPECIES)
-sra_rnaseq_files[1:10,]
-```
-
-###Call peaks on individual RNASeq experiments
+###Call peaks on individual RNA-Seq experiments
 
 -   A plot file is produced. This contains a number for each nucleotide that indicates read depth.
 
@@ -823,6 +807,14 @@ sra_rnaseq_files[1:10,]
     -   Threshold is set to the equivalent of \~15 nt read depth before normalisation
 
 ###callPeaksforGenome.sh
+
+Wrapper for a series of scripts that downloads genomes and fastq files, maps reads and calls peaks for a given genome. The fastq files are downloaded from SRA using a list of available experiment IDs.
+
+```{r find_available_data, echo = T, eval = T}
+load("~/bin/r_git/R/r_files/sra_rnaseq_files.Rda")
+sra_rnaseq_files <- sra_rnaseq_files %>% select(GENOME_ACCESSION, ACCESSION, SPECIES)
+sra_rnaseq_files[1:10,]
+```
 
 ```{bash callPeaksforGenome.sh, eval = F}
 #!/bin/bash
@@ -934,7 +926,7 @@ fi
 
 
 ##-----------------------------------------------------------------##
-##-------------- Download and Process RNASeq Files ----------------##
+##-------------- Download and Process RNA-Seq Files ----------------##
 ##-----------------------------------------------------------------##
 file_lines=`cat tmp1`
 
@@ -1000,6 +992,8 @@ rm tmp1
 ```
 
 ###fetch_genomes_from_GCA.sh
+
+Downloads a given genome and corresponding annotation file (GFF3 format).
 
 ```{bash fetch_genomes_from_GCA.sh, eval = F}
 #!/bin/bash
@@ -1161,6 +1155,8 @@ fi
 
 ###sra2plot.1.0.3.sh
 
+Script that maps reads from fastq file to genome and produces a plot file with read depths for each nucleotide.
+
 ```{bash sra2plot.1.0.3.sh, eval=F}
 #!/bin/sh
 #Downloads fastq files from SRA, trims, maps and generates plotfiles for visualisation in artemis
@@ -1314,6 +1310,8 @@ fi
 
 ###removeProteinCodingRNA.R
 
+In order to call non-coding RNA expression, expression of coding regions must be ignored as not all of the RNA-Seq experiemtns are focused on ncRNA. This script does this by setting coding regions (defined based on the annotation file) to a read depth of 0.
+
 ```{r removeProteinCodingRNA.R, eval = F}
 #!/usr/bin/env Rscript
 suppressMessages(library('getopt'))
@@ -1388,6 +1386,8 @@ write.table(plotDat%>%select(V1,V2), file = paste(filePath, "/", opt$out_name, "
 ```
 
 ###run_rnaPeakCalling.R
+
+Regions of expression are called on each individual RNA-Seq experiment by looking for regions where read depths are > 15 for atleast 50nt.
 
 ```{r run_rnaPeakCalling.R, eval = F}
 #!/usr/bin/env Rscript
@@ -1607,11 +1607,15 @@ write.table(x = gff, file = paste(filePath, "/", opt$out_name, "_sra_calls.gff",
 
 ###rfamscan
 
+Annotations of known sRNAs in the downloaded annotation file were supplemented by searching for known rFam families in each genome.
+
 ```{bash rfamscan, eval = F}
 rfamscan() { counts=$( bc -l <<< "scale=2;$(esl-seqstat $1.fna | grep ^"Total" | tr -s ' ' | cut -d ' ' -f4)*2/1000000"); cmscan -Z $counts  --cut_ga --rfam --nohmmonly --tblout $1.tblout --fmt 2 --clanin ~/Downloads/Rfam.clanin.txt ~/Downloads/Rfam.cm $1.fna; cmscanToGffWrapper.R -f $1.tblout -g $1;}
 ```
 
 ###cmscanToGFFWrapper.R
+
+The output from running cmscan needs to be in the same format as the rest of the data (GFF3).
 
 ```{r cmscanToGFFWrapper.R, eval=F}
 #!/usr/bin/env Rscript
@@ -1691,6 +1695,8 @@ write.table(x = gff, file = paste(opt$file_path, "/",opt$output, "_ncRNA.gff", s
 ```
 
 ###combine_gff_files.R
+
+For each genome all of the individual annotation files are combined into a single file with the description column incuding details of the origin of each annotation.
 
 ```{r combine_gff_files.R, eval=F}
 #!/usr/bin/env Rscript
@@ -2071,7 +2077,7 @@ combined_random <-combinedListRandom[["all_2_merged.gff"]]$number_of_features
 
 ```
 
--   From 21 strains and 11 genera, there were 292 RNASeq files.
+-   From 21 strains and 11 genera, there were 292 RNA-Seq files.
 
     -   *Escherichia* and *Shigella* are separated in the pyhlogenetic tree for this data
 
@@ -2083,7 +2089,7 @@ combined_random <-combinedListRandom[["all_2_merged.gff"]]$number_of_features
 
 ###Combining GFF file
 
-At this stage each individual RNASeq file has a corresponding gff file of SRA calls. There is also the original GFF file containing ncRNAs (along with CDS). Predictions of ncRNAs are made using rfam models and the output is made into a GFF file. There are 2 GFF files containing *known* ncRNAs and a number of GFF files containing predicted SRAs.
+At this stage each individual RNA-Seq file has a corresponding gff file of SRA calls. There is also the original GFF file containing ncRNAs (along with CDS). Predictions of ncRNAs are made using rfam models and the output is made into a GFF file. There are 2 GFF files containing *known* ncRNAs and a number of GFF files containing predicted SRAs.
 
 -   feature files (.gff) files were all combined into a single *ACCESSION*_new_calls.txt file.
 
@@ -2101,6 +2107,8 @@ At this stage each individual RNASeq file has a corresponding gff file of SRA ca
 -   There were 15,072 random regions chosen
 
 ###get_random_srna_sequences.py
+
+A set of 'RNAs' were predicted based on selecting random regions of genomes of the equavilent size to the predicted set in order to give a baseline of what is expected from different sRNA prediction approaches. 
 
 ```{bash get_random_srna_sequences_loop, eval = F}
 for file in *.txt; do accession=`basename $file _new_calls.txt`; echo $accession; get_random_srna_sequences.py -a $accession; done
@@ -2210,7 +2218,20 @@ At this point genome alignments are done using MAUVE.
 
 *progressiveMauve --output=NAME.xmfa --output-guide-tree=NAME.tree --backbone-output=NAME.backbone GENOME_1 GENOME_2*
 
+##Build families of sRNAs
+
+Each individual sRNA was searched against the complete list of sRNAs in order to cluster the related sRNAs into families. These families were then used to search through all of the genomes in the clade to improve on the number of sequences per family. 
+
+![Figure a. show the clade]()
+
+```{bash run_nhmmer_script, eval = F}
+
+
+```
+
 ##Remove redundancy
+
+As there are many sRNAs each comntributing to each model, it is important to enusre that each sequence only shows up in one model rather than several. This means combining the duplicated models to remove redundancy. 
 
 ```{r redundancy_check, eval = F, include=F}
 dat <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/overlapping_models/overlapping_models_ids.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
@@ -2359,6 +2380,28 @@ rowSums(tmp)
 
 ```
 
+```{python redundacy_test_example}
+test_contigs = ['N1', 'N2', 'N3', 'N4']
+test_data = {'query_id':['G1', 'G2', 'G3', 'G1', 'G2', 'G3', 'G1', 'G1', 'G3', 'G3', 'G2', 'G3'], 
+             'target_contig':['N1', 'N1', 'N1', 'N2', 'N2', 'N2', 'N3', 'N3', 'N3', 'N3', 'N4', 'N4'],
+            'target_start':[1, 1, 2, 100, 100, 100, 940, 855, 940, 855, 1010, 1015],
+            'target_end':[100, 100, 95, 180, 180, 180, 860, 935, 860, 935, 1110, 1120]}
+
+test_dat = pd.DataFrame(test_data)
+print(test_dat)
+
+test_d = {}
+for contig in test_contigs:
+    print(contig)
+    subsetDat =  test_dat.loc[test_dat['target_contig'] == contig]
+    print(subsetDat)
+    overlap_list = get_overlap_list(subsetDat = subsetDat)
+    print(overlap_list)
+    test_d = get_overlap_count(overlap_list = overlap_list, d = test_d)
+
+test_d
+```
+
 ```{python redundancy_1}
 alignment_file_counts = pd.read_csv("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/original_stats_all.txt", 
                                     header=None, delim_whitespace=True, names=list('abcdef'))
@@ -2483,6 +2526,18 @@ if run_all == True:
     df.index.name = 'id'
     df.reset_index(inplace=True)    
     df.to_csv('/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/overlap_values_3.csv', index=False)
+    
+    combined_d = {}
+    ids_checked = []
+    for query in query_ids:
+        if query not in ids_checked:
+            combined_d, ids_checked = combined_alignments(query = query, combined_d = combined_d, ids_checked = ids_checked, query_matches = query_matches)
+
+    json_combined_d = json.dumps(combined_d)
+    file = open('/Users/thomasnicholson/phd/RNASeq/python_files/combined_d.json', 'w')
+    file.write(json_combined_d)
+    file.close()
+
 else:
     with open('/Users/thomasnicholson/phd/RNASeq/python_files/dict.json', 'r') as read_file:
         d = json.load(read_file)
@@ -2491,7 +2546,10 @@ else:
     with open('/Users/thomasnicholson/phd/RNASeq/python_files/all_overlaps.json', 'r') as read_file:
         all_overlaps = json.load(read_file)    
     representative_ids = pd.read_csv('/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/representative_ids.csv')
+    overlap_values_3 = pd.read_csv('/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/overlap_values_3.csv')    
     
+    with open('/Users/thomasnicholson/phd/RNASeq/python_files/combined_d.json', 'r') as read_file:
+        combined_d = json.load(read_file)      
 ```
 
 ```{r combine_models, eval=F, include=F}
