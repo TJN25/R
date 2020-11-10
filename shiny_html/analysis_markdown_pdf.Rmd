@@ -42,6 +42,7 @@ library(randomForest)
 library(ROCR)
 library(corrplot)
 library(reticulate)
+library(rjson)
 filePath <- "~/phd/RNASeq/r_files/"
 # use_python("/Users/thomasnicholson/anaconda3/bin/python")
 use_condaenv("comparativesrna")
@@ -810,11 +811,20 @@ accession_info[1:20,]
 
 Wrapper for a series of scripts that downloads genomes and fastq files, maps reads and calls peaks for a given genome. The fastq files are downloaded from SRA using a list of available experiment IDs.
 
-```{r find_available_data, echo = T, eval = T}
-load("~/bin/r_git/R/r_files/sra_rnaseq_files.Rda")
-sra_rnaseq_files <- sra_rnaseq_files %>% select(GENOME_ACCESSION, ACCESSION, SPECIES)
-sra_rnaseq_files[1:10,]
+```{r combine_sRNAs, context="render", echo = F}
+  # actionButton(inputId = "update_result", label = "Button 1")
+  dataTableOutput("available_data")
 ```
+
+```{r combine_sRNAs_server, context="server", echo = F}
+output$tablavailable_datae_1 <- renderDataTable({
+  load("~/bin/r_git/R/r_files/sra_rnaseq_files.Rda")
+  sra_rnaseq_files <- sra_rnaseq_files %>% select(GENOME_ACCESSION, ACCESSION, SPECIES)
+  sra_rnaseq_files
+})
+```
+
+
 
 ```{bash callPeaksforGenome.sh, eval = F}
 #!/bin/bash
@@ -2234,6 +2244,7 @@ Each individual sRNA was searched against the complete list of sRNAs in order to
 As there are many sRNAs each comntributing to each model, it is important to enusre that each sequence only shows up in one model rather than several. This means combining the duplicated models to remove redundancy. 
 
 ```{r redundancy_check, eval = F, include=F}
+
 dat <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/overlapping_models/overlapping_models_ids.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
 colnames(dat) <- c("target.id", "query.id")
 
@@ -2247,126 +2258,24 @@ idsDat <- idsDat %>% filter(Freq > 0)
 
 queryCounts <- idsDat %>% group_by(query.id) %>% summarise(query.count = n()) %>% dplyr::rename(target = query.id)
 
-
-
-i <- unique(idsDat$query.id)[1]
-for(i in unique(idsDat$query.id)){
-# query <- idsDat$query.id[1]
-targets <- idsDat$target.id[idsDat$query.id == i]
-print(length(targets))
-}
-targetsMat <- matrix(ncol = length(targets) + 1, nrow = length(targets))
-
-targetsMat[,1] <- targets
-colnames(targetsMat) <- c("targets", targets)
-
-i <- 57
-for(i in 1:length(targets)){
-  targets2 <- idsDat$target.id[idsDat$query.id == targets[i]]
-  matchVals <- match(table = targets, x = targets2)
-  matchVals <- matchVals[!is.na(matchVals)]
-  targetsMat[matchVals,(i + 1)] <- 1
-}
-
-targetsMat[is.na(targetsMat)] <- 0
-targetsDat <- as.data.frame(targetsMat[,c(2:nrow(targetsMat))])
-targetsDat <- targetsDat %>% mutate_all(as.character) %>% mutate_all(as.numeric)
-counts <- colSums(targetsDat)
-targetCounts <- data.frame(count = counts)
-targetCounts$target <- rownames(targetCounts)
-rownames(targetCounts) <- c(1:nrow(targetCounts))
-
-targetCounts <- targetCounts %>% left_join(queryCounts, by = "target")
-
-targetCounts$query.count[is.na(targetCounts$query.count)] <- 0
-
-targetCounts <- targetCounts %>% mutate(percentage = round(count/query.count*100))
-
-targetCounts$percentage[is.na(targetCounts$percentage)] <- 100
-
-
-
-align_1 <- targetCounts %>% filter(percentage > 85)
-
-
-targets <- idsDat$target.id[idsDat$query.id == unique(idsDat$query.id)[1]]
-i <- 0
-
-while (i < length(targets)) {
-  i <- i + 1
-  print(paste("i = ", i, ", length =  ", length(targets), sep = ""))
-# for(i in 1:50){  
-  # if(align_1$percentage[i] == 100){
-  #   next
-  # }
-  targets2 <- idsDat$target.id[idsDat$query.id == targets[i]]
-  matchVals <- match(table = targets, x = targets2)
-  matchVals <- matchVals[!is.na(matchVals)]
-  total <- queryCounts$query.count[queryCounts$target == targets[i]]
-  matching <- length(matchVals)
-    if(length(total) == 0){
-    total <- 1
-    matching <- 1
-  }else{
-  print(paste(round(matching/total*100), "% matched (", matching, " of ", total, ")", sep = ""))
-  }
-  
-  if(round(matching/total*100) > 95){
-    new.targets <- targets2[ ! targets2 %in% targets]
-    targets <- c(targets, new.targets)
-  }else if(round(matching/total*100) < 85){
-    i <- i - 1
-    targets <- targets[! targets  %in% targets[i]]
-  }
-}
-
-
 df <- data.frame(query.name = targets)
 
 df <- df %>% mutate(group = 1)
 
-#
 
+mat <- reshape2::acast(idsDat, formula = target.id ~ query.id)
+mat[is.na(mat)] <- 0
+g <- graph.incidence(mat, weighted = T)
+g
 
-
-
-
-
-
-
-
-
-
-
-
-aa <- idsDat$target.id[idsDat$query.id == "GCA_002072655.1_111"]
-bb <- idsDat$target.id[idsDat$query.id == "GCA_000006765.1_116"]
-
-aa <- aa[! aa %in% bb]
-
-aa[1]
-#
-
-
-
-tmp <- matrix(c(1,2,3,1,2,3,1,2,3), nrow = 3)
-
-colSums(tmp)
-
-rowSums(tmp)
-
-# mat <- reshape2::acast(df, formula = target.id ~ query.id)
-# g <- graph.incidence(mat, weighted = T)
-# g
-# 
 # svg(filename="~/phd/RNASeq/figures/pc_models.svg", 
 #      width=100, 
 #      height=100, 
 #      pointsize=20)
-# V(g)$color <- V(g)$type
-# V(g)$color=gsub("FALSE","red",V(g)$color)
-# V(g)$color=gsub("TRUE","blue",V(g)$color)
-# plot(g, edge.color="gray30", vertex.size = 5)
+V(g)$color <- V(g)$type
+V(g)$color=gsub("FALSE","red",V(g)$color)
+V(g)$color=gsub("TRUE","blue",V(g)$color)
+plot(g, edge.color="gray30", vertex.size = 5)
 # dev.off()
 # 
 # p <- ggplot(data = df, aes(target.id, query.id, fill = Freq))+
@@ -2379,6 +2288,8 @@ rowSums(tmp)
 # 
 
 ```
+
+Checking that the overlapping sRNAs will be combined correctly.
 
 ```{python redundacy_test_example}
 test_contigs = ['N1', 'N2', 'N3', 'N4']
@@ -2401,6 +2312,8 @@ for contig in test_contigs:
 
 test_d
 ```
+
+Checking the distribution of overlap %.
 
 ```{python redundancy_1}
 alignment_file_counts = pd.read_csv("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/original_stats_all.txt", 
@@ -2452,6 +2365,8 @@ fig.savefig("/Users/thomasnicholson/phd/RNASeq/figures/displot.svg", dpi=100)
 ```{r, echo=FALSE, fig.width=8, fig.height=8}
 knitr::include_graphics("/Users/thomasnicholson/phd/RNASeq/figures/displot.svg")
 ```
+
+Group sRNAs if there is enough of an overlap and write out files. 
 
 ```{python redundancy_2}
 if run_all == True:
@@ -2552,12 +2467,79 @@ else:
         combined_d = json.load(read_file)      
 ```
 
-```{r combine_models, eval=F, include=F}
-oriDat <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/original_stats_2.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
+```{python overlapping_scores, eval=F}
+outfile = open('/Users/thomasnicholson/phd/RNASeq/python_files/ids_and_overlaps.csv', 'a')
+for key, value in query_matches.items():
+    names = key.split("_")
+    id1 = names[:3]
+    id1 = '_'.join(id1)
+    id2 = names[3:]
+    id2 = '_'.join(id2)
+    outfile.write('%s,%s,%s\n' % (id1, id2, value))
+```
+
+Take the overlapping sRNAs, extract the fasta sequences and align the sequences.
+
+```{r output_of_list_of_sRNAs_to_combine, eval = F}
+json_file <- "~/phd/RNASeq/python_files/combined_d.json"
+json_data <- fromJSON(file=json_file)
+
+values <- json_data["GCA_002848605.1_280"]
+
+
+for(i in values[[1]]){
+  print(i)
+}
+  
+for(key in json_data){
+  values <- json_data[key]
+  print(paste("Key: ", key[1], " of length ", length(values[[1]])))
+  for(value in values[[1]]){
+    write.table(x = value, file = paste("~/phd/RNASeq/srna_seqs/version_1/predicted/combined_alignments_ids/", key[1], "_combined_list.txt", sep = ""), append = T, quote = F, row.names = F, col.names = F)
+  }
+}
+
+```
+
+```{bash combine_sRNAs_bash, eval=F}
+for file in *.txt;
+do
+max_num="0"
+outname=`basename $file _combined_list.txt`
+echo $outname
+> fasta/$outname.fa
+while read line; 
+do 
+
+esl-reformat fasta ../alignments_filtered/$line.stk >> fasta/$outname.fa
+
+current_num=`esl-alistat ../alignments_filtered/$line.stk | grep "Number of sequences" | cut -d ' ' -f 4`
+
+if(( $current_num > $max_num ));
+then
+
+max_seq="$line.stk"
+max_num="$current_num"
+fi
+
+done < $file
+
+hmmbuild hmm/$outname.hmm ../alignments_filtered/$max_seq
+
+hmmalign --informat fasta hmm/$outname.hmm fasta/$outname.fa | esl-alimask -g --gapthresh 0.8 -p --pfract 0.5 --pthresh 0.5 - | esl-alimanip   --lnfract 0.6 --lxfract 1.4 --lmin 50 --lmax 500 --detrunc 50 - > combined_alignments_2/$outname.stk
+
+done
+
+
+```
+
+Check that the combined sRNAs are improved when compared to the original alignments (numbers in the table are percentages of the orignial alignments). 
+```{r combine_models, eval=T, include=T}
+oriDat <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/original_stats_3.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
 oriDat <- oriDat %>% filter(V3 != "")
 colnames(oriDat) <- c("ori.descr", "ori.value", "ori.file")
 
-newDat <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/new_stats_2.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
+newDat <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/new_stats_3.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
 newDat <- newDat %>% filter(V3 != "")
 colnames(newDat) <- c("new.descr", "new.value", "new.file")
 
@@ -2588,12 +2570,52 @@ cormat <- cormat %>% mutate(keep = ifelse(number.of.sequences >= 100 & average.i
                                                  ifelse(number.of.sequences >= 150 & average.identity >= 50, 1, 
                                                         ifelse(number.of.sequences > 100 & average.identity >= 80, 1, NA)))))
 
-# cormat1 <- cormat
 
+
+cormat %>% filter(!is.na(keep)) %>% select(-keep) %>% head()
+
+cormat %>% filter(is.na(keep)) %>% select(-keep) %>% head()
+
+
+```
+
+```{r, eval=F}
 write.table(x = cormat %>% filter(is.na(keep)) %>% select(ori.file), file = "~/phd/RNASeq/srna_seqs/version_1/predicted/ids_worse_after_merge.txt", quote = F, row.names = F, col.names = F)
 ```
 
-```{r view_overlap_values, eval = T}
+Replace the sRNAs that have been removed as the new alignments are worse than the original alignments.
+
+```{bash, eval=F}
+while read line;  
+do  
+mv $line ids_worse_after_merge/;  
+
+done < ../../ids_worse_after_merge.txt
+
+while read line; 
+do 
+
+name=`basename $line .stk`
+echo $name 
+
+while read line_2;
+do
+
+echo $line_2
+
+cp ../alignments_filtered/${line_2}.stk combined_alignments_2/
+done < ${name}_combined_list.txt
+
+done < ../ids_worse_after_merge.txt
+
+##move the alignments into the main folder for running later steps.
+for file in *.stk; do cp $file ../../alignments; done
+```
+
+
+```{r view_overlap_values, eval = F}
+# Already done in python
+
 overlaps_2 <- read.csv("~/phd/RNASeq/srna_seqs/version_1/predicted/overlap_values_3.csv", 
                        comment.char = "#", as.is = T, header = T, fill = T)
 
@@ -2622,139 +2644,352 @@ ggplot(data = overlaps_unique) +
 
 ```
 
-```{r combine_models_old, eval = F, include=F}
-genomicCoorinates <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/predicted_genomic_sequence_matches.txt", sep = "", comment.char = "", as.is = T, header = F, fill = T)
-head(genomicCoorinates)
-colnames(genomicCoorinates) <- c("t1", "detail", "t2", "query.id")
+##Score sRNAs
 
-genomicCoorinates <- genomicCoorinates %>% separate(col = detail, into = c("target.contig", "target.coord"), sep = "/", remove = F)
 
-genomicCoorinates <- genomicCoorinates %>% select(query.id, target.contig, target.coord) %>% 
-  separate(col = target.coord, into = c("target.start", "target.stop"), sep = "-", remove = F) %>% 
-  unique()
+**Scripts involved for scoring the sRNAs**
 
-targetContigSet <- unique(genomicCoorinates$target.contig)
-queryGenomeSet <- unique(genomicCoorinates$query.id)
+-   [*run_RNAAlifold.sh*](#section-run_rnaalifold.sh)
 
-genomicCoorinates <- genomicCoorinates %>% mutate(target.start = as.numeric(target.start),
-                                                  target.stop = as.numeric(target.stop)) %>% 
-  arrange(target.start, target.stop)
-subDat <- genomicCoorinates %>% filter(target.contig == "NC_004578.1")
-overlaps <- c()
-get_overlap_values <- function(subDat, overlaps){
-    overlapping_ids <- c()
-    lengths = c()
-    start_val <- 0
-    end_val <- 0
-    i <- 1
-    for (i in 1:nrow(subDat)){
-        query_val = subDat$query.id[i]  
-        new_start_val = min(subDat$target.start[i], subDat$target.stop[i])
-        new_end_val = max(subDat$target.start[i], subDat$target.stop[i])
-    #     print(query_val)
-    #     print(new_start_val)
-    #     print(new_end_val)    
-        if (end_val > new_start_val){
-            overlapping_ids <- c(overlapping_ids, query_val)
-            len_1 = end_val - start_val
-            len_2 = new_end_val - new_start_val
-            shortest_seq = min(c(len_1, len_2))
-            overlap_start = max(c(start_val, new_start_val))
-            overlap_end = min(c(end_val, new_end_val))
-            overlap = (overlap_end - overlap_start)/shortest_seq
-            overlaps <- c(overlaps, overlap)
-    #         print(overlap)
-        }else{
-            end_val <- new_end_val
-            start_val <- new_start_val
-            overlapping_ids <- query_val
-        }
-    }
-    return(overlaps)
-}
-overlaps <- c()
-for(contig in targetContigSet){
-  print(contig)
-  subDat <- genomicCoorinates %>% filter(target.contig == contig)
-  overlaps <- get_overlap_values(subDat, overlaps)
+    -   Produces the alignment file with predicted secondary structure included (useful for later steps) and a visualisation of the predicted secondary structure.
+    
+    -   [*run_Alifold.sh*](#section-run_alifold.sh) 
+
+        -   Compares the predicted secondary structure to a series of alignments from randomly shuffled sequence to give an idea of the how likley it is that the given secondary structure  could occur by chance (in the form of a z-score of the MFE).
+
+    -   [*run_R-scape.sh*](#section-run_r-scape.sh) 
+
+        - Looks for coovaritation in the alignments.
+
+
+------------------------------------------------------------------------
+
+```{bash run_RNAAlifold.sh, eval=F}
+#!/bin/bash
+
+##makes alignments and running alifoldz and r-scape
+##GCA accession number.
+
+usage(){
+    echo "sraAlignAndFold.sh is a script for making a multiple sequence alignment and
+    getting secondary structure information.  
+Usage:
+ fetchGenomeGCA.sh [opts] [input]
+
+Options:
+	-h	Display this help
+
+Input	       
+	-r	Folder location
+
+"
 }
 
+while getopts "i:o:h" arg; do
+case $arg in
+	i) 
+	FOLDER=${OPTARG};;
+	o) 
+	OUTPUT=${OPTARG};;
+    h)
+		usage
+		exit
+      ;;    
+	\?) 
+	echo "Unknown option: -${OPTARG}" >&2; exit 1;;
+    esac
+done
 
-overlaps[1:20]
-
-p <- ggplot() +
-  geom_freqpoly(aes(x = overlaps), binwidth = 0.05)
-
-p
-
-# ggsave(filename = "~/phd/RNASeq/figures/model_overlap_freq.svg", plot = p, device = "svg")
-
-
-
-
-get_overlap_list <- function(subDat){
-    overlapping_ids <- c()
-    overlap_list <- c()
-    lengths = c()
-    start_val <- 0
-    end_val <- 0
-    shortest_seq <- max(subDat$target.stop)
-    i <- 1
-    for (i in 1:nrow(subDat)){
-        query_val = subDat$query.id[i]  
-        new_start_val = min(subDat$target.start[i], subDat$target.stop[i])
-        new_end_val = max(subDat$target.start[i], subDat$target.stop[i])
-    #     print(query_val)
-    #     print(new_start_val)
-    #     print(new_end_val)    
-        if (end_val > new_start_val){
-            len_2 = new_end_val - new_start_val
-            shortest_seq = min(c(shortest_seq, len_2))
-            overlap_start = max(c(start_val, new_start_val))
-            overlap_end = min(c(end_val, new_end_val))
-            overlap = (overlap_end - overlap_start)/shortest_seq
-            if(overlap >= 0.5){
-              overlapping_ids <- c(overlapping_ids, query_val)
-              end_val <- max(end_val,new_end_val)
-            }else{
-              overlap_list <- c(overlap_list, paste(overlapping_ids, collapse = ","))
-              shortest_seq <- max(subDat$target.stop)
-              end_val <- new_end_val
-              start_val <- new_start_val
-              overlapping_ids <- query_val
-            }
-            
-    #         print(overlap)
-        }else{
-              overlap_list <- c(overlap_list, paste(overlapping_ids, collapse = "_"))
-              shortest_seq <- max(subDat$target.stop)
-              end_val <- new_end_val
-              start_val <- new_start_val
-              overlapping_ids <- query_val
-        }
-    }
-    return(overlap_list)
-}
-
-subDat <- genomicCoorinates %>% filter(target.contig == "NC_004578.1")
-overlap_list <- get_overlap_list(subDat = subDat)
-
-df <- data.frame(ids = overlap_list)
+if [ -z ${FOLDER} ]; then
+	FOLDER="./"
+fi
 
 
 
 
+mkdir -p "$FOLDER/alifold/post_script"
+mkdir -p "$FOLDER/RNAAlifold"
+mkdir -p alignments_rnaalifold
 
 
-t1 <- genomicCoorinates %>% filter(query.id == "GCA_000017745.1_1104")
-t2 <- genomicCoorinates %>% filter(query.id == "GCA_000017765.1_281")
+let "fileNum = 0"
+for file in alignments/*.stk
 
-tmp <- t1 %>% bind_rows(t2) %>% group_by(target.contig) %>% arrange(target.start)
+do
+lines=`wc -l < $file`
+if (( $lines < 1));then
+continue
+fi
 
-write.csv(x = tmp, file = "~/phd/RNASeq/foobar.csv", quote = F, row.names = F)
+outname=`basename $file`
 
+
+if [ -f "$FOLDER/RNAAlifold/$outname.rnaalifold" ]; then
+	echo "Already exists: $file"
+	continue
+fi
+
+
+
+
+echo "Running on: $file"
+
+
+start=`grep "GCA" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f1`
+end=`grep "GCA" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f2`
+
+if [[ $start == "" ]]; then
+	start=`grep "NC_" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f1`
+	end=`grep "NC_" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f2`
+
+fi
+
+if [[ $start == "" ]]; then
+	start=`grep "NZ_" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f1`
+	end=`grep "NZ_" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f2`
+
+fi
+
+if [[ $start == "" ]]; then
+	head $file
+fi
+
+
+
+
+length=`expr $end - $start`
+
+if (( $length < 0 )); then
+	length=$(( -1 * $length ))
+fi
+
+if (( $length < 500 )); then
+esl-reformat  clustal $file  | RNAalifold --aln-stk=${file} >> ./RNAAlifold/$outname.rnaalifold
+cat alirna.ps > ./alifold/post_script/$outname.ps      
+else
+	echo "Skipping: $file"
+fi
+
+done
+
+
+for file in alignments_G*;
+do
+outname=`basename $file .stk.stk`
+
+mv $file ./alignments_rnaalifold/$outname.stk
+
+done
 ```
 
+```{bash run_Alifold.sh, eval=F}
+#!/bin/bash
+
+##makes alignments and running alifoldz and r-scape
+##GCA accession number.
+
+usage(){
+    echo "sraAlignAndFold.sh is a script for making a multiple sequence alignment and
+    getting secondary structure information.  
+Usage:
+ fetchGenomeGCA.sh [opts] [input]
+
+Options:
+	-h	Display this help
+
+Input	       
+	-r	Folder location
+
+"
+}
+
+while getopts "i:o:h" arg; do
+case $arg in
+	i) 
+	FOLDER=${OPTARG};;
+	o) 
+	OUTPUT=${OPTARG};;
+    h)
+		usage
+		exit
+      ;;    
+	\?) 
+	echo "Unknown option: -${OPTARG}" >&2; exit 1;;
+    esac
+done
+
+if [ -z ${FOLDER} ]; then
+	FOLDER="./"
+fi
+
+
+
+
+mkdir -p "$FOLDER/alifold/post_script"
+
+
+
+let "fileNum = 0"
+for file in alignments_rnaalifold/*.stk
+
+
+do
+
+outname=`basename $file`
+if [ -f "$FOLDER/alifold/$outname.alifold" ]; then
+	#echo "$FOLDER/alifold/$file.alifold"
+	echo "Already exists: $file"
+	continue
+else
+	echo "Checking size: $file"
+fi
+
+
+lines=`wc -l < $file`
+if (( $lines < 1));then
+continue
+fi
+
+
+nseqs=`grep "#=" $file | cut -d ' ' -f2 | sort | uniq | wc -l`
+
+
+start=`grep "GCA" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f1`
+end=`grep "GCA" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f2`
+
+if [[ $start == "" ]]; then
+	start=`grep "NC_" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f1`
+	end=`grep "NC_" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f2`
+
+fi
+
+if [[ $start == "" ]]; then
+	start=`grep "NZ_" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f1`
+	end=`grep "NZ_" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f2`
+
+fi
+
+if [[ $start == "" ]]; then
+	head $file
+fi
+
+
+
+
+length=`expr $end - $start`
+
+if (( $length < 0 )); then
+	length=$(( -1 * $length ))
+fi
+
+if (( $length < 500 )); then
+
+ID=`grep "NC_" $file | head -n 1 | cut -d " " -f2`
+
+if [[ $ID == "" ]]; then
+	ID=`grep "NZ_" $file | head -n 1 | cut -d " " -f2`
+fi
+
+if [[ $ID == "" ]]; then
+	ID=`grep GCA_" $file | head -n 1 | cut -d " " -f2`
+fi
+
+if [[ $ID == "" ]]; then
+	head $file
+else
+alignmentLength=`grep $ID $file | grep -v "#" | tr -s ' ' | cut -d ' ' -f2 | wc -c`
+
+diffLength=`expr $alignmentLength - $length`
+
+if (( $diffLength > $length ));then
+echo "Alignment is poor: $file"
+continue
+fi
+fi
+
+
+
+
+echo "Running alifoldz.pl on $file (length: $length, nseqs: $nseqs)"
+
+time esl-reformat  clustal $file  | alifoldz.pl > ./alifold/$outname.alifold         
+ 
+
+else
+
+	echo "Skipping: $file"
+
+
+fi
+
+done
+```
+
+```{bash run_R-scape.sh, eval=F}
+#!/bin/bash
+
+##makes alignments and running alifoldz and r-scape
+##GCA accession number.
+
+usage(){
+    echo "sraAlignAndFold.sh is a script for making a multiple sequence alignment and
+    getting secondary structure information.  
+Usage:
+ fetchGenomeGCA.sh [opts] [input]
+
+Options:
+	-h	Display this help
+
+Input	       
+	-r	Folder location
+
+"
+}
+
+while getopts "i:o:h" arg; do
+case $arg in
+	i) 
+	FOLDER=${OPTARG};;
+	o) 
+	OUTPUT=${OPTARG};;
+    h)
+		usage
+		exit
+      ;;    
+	\?) 
+	echo "Unknown option: -${OPTARG}" >&2; exit 1;;
+    esac
+done
+
+if [ -z ${FOLDER} ]; then
+	FOLDER="./"
+fi
+
+
+
+
+mkdir -p "$FOLDER/rscape_out"
+
+
+
+let "fileNum = 0"
+for file in alignments_G*;
+do
+
+checkname=`basename $file .stk`
+if [ -f "../rscape_out/${checkname}_1.R2R.sto" ]; then
+echo "Already exists: $file"
+continue
+else
+
+echo "Running R-scape on: $file"
+	
+fi
+
+time R-scape --r2rall --outdir ../rscape_out/ $file > rsacpe.out
+
+done
+```
 ##Results 
 ###Evolutionary Distance
 ```{r max_conservation_distance, eval = T}
