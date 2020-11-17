@@ -757,6 +757,20 @@ accession_info <- accession_info %>%
   mutate(strain_short = substr(Strain, start = 1, stop = 30)) %>% 
   select(Accession, RNASeq.file.counts, strain_short)
 accession_info[1:20,]
+
+assembly_summary <- read.table("~/phd/RNASeq/SRA_bacteria_RNAseq.txt", sep = "\t", fill = T, quote = "", comment.char = "", header = T)
+
+
+
+assembly_summary <- assembly_summary %>% separate(col = SPECIES, into = c("Genus"), extra = "drop", remove = F, sep = " ")
+
+
+genomes <- assembly_summary %>% filter(DESIGN == "PAIRED", grepl(pattern = "Illumina", x = INSTRUMENT)) %>% group_by(Genus) %>% select(Genus, GENOME_ACCESSION) %>% unique() %>% summarise(genome_count = n())
+experiments <- assembly_summary %>% filter(DESIGN == "PAIRED", grepl(pattern = "Illumina", x = INSTRUMENT)) %>% group_by(Genus) %>% select(Genus, GENOME_ACCESSION, ACCESSION) %>% unique() %>% summarise(experiment_count = n())
+
+counts <- genomes %>% full_join(experiments, by = "Genus")
+
+
 ```
 
 ###Download data and map reads
@@ -826,7 +840,7 @@ output$tablavailable_datae_1 <- renderDataTable({
 
 
 
-```{bash callPeaksforGenome.sh, eval = F}
+```{bash callPeaksforGenome.sh, eval = F, echo=F}
 #!/bin/bash
 
 ##-----------------------------------------------------------------##
@@ -1005,7 +1019,7 @@ rm tmp1
 
 Downloads a given genome and corresponding annotation file (GFF3 format).
 
-```{bash fetch_genomes_from_GCA.sh, eval = F}
+```{bash fetch_genomes_from_GCA.sh, eval = F, echo=F}
 #!/bin/bash
 
 ##-----------------------------------------------------------------##
@@ -1167,7 +1181,7 @@ fi
 
 Script that maps reads from fastq file to genome and produces a plot file with read depths for each nucleotide.
 
-```{bash sra2plot.1.0.3.sh, eval=F}
+```{bash sra2plot.1.0.3.sh, eval=F, echo=F}
 #!/bin/sh
 #Downloads fastq files from SRA, trims, maps and generates plotfiles for visualisation in artemis
 
@@ -1322,7 +1336,7 @@ fi
 
 In order to call non-coding RNA expression, expression of coding regions must be ignored as not all of the RNA-Seq experiemtns are focused on ncRNA. This script does this by setting coding regions (defined based on the annotation file) to a read depth of 0.
 
-```{r removeProteinCodingRNA.R, eval = F}
+```{r removeProteinCodingRNA.R, eval = F, echo=F}
 #!/usr/bin/env Rscript
 suppressMessages(library('getopt'))
 
@@ -1399,7 +1413,7 @@ write.table(plotDat%>%select(V1,V2), file = paste(filePath, "/", opt$out_name, "
 
 Regions of expression are called on each individual RNA-Seq experiment by looking for regions where read depths are > 15 for atleast 50nt.
 
-```{r run_rnaPeakCalling.R, eval = F}
+```{r run_rnaPeakCalling.R, eval = F, echo=F}
 #!/usr/bin/env Rscript
 suppressMessages(library('getopt'))
 
@@ -1619,7 +1633,7 @@ write.table(x = gff, file = paste(filePath, "/", opt$out_name, "_sra_calls.gff",
 
 Annotations of known sRNAs in the downloaded annotation file were supplemented by searching for known rFam families in each genome.
 
-```{bash rfamscan, eval = F}
+```{bash rfamscan, eval = F, echo=F}
 rfamscan() { counts=$( bc -l <<< "scale=2;$(esl-seqstat $1.fna | grep ^"Total" | tr -s ' ' | cut -d ' ' -f4)*2/1000000"); cmscan -Z $counts  --cut_ga --rfam --nohmmonly --tblout $1.tblout --fmt 2 --clanin ~/Downloads/Rfam.clanin.txt ~/Downloads/Rfam.cm $1.fna; cmscanToGffWrapper.R -f $1.tblout -g $1;}
 ```
 
@@ -1627,7 +1641,7 @@ rfamscan() { counts=$( bc -l <<< "scale=2;$(esl-seqstat $1.fna | grep ^"Total" |
 
 The output from running cmscan needs to be in the same format as the rest of the data (GFF3).
 
-```{r cmscanToGFFWrapper.R, eval=F}
+```{r cmscanToGFFWrapper.R, eval=F, echo=F}
 #!/usr/bin/env Rscript
 library('getopt')
 
@@ -1708,7 +1722,7 @@ write.table(x = gff, file = paste(opt$file_path, "/",opt$output, "_ncRNA.gff", s
 
 For each genome all of the individual annotation files are combined into a single file with the description column incuding details of the origin of each annotation.
 
-```{r combine_gff_files.R, eval=F}
+```{r combine_gff_files.R, eval=F, echo=F}
 #!/usr/bin/env Rscript
 suppressMessages(library('getopt'))
 
@@ -2120,11 +2134,11 @@ At this stage each individual RNA-Seq file has a corresponding gff file of SRA c
 
 A set of 'RNAs' were predicted based on selecting random regions of genomes of the equavilent size to the predicted set in order to give a baseline of what is expected from different sRNA prediction approaches. 
 
-```{bash get_random_srna_sequences_loop, eval = F}
+```{bash get_random_srna_sequences_loop, eval = F, echo=F}
 for file in *.txt; do accession=`basename $file _new_calls.txt`; echo $accession; get_random_srna_sequences.py -a $accession; done
 ```
 
-```{python get_random_srna_sequences.py, eval = F, python.reticulate = FALSE}
+```{python get_random_srna_sequences.py, eval = F, python.reticulate = FALSE, echo=F}
 #!/usr/bin/python
 
 '''
@@ -2234,7 +2248,7 @@ Each individual sRNA was searched against the complete list of sRNAs in order to
 
 ![Figure a. show the clade]()
 
-```{bash run_nhmmer_script, eval = F}
+```{bash run_nhmmer_script, eval = F, echo=F}
 
 
 ```
@@ -2613,7 +2627,7 @@ for file in *.stk; do cp $file ../../alignments; done
 ```
 
 
-```{r view_overlap_values, eval = F}
+```{r view_overlap_values, eval = T}
 # Already done in python
 
 overlaps_2 <- read.csv("~/phd/RNASeq/srna_seqs/version_1/predicted/overlap_values_3.csv", 
@@ -2653,17 +2667,20 @@ ggplot(data = overlaps_unique) +
 
     -   Produces the alignment file with predicted secondary structure included (useful for later steps) and a visualisation of the predicted secondary structure.
     
-    -   [*run_Alifold.sh*](#section-run_alifold.sh) 
+-   [*run_Alifold.sh*](#section-run_alifold.sh) 
 
-        -   Compares the predicted secondary structure to a series of alignments from randomly shuffled sequence to give an idea of the how likley it is that the given secondary structure  could occur by chance (in the form of a z-score of the MFE).
+    -   Compares the predicted secondary structure to a series of alignments from randomly shuffled sequence to give an idea of the how likley it is that the given secondary structure  could occur by chance (in the form of a z-score of the MFE).
 
-    -   [*run_R-scape.sh*](#section-run_r-scape.sh) 
+-   [*run_R-scape.sh*](#section-run_r-scape.sh) 
 
-        - Looks for coovaritation in the alignments.
+    - Looks for coovaritation in the alignments.
 
+-   [*run_rmfamscan.sh*](#section-run_rmfamscan.sh) *-e* *\<file extentsion\>* *-a*
+    
+    - Looks for motifs in the sRNAs
 
 ------------------------------------------------------------------------
-
+###run_RNAAlifold.sh
 ```{bash run_RNAAlifold.sh, eval=F}
 #!/bin/bash
 
@@ -2782,6 +2799,8 @@ mv $file ./alignments_rnaalifold/$outname.stk
 done
 ```
 
+
+###run_Alifold.sh
 ```{bash run_Alifold.sh, eval=F}
 #!/bin/bash
 
@@ -2925,6 +2944,8 @@ fi
 done
 ```
 
+
+###run_R-scape.sh
 ```{bash run_R-scape.sh, eval=F}
 #!/bin/bash
 
@@ -2990,13 +3011,251 @@ time R-scape --r2rall --outdir ../rscape_out/ $file > rsacpe.out
 
 done
 ```
+
+### run_rmfamscan.sh
+```{bash run_rmfamscan.sh, eval=F}
+#!/bin/bash
+
+##Run rmfam over all fasta files
+
+usage(){
+    echo "run_rmfam_scan.sh is a script for running rmfam_scan over a set of fasta
+    files.  
+Usage:
+ run_rmfam_scan.sh [opts] [extension]
+
+Options:
+	-h	Display this help
+
+Input
+	-e extension	       
+	-a	align
+	-o output
+	-k keep tmp files
+
+"
+}
+
+align="F"
+keep="F"
+while getopts "e:ao:hk" arg; do
+case $arg in
+	e)
+		extension=${OPTARG}
+		;;
+	a) 
+		align="T"
+		;;
+    h)
+		usage
+		exit
+      ;;    
+    k)
+		keep="T"
+      	;;   
+	\?) 
+	echo "Unknown option: -${OPTARG}" >&2; exit 1;;
+    esac
+done
+
+COUNTER=0
+mkdir -p "rmfam_cmscan"
+mkdir -p "rmfam_gff_files"
+mkdir -p "rmfam_tblout"
+
+
+let "fileNum = 0"
+if [[ $extension == "fna" ]]; then
+
+	for file in *.$extension
+	do
+		if [ -f "rmfam_tblout/$file.out.tblout" ]; then
+			echo "Already exists: $file"
+ 			continue
+		fi
+		length=`grep -v ">" $file | wc -c`
+		if (( $length < 500 )); then
+			echo "Running rmfam_scan on $file (length: $length)"
+			time rmfam_scan.pl -g -f ~/phd/RNASeq/RMfam/scripts/RMfam.cm $file -o $file.out 
+			mv *.tblout rmfam_tblout
+			mv *.cmscan rmfam_cmscan
+			mv *.gff rmfam_gff_files
+		else
+			echo "Skipping: $file"
+		fi
+	done
+else
+
+
+for file in *.$extension
+
+do
+
+
+if [ -f "rmfam_tblout/$file.out.tblout" ]; then
+	echo "Already exists: $file"
+ 	continue
+else
+echo "Checking size: $file"
+fi
+
+
+lines=`wc -l < $file`
+if (( $lines < 1));then
+continue
+fi
+
+# COUNTER=$((COUNTER+1))
+# 
+# if (( $COUNTER > 100 )); then
+# echo "waiting"
+# COUNTER=1
+# time wait
+# 
+# 
+# 
+# fi
+
+
+# if [[ $align == "T" ]]; then
+
+# echo "Aligning $file"
+# esl-reformat  clustal $file > $file.clustal
+
+nseqs=`grep "#=" $file | cut -d ' ' -f2 | sort | uniq | wc -l`
+
+
+start=`grep "GCA" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f1`
+end=`grep "GCA" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f2`
+
+if [[ $start == "" ]]; then
+	start=`grep "NC_" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f1`
+	end=`grep "NC_" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f2`
+
+fi
+
+if [[ $start == "" ]]; then
+	start=`grep "NZ_" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f1`
+	end=`grep "NZ_" $file | head -n 1 | cut -d " " -f2 | cut -d "/" -f2 | cut -d "-" -f2`
+
+fi
+
+if [[ $start == "" ]]; then
+	head $file
+fi
+
+
+
+
+length=`expr $end - $start`
+
+if (( $length < 0 )); then
+	length=$(( -1 * $length ))
+fi
+
+if (( $length < 500 )); then
+
+ID=`grep "NC_" $file | head -n 1 | cut -d " " -f2`
+
+if [[ $ID == "" ]]; then
+	ID=`grep "NZ_" $file | head -n 1 | cut -d " " -f2`
+fi
+
+if [[ $ID == "" ]]; then
+	ID=`grep GCA_" $file | head -n 1 | cut -d " " -f2`
+fi
+
+if [[ $ID == "" ]]; then
+	head $file
+else
+alignmentLength=`grep $ID $file | grep -v "#" | tr -s ' ' | cut -d ' ' -f2 | wc -c`
+
+diffLength=`expr $alignmentLength - $length`
+
+if (( $diffLength > $length ));then
+echo "Alignment is poor: $file"
+continue
+fi
+fi
+
+
+
+
+echo "Running rmfam_scan on $file (length: $length, nseqs: $nseqs)"
+
+ time rmfam_scan.pl -g -f ~/phd/RNASeq/RMfam/scripts/RMfam.cm $file -o $file.out 
+ 
+ 
+ mv *.tblout rmfam_tblout
+mv *.cmscan rmfam_cmscan
+mv *.gff rmfam_gff_files
+ 
+else
+
+	echo "Skipping: $file"
+
+
+fi
+
+done
+
+fi
+
+cd rmfam_tblout
+
+let "fileNum = 0"
+
+for file in *.tblout
+
+do
+
+sed 's/  /__/g' $file | sed 's/ /--/g' | sed 's/__/ /g' | tr -s ' ' | sed 's/ --/ /g' | sed 's/-- / /g' | sed 's/--!/ !/g' | tr ' ' '\t' | sed 's/--/_/g' > $file.formatted.tblout
+
+done
+
+```
+
 ##Results 
 ###Evolutionary Distance
-```{r max_conservation_distance, eval = T}
+```{r conservation_distance, eval=T}
+dat <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/query_target_pairs.txt")
+colnames(dat) <- c("contig", "query.id")
+contigLookup <- read.table("~/phd/RNASeq/sequences/contig_ids_accession.lookup", sep = "\t", comment.char = "#", as.is = T, header = F, fill = T)
+colnames(contigLookup) <- c("contig", "target.id")
+
+dat <- dat %>% left_join(contigLookup, by = "contig")
+load(file = "~/bin/r_git/R/phyloDistMatrix.Rda")
+
+phyloDat <- melt(phyloDistMat)
+
+phyloDat <- phyloDat %>% mutate(uid = paste(Var1, Var2, sep = ","))
+dat <- dat %>%  mutate(uid = paste(query.id, target.id, sep = ","))
+
+dat <- dat %>% left_join(phyloDat, by = 'uid') %>% filter(!is.na(value))
+load(file = "~/bin/r_git/R/distsCumulativeCount.Rda")
+tmp <- distsCumulativeCount
+tmp <- tmp %>% filter(group != "Predicted")
+distsCumulativeCount <- dat %>% group_by(value) %>% summarise(count = n()) %>% ungroup() %>% arrange(value) %>% mutate(max_dist = value, cumulative_count = cumsum(count)) %>% 
+  mutate(cumulative_prop = 1 - (cumulative_count/nrow(dat)))  %>% 
+  mutate(group = "Predicted")%>% 
+  select(group, max_dist, cumulative_prop)
+distsCumulativeCount <- distsCumulativeCount %>% bind_rows(tmp)
+
+save(distsCumulativeCount, file = "distsCumulativeCount.Rda")
+
+p <-  ggplot()+
+  geom_line(data = distsCumulativeCount, aes(x = max_dist, y = cumulative_prop, group  = group, color = group))
+
+p
+ggsave(filename = "~/phd/RNASeq/figures/max_conservation_distance_3.svg", plot = p)
+
+
+```
+
+```{r conservation_distance_roc_curve, eval = T}
 load( file = "~/bin/r_git/R/maxDistsPC.Rda")
 load(file = "~/bin/r_git/R/maxDistsPred.Rda")
 load(file = "~/bin/r_git/R/maxDistsNC.Rda")
-load(file = "~/bin/r_git/R/distsCumulativeCount.Rda")
 
 load( file = "~/bin/r_git/R/groupSizePositive.Rda")
 load(file = "~/bin/r_git/R/groupSizeNegative.Rda")
@@ -3013,12 +3272,6 @@ groupSizes <- groupSizes %>% mutate(ID = paste(query.name, group)) %>% select(-q
 dists <- dists %>% full_join(groupSizes, by = "ID")
 
 dists <- dists %>% mutate(score = max_dist*group_size)
-
-p <-  ggplot()+
-  geom_line(data = distsCumulativeCount %>% filter(group != "Predicted"), aes(x = max_dist, y = cumulative_prop, group = group, colour = group))
-
-p
-ggsave(filename = "~/phd/RNASeq/figures/max_conservation_distance_2.svg", plot = p)
 rocData <- dists %>% filter(group != "Predicted") %>% mutate(response = ifelse(group == "Positive Control", 1, 0))
 roc.curve(response = rocData$response, predicted = rocData$max_dist,
           main="ROC curve for Maximum Phylogenetic Distance")
@@ -3028,12 +3281,147 @@ roc.curve(response = rocData$response, predicted = rocData$score,
 
 ```
 
+```{r predicted_data_upsetr}
+dat <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/query_target_pairs_2.txt")
+colnames(dat) <- c("contig", "query.id", "id1")
+contigLookup <- read.table("~/phd/RNASeq/sequences/contig_ids_accession.lookup", sep = "\t", comment.char = "#", as.is = T, header = F, fill = T)
+colnames(contigLookup) <- c("contig", "target.id")
+
+dat <- dat %>% left_join(contigLookup, by = "contig")
+
+taxMat <- read.csv("~/phd/RNASeq/taxonomy_matrix.csv", as.is = T)
+meltTaxa <- function(taxMat = taxMat){
+taxMat[taxMat == "Strain"] <- "1"
+taxMat[taxMat == "Species"] <- "2"
+taxMat[taxMat == "Genus"] <- "3"
+taxMat[taxMat == "Family"] <- "4"
+taxMat[taxMat == "Order"] <- "5"
+
+names <- taxMat$names
+
+taxMat <- taxMat %>% mutate_all(as.numeric)
+
+taxMat$names <- names
+  
+taxa <- melt(taxMat)
+taxa[taxa == 1] <- "Strain"
+taxa[taxa == 2] <- "Species"
+taxa[taxa == 3] <- "Genus"
+taxa[taxa == 4] <- "Family"
+taxa[taxa == 5] <- "Order"
+return(taxa)
+}
+taxa <- meltTaxa(taxMat)
+
+accessions <- read.csv("~/phd/RNASeq/accession_info_all.csv")
+accessions <- accessions %>%select(Accession, Species)
+
+accessions <- accessions %>% dplyr::rename(query.id = Accession, query.species = Species)
+dat <- dat %>% left_join(accessions, by = "query.id")
+
+accessions <- accessions %>% dplyr::rename(target.id = query.id, target.species = query.species)
+dat <- dat %>% left_join(accessions, by = "target.id")
+
+dat <- dat %>% filter(!is.na(target.species))
+
+dat <- dat %>% mutate(species_id = paste(query.species, target.species, sep = "_"))
+
+taxa <- taxa %>% mutate(species_id = paste(names, variable, sep = "_"))
+
+dat <- dat %>% left_join(taxa, by = "species_id")
+
+dat <- dat %>% mutate(uid = paste(query.id, target.id, sep = ","))
+
+load(file = "~/bin/r_git/R/phyloDistMatrix.Rda")
+
+phyloDat <- melt(phyloDistMat)
+
+phyloDat <- phyloDat %>% mutate(uid = paste(Var1, Var2, sep = ",")) %>% dplyr::rename(phylo_value = value)
+dat <- dat %>% left_join(phyloDat, by = "uid")
+
+sRNAs_and_evo_dists <- dat
+
+save(sRNAs_and_evo_dists, file = "sRNAs_and_evo_dists.Rda")
+
+rep_ids <- read.csv("~/phd/RNASeq/srna_seqs/version_1/predicted/representative_ids.csv", 
+                       comment.char = "#", as.is = T, header = T, fill = T)
+
+dat <- dat %>% left_join(rep_ids, by = "id1")
+
+repDat <- dat %>% filter(!is.na(id_count)) %>% unique()
+
+repDat <- repDat %>% select(id1, target.species) %>% mutate(count = 1)
+
+mat <- reshape2::acast(repDat, formula = id1 ~ target.species)
+
+upsetDat <- as.data.frame(mat)
+
+upsetDat$names <- row.names(upsetDat)
+upsetDat[upsetDat != 0] <- 1
+
+upsetDat <- upsetDat %>% select(names, Shigella, Escherichia, Salmonella, Klebsiella, Enterobacter, Serratia, Pseudomonas, Xanthomonas, Lysobacter, Acinetobacter, Alteromonas)
+
+UpSetR::upset(upsetDat, sets = colnames(upsetDat)[2:12], mb.ratio = c(0.55, 0.45), order.by = "freq", nintersects = 15, keep.order = T)
+
+write_data <- F
+if(write_data){
+svg(filename="~/phd/RNASeq/figures/upsetr_plot_pred.svg",
+     width=15,
+     height=10,
+     pointsize=12)
+UpSetR::upset(upsetDat, sets = colnames(upsetDat)[2:12], mb.ratio = c(0.55, 0.45), order.by = "freq", nintersects = 15, keep.order = T)
+
+dev.off()
+}
+
+```
+
+```{r}
+load("sRNAs_and_evo_dists.Rda")
+
+sRNAs_and_evo_dists$value[sRNAs_and_evo_dists$value == "Strain"] <- "Species"
+
+# sRNAs_and_evo_dists$value[sRNAs_and_evo_dists$species_id == "Escherichia_Escherichia"] <- "Strain"
+# sRNAs_and_evo_dists$value[sRNAs_and_evo_dists$species_id == "Salmonella_Salmonella"] <- "Strain"
+
+
+sRNAs_and_evo_dists <- sRNAs_and_evo_dists %>% filter(grepl(pattern = "Pseudomonas", x = species_id) != T )
+minDat <- sRNAs_and_evo_dists %>% filter(phylo_value > 0) %>% group_by(value) %>% summarise(min_val = mean(phylo_value) - sd(phylo_value)*2)
+maxDat <- sRNAs_and_evo_dists %>% group_by(value) %>% summarise(max_val = mean(phylo_value) + sd(phylo_value)*2)
+
+
+
+
+taxa_dists <- minDat %>% full_join(maxDat, by = 'value')
+
+load("distsCumulativeCount.Rda")
+p <-  ggplot()+
+  geom_line(data = distsCumulativeCount, aes(x = max_dist, y = cumulative_prop, group  = group, color = group)) +
+  geom_vline(aes(xintercept = taxa_dists$min_val), color = "red") +
+  geom_vline(aes(xintercept = taxa_dists$max_val), color = "blue")
+
+p
+ggsave(filename = "~/phd/RNASeq/figures/max_conservation_distance_3.svg", plot = p)
+
+```
+
 ```{r UpSet_Plot, echo = T, eval=T}
 load("~/bin/r_git/R/nhmmerGeneraUpsetR.Rda") #nhmmerGeneraUpsetR
 
 nhmmerGeneraUpsetR <- nhmmerGeneraUpsetR %>% select(name, Salmonella, Escherichia, Shigella, Enterobacter, Klebsiella, Serratia, Acinetobacter, Pseudomonas, Lysobacter, Xanthomonas, Alteromonas)
 
 UpSetR::upset(nhmmerGeneraUpsetR, sets = colnames(nhmmerGeneraUpsetR)[2:ncol(nhmmerGeneraUpsetR)], mb.ratio = c(0.55, 0.45), order.by = "freq", nintersects = 15, keep.order = T)
+
+write_data <- F
+if(write_data){
+svg(filename="~/phd/RNASeq/figures/upsetr_plot_pc.svg",
+     width=15,
+     height=10,
+     pointsize=12)
+UpSetR::upset(nhmmerGeneraUpsetR, sets = colnames(nhmmerGeneraUpsetR)[2:ncol(nhmmerGeneraUpsetR)], mb.ratio = c(0.55, 0.45), order.by = "freq", nintersects = 15, keep.order = T)
+
+dev.off()
+}
 ```
 
 ```{r evolutionary_distance, eval = F, echo=T}
@@ -3581,18 +3969,27 @@ roc.curve(response = rocData$response, predicted = rocData$z_mean,
 
 ```
 
-```{r MFE, eval = F, echo=F}
+```{r MFE, eval = T, echo=T}
 pcMFE <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/positive_control.rnaalifold", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
 ncMFE <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/negative_control.rnaalifold", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
 predMFE <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/predicted.rnaalifold", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
 
 pcMFE <- pcMFE %>% filter(V1 != "From", grepl(pattern = "-", x = V1) ==F, V1 != "ERROR")
 ncMFE <- ncMFE %>% filter(V1 != "From", grepl(pattern = "-", x = V1) ==F, V1 != "ERROR")
+predMFE <- predMFE %>% filter(V1 != "From", grepl(pattern = "-", x = V1) ==F, V1 != "ERROR")
 
+pcMFE <- pcMFE %>% mutate(group = "Positive Control")
+ncMFE <- ncMFE %>% mutate(group = "Negative Control")
+predMFE <- predMFE %>% mutate(group = "Predicted")
 
+mfe <- pcMFE %>% bind_rows(ncMFE, predMFE)
+
+ggplot(data = mfe) +
+  geom_freqpoly(aes(x = V2, group = group, colour = group), binwidth = 2)
 
 pcMFE <- pcMFE %>% mutate(response = 1)
 ncMFE <- ncMFE %>% mutate(response = 0)
+
 rocData <- pcMFE %>% bind_rows(ncMFE) 
 roc.curve(response = rocData$response, predicted = rocData$V2,
           main="ROC curve for MFE")
@@ -3815,6 +4212,8 @@ validation1 <- dat2[-indexes,]
 rf_classifier = randomForest(group ~ ., data=training, ntree=100, importance=TRUE)
 rf_classifier
 varImpPlot(rf_classifier)
+
+# Make predictions
 prediction_for_table <- predict(rf_classifier,validation1[,-1])
 table(observed=validation1[,1],predicted=prediction_for_table)
 prediction_for_roc_curve <- predict(rf_classifier,validation1[,-1],type="prob")
@@ -3842,5 +4241,18 @@ p <- ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
     size = 12, hjust = 1))+
  coord_fixed()
 p
+ggsave(filename = "~/phd/RNASeq/figures/corrmat.svg", plot = p)
 
+
+write_data <- F
+if(write_data){
+svg(filename="~/phd/RNASeq/figures/random_forest.svg",
+     width=20,
+     height=20,
+     pointsize=12)
+varImpPlot(rf_classifier)
+
+
+dev.off()
+}
 ```
