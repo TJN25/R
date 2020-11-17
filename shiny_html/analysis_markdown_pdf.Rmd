@@ -2391,7 +2391,7 @@ if run_all == True:
         overlap_list = srna.get_overlap_list(subsetDat = subsetDat)
         d = srna.get_overlap_count(overlap_list = overlap_list, d = d)
     json_data = json.dumps(d)
-    file = open('/Users/thomasnicholson/phd/RNASeq/python_files/dict.json', 'w')
+    file = open('/Users/thomasnicholson/bin/python_git/python_files/dict.json', 'w')
     file.write(json_data)
     file.close()
     query_matches = {}
@@ -2414,11 +2414,11 @@ if run_all == True:
                     query_matches[current_id] = d[current_id]/count
                     query_counts[current_id] = [d[current_id]/count, count, d[current_id]]
     json_query_matches = json.dumps(query_matches)
-    file = open('/Users/thomasnicholson/phd/RNASeq/python_files/query_matches.json', 'w')
+    file = open('/Users/thomasnicholson/bin/python_git/python_files/query_matches.json', 'w')
     file.write(json_query_matches)
     file.close()
     json_query_counts = json.dumps(query_counts)
-    file = open('/Users/thomasnicholson/phd/RNASeq/python_files/query_counts.json', 'w')
+    file = open('/Users/thomasnicholson/bin/python_git/python_files/query_counts.json', 'w')
     file.write(json_query_counts)
     file.close()
     
@@ -2436,7 +2436,7 @@ if run_all == True:
         if make_new == True:
             all_overlaps[id1] = [id2]
     json_all_overlaps = json.dumps(all_overlaps)
-    file = open('/Users/thomasnicholson/phd/RNASeq/python_files/all_overlaps.json', 'w')
+    file = open('/Users/thomasnicholson/bin/python_git/python_files/all_overlaps.json', 'w')
     file.write(json_all_overlaps)
     file.close()
       
@@ -2463,26 +2463,26 @@ if run_all == True:
             combined_d, ids_checked = combined_alignments(query = query, combined_d = combined_d, ids_checked = ids_checked, query_matches = query_matches)
 
     json_combined_d = json.dumps(combined_d)
-    file = open('/Users/thomasnicholson/phd/RNASeq/python_files/combined_d.json', 'w')
+    file = open('/Users/thomasnicholson/bin/python_git/python_files/combined_d.json', 'w')
     file.write(json_combined_d)
     file.close()
 
 else:
-    with open('/Users/thomasnicholson/phd/RNASeq/python_files/dict.json', 'r') as read_file:
+    with open('/Users/thomasnicholson/bin/python_git/python_files/dict.json', 'r') as read_file:
         d = json.load(read_file)
-    with open('/Users/thomasnicholson/phd/RNASeq/python_files/query_counts.json', 'r') as read_file:
+    with open('/Users/thomasnicholson/bin/python_git/python_files/query_counts.json', 'r') as read_file:
         query_counts = json.load(read_file)
-    with open('/Users/thomasnicholson/phd/RNASeq/python_files/all_overlaps.json', 'r') as read_file:
+    with open('/Users/thomasnicholson/bin/python_git/python_files/all_overlaps.json', 'r') as read_file:
         all_overlaps = json.load(read_file)    
     representative_ids = pd.read_csv('/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/representative_ids.csv')
     overlap_values_3 = pd.read_csv('/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/overlap_values_3.csv')    
     
-    with open('/Users/thomasnicholson/phd/RNASeq/python_files/combined_d.json', 'r') as read_file:
+    with open('/Users/thomasnicholson/bin/python_git/python_files/combined_d.json', 'r') as read_file:
         combined_d = json.load(read_file)      
 ```
 
 ```{python overlapping_scores, eval=F}
-outfile = open('/Users/thomasnicholson/phd/RNASeq/python_files/ids_and_overlaps.csv', 'a')
+outfile = open('/Users/thomasnicholson/bin/python_git/python_files/ids_and_overlaps.csv', 'a')
 for key, value in query_matches.items():
     names = key.split("_")
     id1 = names[:3]
@@ -2495,7 +2495,7 @@ for key, value in query_matches.items():
 Take the overlapping sRNAs, extract the fasta sequences and align the sequences.
 
 ```{r output_of_list_of_sRNAs_to_combine, eval = F}
-json_file <- "~/phd/RNASeq/python_files/combined_d.json"
+json_file <- "~/bin/python_git/python_files/combined_d.json"
 json_data <- fromJSON(file=json_file)
 
 values <- json_data["GCA_002848605.1_280"]
