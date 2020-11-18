@@ -758,8 +758,8 @@ accession_info <- accession_info %>%
   select(Accession, RNASeq.file.counts, strain_short)
 accession_info[1:20,]
 
-assembly_summary <- read.table("~/phd/RNASeq/SRA_bacteria_RNAseq.txt", sep = "\t", fill = T, quote = "", comment.char = "", header = T)
 
+load("~/bin/r_git/R/r_files/assembly_summary.Rda") # made from ~/phd/RNASeq/SRA_bacteria_RNAseq.txt
 
 
 assembly_summary <- assembly_summary %>% separate(col = SPECIES, into = c("Genus"), extra = "drop", remove = F, sep = " ")
@@ -1965,7 +1965,7 @@ write.table(x = mergedDat, file = paste(file_path, "/", opt$out_name, "_new_call
 -   One genome from each genus was used as an alignment against the other genomes
 
 ```{r tree_viewer, echo=T, include=T, eval=T}
-  tree <- read.tree("~/phd/RNASeq/alignments/all_alignments/genera_11.guide_tree")
+  tree <- read.tree("~/bin/r_git/R/r_files/genera_11.guide_tree")
   p <-ggtree(tree) + 
   geom_tiplab() +
   xlim(0,0.8)
@@ -2259,10 +2259,12 @@ As there are many sRNAs each comntributing to each model, it is important to enu
 
 ```{r redundancy_check, eval = F, include=F}
 
-dat <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/overlapping_models/overlapping_models_ids.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
-colnames(dat) <- c("target.id", "query.id")
 
-tbl <- table(dat[,c('target.id','query.id')])
+load("~/bin/r_git/R/r_files/overlapping_models_ids.Rda") #made from ~/phd/RNASeq/srna_seqs/version_1/positive_control/overlapping_models/overlapping_models_ids.txt
+
+colnames(overlapping_models_ids) <- c("target.id", "query.id")
+
+tbl <- table(overlapping_models_ids[,c('target.id','query.id')])
 idsDat <- as.data.frame(as.matrix(tbl))
 
 
@@ -2365,7 +2367,7 @@ if run_all == True:
     df = pd.DataFrame(data = overlaps)
     df.to_csv('/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/overlaps_data.csv', index=False)
 else:
-  overlaps = pd.read_csv("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/overlaps_data.csv",
+  overlaps = pd.read_csv("/Users/thomasnicholson/bin/python_git/python_files/overlaps_data.csv",
   header=None, delim_whitespace=True)
 
 overlaps[:10]
@@ -2449,12 +2451,12 @@ if run_all == True:
     representative_ids.columns = ['id_count']
     representative_ids.index.name = 'id1'
     representative_ids.reset_index(inplace=True)
-    representative_ids.to_csv('/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/representative_ids.csv', index=False)
+    representative_ids.to_csv('/Users/thomasnicholson/bin/python_git/python_files/representative_ids.csv', index=False)
     
     df = pd.DataFrame.from_dict(query_counts, orient='index', columns = ['percentage', 'total', 'count'])
     df.index.name = 'id'
     df.reset_index(inplace=True)    
-    df.to_csv('/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/overlap_values_3.csv', index=False)
+    df.to_csv('/Users/thomasnicholson/bin/python_git/python_files/overlap_values.csv', index=False)
     
     combined_d = {}
     ids_checked = []
@@ -2474,8 +2476,8 @@ else:
         query_counts = json.load(read_file)
     with open('/Users/thomasnicholson/bin/python_git/python_files/all_overlaps.json', 'r') as read_file:
         all_overlaps = json.load(read_file)    
-    representative_ids = pd.read_csv('/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/representative_ids.csv')
-    overlap_values_3 = pd.read_csv('/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/overlap_values_3.csv')    
+    representative_ids = pd.read_csv('/Users/thomasnicholson/bin/python_git/python_files/representative_ids.csv')
+    overlap_values_3 = pd.read_csv('/Users/thomasnicholson/bin/python_git/python_files/overlap_values.csv')    
     
     with open('/Users/thomasnicholson/bin/python_git/python_files/combined_d.json', 'r') as read_file:
         combined_d = json.load(read_file)      
@@ -2549,11 +2551,11 @@ done
 
 Check that the combined sRNAs are improved when compared to the original alignments (numbers in the table are percentages of the orignial alignments). 
 ```{r combine_models, eval=T, include=T}
-oriDat <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/original_stats_3.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
+load("~/bin/r_git/R/r_files/oriDat.Rda") #made from ~/phd/RNASeq/srna_seqs/version_1/predicted/original_stats_3.txt
+load("~/bin/r_git/R/r_files/newDat.Rda") #made from ~/phd/RNASeq/srna_seqs/version_1/predicted/new_stats_3.txt
+
 oriDat <- oriDat %>% filter(V3 != "")
 colnames(oriDat) <- c("ori.descr", "ori.value", "ori.file")
-
-newDat <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/new_stats_3.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
 newDat <- newDat %>% filter(V3 != "")
 colnames(newDat) <- c("new.descr", "new.value", "new.file")
 
@@ -2584,13 +2586,7 @@ cormat <- cormat %>% mutate(keep = ifelse(number.of.sequences >= 100 & average.i
                                                  ifelse(number.of.sequences >= 150 & average.identity >= 50, 1, 
                                                         ifelse(number.of.sequences > 100 & average.identity >= 80, 1, NA)))))
 
-
-
 cormat %>% filter(!is.na(keep)) %>% select(-keep) %>% head()
-
-cormat %>% filter(is.na(keep)) %>% select(-keep) %>% head()
-
-
 ```
 
 ```{r, eval=F}
@@ -2630,10 +2626,10 @@ for file in *.stk; do cp $file ../../alignments; done
 ```{r view_overlap_values, eval = T}
 # Already done in python
 
-overlaps_2 <- read.csv("~/phd/RNASeq/srna_seqs/version_1/predicted/overlap_values_3.csv", 
+overlaps_2 <- read.csv("~/bin/python_git/python_files//overlap_values.csv", 
                        comment.char = "#", as.is = T, header = T, fill = T)
 
-rep_ids <- read.csv("~/phd/RNASeq/srna_seqs/version_1/predicted/representative_ids.csv", 
+rep_ids <- read.csv("~/bin/python_git/python_files/representative_ids.csv", 
                        comment.char = "#", as.is = T, header = T, fill = T)
 
 overlaps_2 <- overlaps_2 %>% 
