@@ -228,7 +228,7 @@ accession_info[1:20,]
 ------------------------------------------------------------------------
 
 ```{r find_available_data, echo = T, eval = T}
-load("~/bin/r_git/R/r_files/sra_rnaseq_files.Rda")
+load("../r_files/sra_rnaseq_files.Rda")
 sra_rnaseq_files <- sra_rnaseq_files %>% select(GENOME_ACCESSION, ACCESSION, SPECIES)
 sra_rnaseq_files[1:10,]
 ```
@@ -1357,7 +1357,7 @@ write.table(x = mergedDat, file = paste(file_path, "/", opt$out_name, "_new_call
 -   All genomes within a genus were aligned.
 -   One genome from each genus was used as an alignment against the other genomes
 
-```{r tree_viewer, echo=T, include=T, eval=T}
+```{r tree_viewer, echo=T, include=T, eval=F}
   tree <- read.tree("~/phd/RNASeq/alignments/all_alignments/genera_11.guide_tree")
   p <-ggtree(tree) + 
   geom_tiplab() +
