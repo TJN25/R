@@ -10,7 +10,7 @@ runtime: shiny
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-suppressMessages(library(comparativeSRA))
+# suppressMessages(library(comparativeSRA))
 library(tidyverse)
 library(VennDiagram)
 library(shiny)
@@ -31,8 +31,8 @@ library(genoPlotR)
 library(drake)
 library(ape)
 library(Biostrings)
-library(ggtree)
-library(treeio)
+# library(ggtree)
+# library(treeio)
 library(geiger)
 library(ROSE)
 library(reshape2)
@@ -41,6 +41,7 @@ library("viridis")
 library(randomForest)
 library(ROCR)
 library(corrplot)
+
 library(reticulate)
 library(rjson)
 filePath <- "~/phd/RNASeq/r_files/"
@@ -752,7 +753,8 @@ def combined_alignments(query, combined_d, ids_checked, query_matches):
 ####Summary of strains used
 
 ```{r summary_of_strains, echo = T, eval = T}
-load("~/bin/r_git/R/r_files/accession_info.Rda")
+getwd()
+load("../r_files/accession_info.Rda")
 accession_info <- accession_info %>% 
   mutate(strain_short = substr(Strain, start = 1, stop = 30)) %>% 
   select(Accession, RNASeq.file.counts, strain_short)
@@ -808,6 +810,7 @@ counts <- genomes %>% full_join(experiments, by = "Genus")
     -   [*combine_gff_files.R*](#section-combine_gff_files.r) -f *./gff_files/* *-o* *\<GCA Accession\>*
 
 ------------------------------------------------------------------------
+
 
 ###Call peaks on individual RNA-Seq experiments
 
@@ -1963,6 +1966,7 @@ write.table(x = mergedDat, file = paste(file_path, "/", opt$out_name, "_new_call
 
 -   All genomes within a genus were aligned.
 -   One genome from each genus was used as an alignment against the other genomes
+
 
 ```{r tree_viewer, echo=T, include=T, eval=T}
   tree <- read.tree("~/bin/r_git/R/r_files/genera_11.guide_tree")
