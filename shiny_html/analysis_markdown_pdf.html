@@ -1730,7 +1730,9 @@ cormat &lt;- cormat %&gt;% mutate(keep = ifelse(number.of.sequences &gt;= 100 &a
                                                  ifelse(number.of.sequences &gt;= 150 &amp; average.identity &gt;= 50, 1, 
                                                         ifelse(number.of.sequences &gt; 100 &amp; average.identity &gt;= 80, 1, NA)))))
 
-# cormat1 &lt;- cormat</code></pre>
+# cormat1 &lt;- cormat
+
+write.table(x = cormat %&gt;% filter(is.na(keep)) %&gt;% select(ori.file), file = &quot;~/phd/RNASeq/srna_seqs/version_1/predicted/ids_worse_after_merge.txt&quot;, quote = F, row.names = F, col.names = F)</code></pre>
 <pre class="r"><code>genomicCoorinates &lt;- read.table(&quot;~/phd/RNASeq/srna_seqs/version_1/predicted/predicted_genomic_sequence_matches.txt&quot;, sep = &quot;&quot;, comment.char = &quot;&quot;, as.is = T, header = F, fill = T)
 head(genomicCoorinates)
 colnames(genomicCoorinates) &lt;- c(&quot;t1&quot;, &quot;detail&quot;, &quot;t2&quot;, &quot;query.id&quot;)
