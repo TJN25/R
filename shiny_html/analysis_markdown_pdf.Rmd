@@ -2869,7 +2869,8 @@ for(item in unique(smalldat$target.name)){
 ```
 
 ```{r dna_dists, eval=F}
-
+run_all <- F
+if(run_all){
 dat <- read.csv("~/phd/RNASeq/RF00177_rep_MATRIX.dists")
 
 # rownames(dat) <- colnames(dat)
@@ -2903,7 +2904,9 @@ meltDat <- meltDat %>% left_join(contig_labels, by = 'query.name')
 
 meltDat <- meltDat %>% filter(!is.na(query.genome), !is.na(target.genome))%>% group_by(target.genome, query.genome) %>% arrange(-as.numeric(distance)) %>% mutate(row_num = row_number()) %>% filter(row_num == 1) %>% select(-row_num)
 
+mat <- reshape2::acast(data = meltDat %>% select(target.genome, query.genome, distance), formula = target.genome ~ query.genome)
 
+distanceMat <- as.data.frame(mat)
 
 
 pairs <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/query_target_pairs_2.txt")
@@ -2923,6 +2926,12 @@ counter <- 0
 
 
 max_dists <- max_dists %>% mutate(complete = ifelse(is.na(distance), F, T))
+length(unique(pairs$target.genome))
+
+
+item <- 172
+
+
 
 
 for(item in 1:nrow(max_dists)){
@@ -2938,25 +2947,57 @@ for(item in 1:nrow(max_dists)){
   max_val <- 0
   # print(as.character(max_dists$id[item]))
   df <- pairs %>% filter(ID == as.character(max_dists$id[item])) %>% unique()
+  
+
   if(nrow(df) == 1){
     max_val <- 0
     max_dists$distance[item] <- max_val
     max_dists$complete[item] <- T
     next
   }
-  for(i in 1:(nrow(df) - 1)){
-    # print(i)
-    genome_i <- meltDat[meltDat$target.genome == df$target.genome[i],]# %>% filter(target.genome == df$target.genome[i])
-    for(j in (i + 1):(nrow(df))){
-      print(j)
-      dist_val <- genome_i$distance[meltDat$query.genome == df$target.genome[j]]
-      max_val <- max(c(max_val, dist_val), na.rm = T)
-    }
-  }
+genomes <- df$target.genome
+rows <- match(x = genomes, table = rownames(distanceMat))
+cols <- match(x = genomes, table = colnames(distanceMat))
+rows <- rows[!is.na(rows)]
+cols <- cols[!is.na(cols)]
+
+max_val <- max(c(max(distanceMat[rows, cols]),max_val))
+
   max_dists$distance[item] <- max_val
   max_dists$complete[item] <- T
 }
+save(max_dists, file = "~/bin/r_git/R/r_files/max_dists.Rda")
+}
+load("~/bin/r_git/R/r_files/max_dists.Rda")
 
+cumulativeCounts <- function(dists, smooth = T){
+
+  groups <- unique(dists$group)
+  for(i in groups){
+    dat <- dists %>% filter(group == i)
+    dat <- dat %>% mutate(count = 1) %>% 
+    arrange(-max_dist) %>% group_by(group) %>% 
+    mutate(cumulativeCount = cumsum(count)) %>% ungroup() %>% 
+    group_by(group, max_dist) %>% summarise(cumulative_prop = max(cumulativeCount)/ nrow(dat))
+    
+    if(smooth){
+      dat <- as.data.frame(spline(x = dat$max_dist,y =  dat$cumulative_prop))
+    }
+    dat <- dat %>% ungroup() %>% mutate(group = i)
+    if(exists('combinedDat')){
+      combinedDat <- combinedDat %>% bind_rows(dat)
+    }else{
+      combinedDat <- dat 
+    }
+  }
+  return(combinedDat)  
+
+}
+dists <- max_dists %>% mutate(group = "Predicted") %>% dplyr::rename(max_dist = distance)
+distsCumulativeCount <- cumulativeCounts(dists = dists, smooth = F)
+
+ggplot() +
+  geom_line(data = distsCumulativeCount, aes(x= max_dist, y = cumulative_prop), binwidth = 0.1)
 
 ```
 
