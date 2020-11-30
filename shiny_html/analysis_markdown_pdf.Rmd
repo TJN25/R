@@ -3048,7 +3048,7 @@ dists <- max_dists %>% mutate(group = "Predicted") %>% dplyr::rename(max_dist = 
 distsCumulativeCount <- cumulativeCounts(dists = dists, smooth = F)
 
 ggplot() +
-  geom_line(data = distsCumulativeCount, aes(x= max_dist, y = cumulative_prop), binwidth = 0.1)
+  geom_line(data = distsCumulativeCount, aes(x= max_dist, y = cumulative_prop))
 
 ```
 
