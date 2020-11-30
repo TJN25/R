@@ -2697,11 +2697,12 @@ complete_genomes <- complete_genomes %>%
   mutate(counter.2 = row_number()) %>% 
   filter(counter.2 < 3)
 
-
 files <- complete_genomes %>% mutate(species.2 = str_replace_all(string = species, pattern = " ", "_")) %>% mutate(file_path = paste(substr(genus, 1, 1), "/", species.2, "-", some_number, "\\#", accession.1, "/", sep = "")) %>% ungroup() %>% select(file_path)
 
 write.table(x = files, file = "~/bin/r_git/R/r_files/server_genomes_file_paths.txt", quote = F, row.names = F, col.names = F)
 
+write.table(x = complete_genomes$accession.2, file = "~/phd/RNASeq/all_taxa_accession.txt", quote = F, row.names = F, col.names = F)
+write.table(x = complete_genomes$species, file = "~/phd/RNASeq/all_taxa_names.txt", quote = F, row.names = F, col.names = F)
 ```
 
 ```{r subset_of_genomes_list, eval = F, include=T}
@@ -2911,7 +2912,8 @@ for(item in unique(smalldat$target.name)){
 
 
 ```{r large_tree, eval=F}
-  tree <- read.tree("~/bin/r_git/R/r_files/large_labelled_tree.tree")
+  # tree <- read.tree("~/bin/r_git/R/r_files/large_labelled_tree.tree")
+  tree <- read.tree("~/phd/RNASeq/all_taxa.tree")
   p <-ggtree(tree) + 
   geom_tiplab() +
   xlim(0,0.8)
