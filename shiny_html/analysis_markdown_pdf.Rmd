@@ -2658,7 +2658,51 @@ ggplot(data = overlaps_unique) +
 
 ```
 
+
 ##Run over subset of genomes for all genera
+
+```{r get_genomes_for_analysis, eval=F}
+assembly_summary <- read.table("/Volumes/scratch/brownlab/chrisbr/DB/REFSEQ_REPREF/bacteria/assembly_summary_repref.txt", sep = "\t", fill = T, quote = "", comment.char = "")
+assembly_summary <- assembly_summary %>% select(V1, V5, V8, , V18, V20, V12, V6)
+colnames(assembly_summary) <- c("accession.1", "type", "species", "accession.2", "genome_link", "assembly.type", "some_number")
+
+assembly_summary <- assembly_summary %>% separate(col = species, into = "genus", sep = " ", extra = 'drop', remove = F)
+
+all_genera <- assembly_summary %>% group_by(genus) %>% summarise(count_all = n())
+dat <- assembly_summary %>% filter(assembly.type != "Scaffold")
+genera <- dat %>% group_by(genus) %>% summarise(count = n())
+
+genera <- genera %>% full_join(all_genera, by = 'genus')
+
+
+complete_genomes <- assembly_summary %>% filter(assembly.type == "Complete Genome")
+contigs <- assembly_summary %>% filter(assembly.type == "Contig")
+
+complete_genomes <- complete_genomes %>% 
+  group_by(genus) %>% 
+  mutate(counter = row_number()) %>% 
+  filter(counter < 3) %>% 
+  mutate(group = "complete")
+
+contigs <- contigs %>% 
+  group_by(genus) %>% 
+  mutate(counter = row_number() + 2) %>% 
+  filter(counter < 5) %>% 
+  mutate(group = "contig")
+
+complete_genomes <- complete_genomes %>% 
+  bind_rows(contigs) %>% 
+  group_by(genus) %>% 
+  arrange(counter) %>% 
+  mutate(counter.2 = row_number()) %>% 
+  filter(counter.2 < 3)
+
+
+files <- complete_genomes %>% mutate(species.2 = str_replace_all(string = species, pattern = " ", "_")) %>% mutate(file_path = paste(substr(genus, 1, 1), "/", species.2, "-", some_number, "\\#", accession.1, "/", sep = "")) %>% ungroup() %>% select(file_path)
+
+write.table(x = files, file = "~/bin/r_git/R/r_files/server_genomes_file_paths.txt", quote = F, row.names = F, col.names = F)
+
+```
 
 ```{r subset_of_genomes_list, eval = F, include=T}
 load("~/bin/r_git/R/r_files/assembly_summary.Rda")
@@ -2821,7 +2865,7 @@ write.table(x = smalldat, file = "~/phd/RNASeq/RF00177_rep_locations.txt", row.n
 ```{r cmsearch_res_pc, eval=F}
 
 ##file made with cat RF00177.tbl | sed 's/  /\t/g' | tr -s '\t' | sed 's/\t /\t/g' | sed 's/ \t/\t/g' | sed 's/ /\t/3' | sed 's/ /\t/' | sed 's/ /\t/' | sed 's/ /_/g' | sed 's/_!/\t!/g' | tr -s '\t' | sed 's/Pseudomonas\t/Pseudomonas_/g' > RF00177.tab along with manually replacing some incorrect _ and \t 
-dat <- read.table("~/phd/RNASeq/rfam_files/positive_control_rfam.tbl", sep = "", comment.char = "#", fill = T)
+dat <- read.table("~/phd/RNASeq/representative_genomes.tab", sep = "", quote = "", comment.char = "#", fill = T)
 
 contig_labels <- read.table("~/phd/RNASeq/genome_contig_pairs.txt")
 colnames(contig_labels) <- c("query.name", "genome")
@@ -2830,7 +2874,7 @@ dat <- dat[,2:18]
 
 colnames(dat) <- c("description.of.target", "target.name", "query.name", "accession", "accession.2", "mdl", "mdl.from", "mdl.to", "seq.from", "seq.to", "strand", "trunc", "pass", "gc", "bias", "score", "e.value")
 
-
+dat <- dat %>% filter(!is.na(e.value))
 
 dat <- dat %>% group_by(target.name, query.name) %>% 
   arrange(as.numeric(e.value)) %>% 
@@ -2847,6 +2891,8 @@ smalldat <- dat %>%
 
 smalldat <- smalldat %>% left_join(contig_labels, by = 'query.name')
 
+RF00177 <- smalldat %>% filter(target.name == "RF00177")
+
 for(item in unique(smalldat$target.name)){
   print(item)
   modelDat <- smalldat %>% filter(target.name == item)
@@ -2854,7 +2900,8 @@ for(item in unique(smalldat$target.name)){
     continue
   }
   modelDat <- modelDat %>% select(query.name, seq.from, seq.to, strand)
-  write.table(x = modelDat, file = paste("~/phd/RNASeq/rfam_files/", item,"_locations.txt", sep = ""), row.names = F, col.names = F, quote = F, sep = "\t")
+  
+# write.table(x = modelDat, file = paste("~/phd/RNASeq/rfam_files/", item,"_locations.txt", sep = ""), row.names = F, col.names = F, quote = F, sep = "\t")
 }
 
 
@@ -3001,7 +3048,7 @@ dists <- max_dists %>% mutate(group = "Predicted") %>% dplyr::rename(max_dist = 
 distsCumulativeCount <- cumulativeCounts(dists = dists, smooth = F)
 
 ggplot() +
-  geom_line(data = distsCumulativeCount, aes(x= max_dist, y = cumulative_prop), binwidth = 0.1)
+  geom_line(data = distsCumulativeCount, aes(x= max_dist, y = cumulative_prop))
 
 ```
 
