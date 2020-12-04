@@ -7,7 +7,7 @@ output:
     toc: true
 runtime: shiny
 ---
-
+##setup
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 # suppressMessages(library(comparativeSRA))
@@ -46,7 +46,7 @@ library(reticulate)
 library(rjson)
 filePath <- "~/phd/RNASeq/r_files/"
 # use_python("/Users/thomasnicholson/anaconda3/bin/python")
-use_condaenv("comparativesrna")
+# use_condaenv("comparativesrna")
 ```
 
 ```{r functions, include=F}
@@ -2835,120 +2835,41 @@ cormat %>% filter(!is.na(keep)) %>% select(-keep) %>% head()
 
 ```
 
-```{r set_up_dna_dist_file, eval=F}
-dat <- read.table("~/phd/RNASeq/RF00177_rep.clustal")
 
-dat <- dat %>% separate(col = V1, into = c("a", "b"), sep = "\\|", extra = 'merge', remove = F) %>% 
-  separate(col = b, into = c("contig", "coordinates"), sep = "\\/", extra = 'merge', remove = T) %>% 
-  separate(col = coordinates, into = c("start", "end"), sep = "-", extra = 'merge', remove = T)
+## Search for known ncRNAs and get phylogenetic distance matrix
 
-dat <- dat %>% arrange(as.numeric(start), contig) %>% unique()
-
-#dat <- dat %>% group_by(contig) %>% top_n(n = 1, wt = a)
-
-counts <- dat %>% group_by(contig) %>% summarise(count = n())
-
-if(max(counts$count) > 1){
-  print("Not Unique!")
-}else{
-  print("Unique contig list!")
-}
-
-dat <- dat %>% mutate(seq_length = nchar(as.character(V2)))
-if(length(unique(dat$seq_length)) > 1){
-  print("Sequences differ in length!")
-}else{
-  print("Sequences all the same length!")
-}
-
-
-
-
-write.table(x = dat %>% select(contig, V2), file = "~/phd/RNASeq/RF00177_rep_nr_all.txt", row.names = F, col.names = F, quote = F, sep = "\t", append = T)
-
-
-```
-
-
-```{python set_up_dna_dist_file_python, eval=F}
-infile=open('/Users/thomasnicholson/phd/RNASeq/RF00177_rep_nr_all.txt', 'r')
-outfile=open('/Users/thomasnicholson/phd/RNASeq/RF00177_full_TEST.txt', 'a')
-checked_contigs = []
-contig=""
-sequence=""
-i = 0
-for line in infile:
-    i += 1
-    line = line.rstrip()
-    words = line.split("\t")
-    current_contig = words[0]
-    current_sequence = words[1]
+-   cmscan run with commands
     
-    print("%s\t%s\n" %(contig, sequence))
-    if current_contig == contig:
-        sequence = sequence + current_sequence
-    else:
-        if current_contig in checked_contigs:
-            continue
-        outfile.write("%s\t%s\n" %(contig, sequence))
-        print("%s\t%s\n" %(contig, sequence))
-        checked_contigs.append(current_contig)
-        contig = current_contig
-        sequence = current_sequence
+    - rfamscan() is the command called.
+    - cmscan -Z $counts --cut_ga --rfam --nohmmonly --tblout $1.tblout --fmt 2 --clanin ~/phd/RNASeq/Rfam.clanin.txt ~/phd/RNASeq/Rfam.cm $1
+  
+###run_csmscan_across_multiple_files
 
+```{bash run_csmscan_across_multiple_files, eval=F}
+for file in *.fna; 
+do 
 
-```
+  runname=`basename $file .fna`;  
 
-```{r set_up_dna_dist_file_2, eval=F}
-dat <- read.table("~/phd/RNASeq/RF00177_full_TEST.txt")
+  if [ -f "check_files/${runname}.tmp.out" ]; then 
+    echo "Already exists: $runname"; 
+    continue;
+  else 
+    echo "$runname";  
+  fi;  
+  
+  rfamscan $file;  
+  > check_files/$runname.tmp.out;  
 
-dat <- dat %>% mutate(seq_length = nchar(as.character(V2)))
-
-min_len <- min(dat$seq_length)
-
-dat <- dat %>% mutate(sequence = substr(x = as.character(V2), start = 1, stop = min_len))
-
-dat <- dat %>% mutate(seq_length_2 = nchar(as.character(sequence)))
-
-seq_length <- dat$seq_length[1]
-contigs <- nrow(dat)
-
-fileConn<-file("~/phd/RNASeq/RF00177_full.txt")
-writeLines(c(paste("", contigs, seq_length, sep = "\t")), fileConn)
-close(fileConn)
-
-write.table(x = dat %>% select(V1, sequence), file = "~/phd/RNASeq/RF00177_full.txt", row.names = F, col.names = F, quote = F, sep = "\t", append = T)
+done
 
 ```
 
+-   output combined with 'cat *.tblout >> ../representative_genomes.tblout'
 
-```{r cmsearch_res, eval=F}
+-   reformatted for R with 'cat representative_genomes.tblout | sed 's/  /\t/g' | tr -s '\t' | sed 's/\t /\t/g' | sed 's/ \t/\t/g' | sed 's/ /\t/3' | sed 's/ /\t/' | sed 's/ /\t/' | sed 's/ /_/g' | sed 's/_!/\t!/g' | tr -s '\t' | sed 's/Pseudomonas\t/Pseudomonas_/g' > representative_genomes.tab'
 
-##file made with cat RF00177.tbl | sed 's/  /\t/g' | tr -s '\t' | sed 's/\t /\t/g' | sed 's/ \t/\t/g' | sed 's/ /\t/3' | sed 's/ /\t/' | sed 's/ /\t/' | sed 's/ /_/g' | sed 's/_!/\t!/g' | tr -s '\t' | sed 's/Pseudomonas\t/Pseudomonas_/g' > RF00177.tab along with manually replacing some incorrect _ and \t 
-dat <- read.table("~/phd/RNASeq/RF00177.tab", sep = "", comment.char = "#", fill = T)
-
-colnames(dat) <- c("target.name", "accession", "query.name", "accession.2", "mdl", "mdl.from", "mdl.to", "seq.from", "seq.to", "strand", "trunc", "pass", "gc", "bias", "score", "e.value", "inc", "description.of.target")
-
-
-
-dat <- dat %>% group_by(target.name) %>% 
-  arrange(as.numeric(e.value)) %>% 
-  mutate(order.num = row_number()) %>% 
-  filter(order.num == 1) %>% 
-  ungroup()
-
-contig_descriptions <- dat %>% select(target.name, description.of.target) %>% unique()
-write.table(x = contig_descriptions, file = "~/phd/RNASeq/contig_descriptions.txt", row.names = F, col.names = F, quote = F, sep = "\t")
-
-
-
-smalldat <- dat %>% 
-  select(target.name, seq.from, seq.to, strand)
-
-write.table(x = smalldat, file = "~/phd/RNASeq/RF00177_rep_locations.txt", row.names = F, col.names = F, quote = F, sep = "\t")
-
-```
-
+###cmsearch_res_pc
 ```{r cmsearch_res_pc, eval=F}
 
 ##file made with cat RF00177.tbl | sed 's/  /\t/g' | tr -s '\t' | sed 's/\t /\t/g' | sed 's/ \t/\t/g' | sed 's/ /\t/3' | sed 's/ /\t/' | sed 's/ /\t/' | sed 's/ /_/g' | sed 's/_!/\t!/g' | tr -s '\t' | sed 's/Pseudomonas\t/Pseudomonas_/g' > RF00177.tab along with manually replacing some incorrect _ and \t 
@@ -2974,11 +2895,17 @@ dat <- dat %>% group_by(target.name, query.name) %>%
 
 
 smalldat <- dat %>% 
-  select(target.name, query.name, seq.from, seq.to, strand)
+  select(target.name, query.name, seq.from, seq.to, strand, e.value, mdl.from, mdl.to)
 
-smalldat <- smalldat %>% left_join(contig_labels, by = 'query.name')
+smalldat <- smalldat %>% left_join(contig_labels, by = 'query.name') %>% 
+  group_by(genome, target.name) %>% 
+  arrange(as.numeric(e.value)) %>%
+  mutate(order.num = row_number()) %>% 
+  filter(order.num == 1) %>% 
+  ungroup()
 
-RF00177 <- smalldat %>% filter(target.name == "RF00177")
+RF00177 <- smalldat %>% filter(target.name == "RF00177") 
+
 
 for(item in unique(smalldat$target.name)){
   print(item)
@@ -2988,24 +2915,162 @@ for(item in unique(smalldat$target.name)){
   }
   modelDat <- modelDat %>% select(query.name, seq.from, seq.to, strand)
   
-# write.table(x = modelDat, file = paste("~/phd/RNASeq/rfam_files/", item,"_locations.txt", sep = ""), row.names = F, col.names = F, quote = F, sep = "\t")
+write.table(x = modelDat, file = paste("~/phd/RNASeq/rfam_files/locations/", item,"_locations.txt", sep = ""), row.names = F, col.names = F, quote = F, sep = "\t")
+  
+
 }
 
-
+  write.table(x = RF00177 %>% select(query.name, seq.from, seq.to, strand), file = "~/phd/RNASeq/rfam_files/RF00177_locations.txt", row.names = F, col.names = F, quote = F, sep = "\t")
 
 
 ```
 
+-   RF00177 (Ribosome SSU) saved as above.
 
-```{r large_tree, eval=F}
-  # tree <- read.tree("~/bin/r_git/R/r_files/large_labelled_tree.tree")
-  tree <- read.tree("~/bin/r_git/R/r_files/subset_taxa.tree")
-tree
-  p <-ggtree(tree) + 
-  geom_tiplab(align = T) 
-  p
-  ggsave(filename = "~/phd/RNASeq/figures/subset_genus_tree_large.svg", device = 'svg', width = 50, height = 50, limitsize = FALSE)
+-   Other models also saved
+
+-   'esl-sfetch --index representative_genomes.fna' used to index the fasta file
+
+
+###get_nucelotide_sequences
+
+```{bash get_nucelotide_sequences, eval = F}   
+
+##from ~/phd/RNASeq/rfam_files/
+
+# > RF00177_rep_seqs.fna
+
+i=0
+file_count=1
+> RF00177_files/RF00177_rep_seqs_${file_count}.fna
+while read line; 
+do 
+  i=`expr $i + 1`
+  if (( $i > 50 )); then
+  i=0
+  file_count=`expr $file_count + 1`
+  > RF00177_files/RF00177_rep_seqs_${file_count}.fna
+  fi
+
+  
+  contig=`echo $line | cut -d ' ' -f1`; 
+  contig_start=`echo $line | cut -d ' ' -f2`; 
+  contig_end=`echo $line | cut -d ' ' -f3`; 
+  contig_strand=`echo $line | cut -d ' ' -f4`;  
+  
+  length=`expr $contig_end - $contig_start`
+  
+  length=`echo $length | tr -d '-'`
+  
+  if (( $length < 1400 )); then
+  echo "$contig too short" 
+  continue
+  fi
+  
+  if [[ $contig_strand == "+" ]]; then 
+    
+    esl-sfetch -c ${contig_start}..${contig_end} ../representative_genomes/representative_genomes.fna $contig        >> RF00177_files/RF00177_rep_seqs_${file_count}.fna;
+  else 
+    esl-sfetch -r -c ${contig_start}..${contig_end} ../representative_genomes/representative_genomes.fna $contig >> RF00177_files/RF00177_rep_seqs_${file_count}.fna
+    
+  fi;  
+  
+done < RF00177_locations.txt
+
+
+##from ~/phd/RNASeq/rfam_files/locations
+for file in *_locations.txt;
+do
+outname=`basename $file _locations.txt`
+
+echo $outname
+
+> ../${outname}_seqs.fna
+while read line;
+do
+
+contig=`echo $line | cut -d ' ' -f1`
+contig_start=`echo $line | cut -d ' ' -f2`
+contig_end=`echo $line | cut -d ' ' -f3`
+contig_strand=`echo $line | cut -d ' ' -f4`
+
+if [[ $contig_strand == "+" ]];then
+esl-sfetch -c ${contig_start}..${contig_end} ~/phd/RNASeq/representative_genomes/representative_genomes.fna $contig >> ../${outname}_seqs.fna
+else
+esl-sfetch -r -c ${contig_start}..${contig_end} ~/phd/RNASeq/representative_genomes/representative_genomes.fna $contig >> ../${outname}_seqs.fna
+
+fi
+
+
+done < $file
+done
+
+
 ```
+
+-   output then aligned with muscle 'muscle -in RF00177_rep_seqs.fna -out RF00177_rep_seqs.mcl'
+
+-   also tried with 'cmalign -o RF00177_rep_seqs.cm RF00177.cm RF00177_rep_seqs.fna '
+    
+    -   this took too long with to much memory used
+
+-   the .mcl file is converted to phylip format 
+
+    -   esl-reformat phylip RF00177_rep_seqs.mcl > RF00177_rep_seqs.phylip
+
+-   the .phylip file is used with dnadist to create the RF00177_rep.dists file
+
+###reformat_matrix
+
+```{python reformat_matrix, eval=F}
+infile=open('/Users/thomasnicholson/phd/RNASeq/RF00177_rep.dists', 'r')
+
+contig_dat = pd.read_csv("/Users/thomasnicholson/phd/RNASeq/contig_descriptions.txt", sep = "\t")
+
+contigs = contig_dat.iloc[:,0].to_list()
+
+df = pd.DataFrame(index=range(0,296),columns=range(0,296))
+
+i = 0
+row_counter = 0
+col_colunter = -1
+
+row_names =[]
+
+for line in infile:
+    i += 1
+#     print(i)
+    if i == 1:
+        continue
+#     elif i > 1000:
+#         break
+    elif i % 100 == 0:
+        print(i)
+    line = line.rstrip()
+    words = line.split(' ')
+    if words[0] != '':
+        increment = 7
+        col_counter = 0
+        row_counter += 1
+        row_names.append(words[0])
+        df.iloc[row_counter - 1,col_counter:(col_counter + increment)] = words[1:]
+        col_counter += increment
+    else:
+        increment = len(words[1:])
+        df.iloc[row_counter - 1,col_counter:(col_counter + increment)] = words[1:]
+        col_counter += increment
+
+print(df.iloc[:10,:10])
+
+df.index = row_names
+df.columns = row_names
+
+df.to_csv('/Users/thomasnicholson/phd/RNASeq/RF00177_rep_MATRIX.dists', index=True)
+```
+
+
+
+###dna_dists
 
 ```{r dna_dists, eval=F}
 run_all <- F
@@ -3138,6 +3203,18 @@ distsCumulativeCount <- cumulativeCounts(dists = dists, smooth = F)
 ggplot() +
   geom_line(data = distsCumulativeCount, aes(x= max_dist, y = cumulative_prop))
 
+```
+
+###large_tree
+
+```{r large_tree, eval=F}
+  # tree <- read.tree("~/bin/r_git/R/r_files/large_labelled_tree.tree")
+  tree <- read.tree("~/bin/r_git/R/r_files/all_taxa.tree")
+  p <-ggtree(tree) + 
+  geom_tiplab() +
+  xlim(0,0.8)
+  p
+  ggsave(filename = "~/phd/RNASeq/figures/large_tree.svg", device = 'svg', width = 50, height = 50, limitsize = FALSE)
 ```
 
 
