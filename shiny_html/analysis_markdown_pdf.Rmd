@@ -31,7 +31,7 @@ library(genoPlotR)
 library(drake)
 library(ape)
 library(Biostrings)
-# library(ggtree)
+library(ggtree)
 # library(treeio)
 library(geiger)
 library(ROSE)
@@ -774,6 +774,92 @@ counts <- genomes %>% full_join(experiments, by = "Genus")
 
 
 ```
+
+
+How to get the summary table for the genera for the RNA-seq data:
+
+-   Search the [SRA](https://www.ncbi.nlm.nih.gov/sra/) section of ncbi with the genus name and ['Organism'] tag.
+
+-   Select "Send results to Run selector"
+
+-   Select the "Metadata" button of the "Total" row and "Download" Column.
+
+-   cat SraRunTable* >> ~/phd/RNASeq/sra_run_tables.csv
+
+```{r selecting_more_data, echo=F, eval=F}
+run_all <- F
+if(run_all){
+datAll <- read.csv("~/phd/RNASeq/sra_run_tables.csv")
+
+assayTypes <- datAll %>% group_by(Assay.Type) %>% summarise(count = n())
+sraDatAll <- datAll %>% filter(grepl(pattern = "RNA", x = Assay.Type))
+                      
+                      
+dat <- sraDatAll %>% filter(grepl(pattern = "Illumina", Instrument), LibraryLayout == "PAIRED") %>% unique()
+
+dat <- dat %>% select(Run, Experiment, Organism, Strain, ReleaseDate, Sample.Name, SRA.Study, LibraryLayout, LibrarySelection, LibrarySource, Instrument) %>% mutate_all(as.character)
+
+# datAll <- datAll %>% select(Run, Experiment, Organism, Strain, ReleaseDate, Sample.Name, SRA.Study, LibraryLayout, LibrarySelection, LibrarySource, Instrument) %>% mutate_all(as.character)
+
+SRA_bacteria_RNASeq_v2 <- dat
+SRA_bacteria_RNASeq_v2_all <- sraDatAll
+save(SRA_bacteria_RNASeq_v2, file ="~/bin/r_git/R/r_files/SRA_bacteria_RNASeq_v2.Rda")
+save(SRA_bacteria_RNASeq_v2_all, file ="~/bin/r_git/R/r_files/SRA_bacteria_RNASeq_v2_all.Rda")
+}
+
+load("~/bin/r_git/R/r_files/SRA_bacteria_RNASeq_v2.Rda")
+load("~/bin/r_git/R/r_files/SRA_bacteria_RNASeq_v2_all.Rda")
+
+sraDat <- SRA_bacteria_RNASeq_v2
+sraDatAll <- SRA_bacteria_RNASeq_v2_all
+
+strainsCount <- sraDatAll %>% group_by(Organism, Strain) %>% summarise(count = n())
+
+sraDatAll <- sraDatAll %>% separate(col = Organism, into = "genus", sep = " ", remove = F, extra = 'drop')
+library.options <- c("PAIRED", "SINGLE")
+sraDatAll1 <- sraDatAll %>% filter(LibraryLayout %in% library.options) 
+sraDatAll2 <- sraDatAll %>% filter(SRA.Study %in% library.options) %>% select(-genus) %>% mutate(LibraryLayout = SRA.Study)
+sraDatAll3 <- sraDatAll %>% filter(AvgSpotLen %in% library.options) %>% select(-genus) %>% mutate(LibraryLayout = AvgSpotLen)
+sraDatAll4 <- sraDatAll %>% filter(Sample.Name %in% library.options) %>% select(-genus) %>% mutate(LibraryLayout = Sample.Name)
+sraDatAll5 <- sraDatAll %>% filter(genus %in% library.options) %>% mutate(LibraryLayout = genus) %>% select(-genus) 
+sraDatAll6 <- sraDatAll %>% filter(LibrarySelection %in% library.options) %>% select(-genus) %>% mutate(LibraryLayout = LibrarySelection)
+sraDatAll7 <- sraDatAll %>% filter(Platform %in% library.options) %>% select(-genus) %>% mutate(LibraryLayout = Platform)
+
+
+
+sraDatAll2 <- sraDatAll2  %>% 
+  dplyr::mutate(Organism = Bytes)%>% separate(col = Organism, into = "genus", sep = " ", remove = F, extra = 'drop')
+sraDatAll3 <- sraDatAll3 %>% 
+  dplyr::mutate(Organism = DATASTORE.filetype)%>% separate(col = Organism, into = "genus", sep = " ", remove = F, extra = 'drop')
+sraDatAll4 <- sraDatAll4 %>%  
+  dplyr::mutate(Organism = Bases)%>% separate(col = Organism, into = "genus", sep = " ", remove = F, extra = 'drop')
+sraDatAll5 <- sraDatAll5 %>% 
+  dplyr::mutate(Organism = Sample.Name)%>% separate(col = Organism, into = "genus", sep = " ", remove = F, extra = 'drop')
+sraDatAll6 <- sraDatAll6 %>% 
+  dplyr::mutate(Organism = Platform)%>% separate(col = Organism, into = "genus", sep = " ", remove = F, extra = 'drop')
+sraDatAll7 <- sraDatAll7 %>% 
+  dplyr::mutate(Organism = SRA.Study)%>% separate(col = Organism, into = "genus", sep = " ", remove = F, extra = 'drop')
+
+
+
+
+genusCount1 <- sraDatAll1 %>% group_by(genus) %>% summarise(count = n())
+genusCount2 <- sraDatAll2 %>% group_by(genus) %>% summarise(count = n())
+genusCount3 <- sraDatAll3 %>% group_by(genus) %>% summarise(count = n())
+genusCount4 <- sraDatAll4 %>% group_by(genus) %>% summarise(count = n())
+genusCount5 <- sraDatAll5 %>% group_by(genus) %>% summarise(count = n())
+genusCount6 <- sraDatAll6 %>% group_by(genus) %>% summarise(count = n())
+genusCount7 <- sraDatAll7 %>% group_by(genus) %>% summarise(count = n())
+
+genusCount <- genusCount1 %>% bind_rows(genusCount2, genusCount3, genusCount4, genusCount5, genusCount6, genusCount7)
+
+
+sraDatAll <- sraDatAll1 %>% bind_rows(sraDatAll2, sraDatAll3, sraDatAll4, sraDatAll5, sraDatAll6, sraDatAll7)
+
+sraDatAll <- sraDatAll %>% select(Run, Experiment, Organism, Strain, genus, LibraryLayout, ReleaseDate, Sample.Name, SRA.Study, LibrarySelection, LibrarySource, Instrument) %>% mutate_all(as.character)
+
+```
+
 
 ###Download data and map reads
 
@@ -2913,12 +2999,12 @@ for(item in unique(smalldat$target.name)){
 
 ```{r large_tree, eval=F}
   # tree <- read.tree("~/bin/r_git/R/r_files/large_labelled_tree.tree")
-  tree <- read.tree("~/phd/RNASeq/all_taxa.tree")
+  tree <- read.tree("~/bin/r_git/R/r_files/subset_taxa.tree")
+tree
   p <-ggtree(tree) + 
-  geom_tiplab() +
-  xlim(0,0.8)
+  geom_tiplab(align = T) 
   p
-  ggsave(filename = "~/phd/RNASeq/figures/large_tree.svg", device = 'svg', width = 50, height = 50, limitsize = FALSE)
+  ggsave(filename = "~/phd/RNASeq/figures/subset_genus_tree_large.svg", device = 'svg', width = 50, height = 50, limitsize = FALSE)
 ```
 
 ```{r dna_dists, eval=F}
