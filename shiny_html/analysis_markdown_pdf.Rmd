@@ -7,7 +7,7 @@ output:
     toc: true
 runtime: shiny
 ---
-
+##setup
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 # suppressMessages(library(comparativeSRA))
@@ -2852,18 +2852,40 @@ write.table(x = modelDat, file = paste("~/phd/RNASeq/rfam_files/locations/", ite
 
 ##from ~/phd/RNASeq/rfam_files/
 
-> RF00177_rep_seqs.fna
+# > RF00177_rep_seqs.fna
+
+i=0
+file_count=1
+> RF00177_files/RF00177_rep_seqs_${file_count}.fna
 while read line; 
 do 
+  i=`expr $i + 1`
+  if (( $i > 50 )); then
+  i=0
+  file_count=`expr $file_count + 1`
+  > RF00177_files/RF00177_rep_seqs_${file_count}.fna
+  fi
+
   
   contig=`echo $line | cut -d ' ' -f1`; 
   contig_start=`echo $line | cut -d ' ' -f2`; 
   contig_end=`echo $line | cut -d ' ' -f3`; 
   contig_strand=`echo $line | cut -d ' ' -f4`;  
   
+  length=`expr $contig_end - $contig_start`
+  
+  length=`echo $length | tr -d '-'`
+  
+  if (( $length < 1400 )); then
+  echo "$contig too short" 
+  continue
+  fi
+  
   if [[ $contig_strand == "+" ]]; then 
     
-    esl-sfetch -c ${contig_start}..${contig_end} ../representative_genomes/representative_genomes.fna $contig        >> RF00177_rep_seqs.fna; else esl-sfetch -r -c ${contig_start}..${contig_end} ../representative_genomes/representative_genomes.fna $contig >> RF00177_rep_seqs.fna;  
+    esl-sfetch -c ${contig_start}..${contig_end} ../representative_genomes/representative_genomes.fna $contig        >> RF00177_files/RF00177_rep_seqs_${file_count}.fna;
+  else 
+    esl-sfetch -r -c ${contig_start}..${contig_end} ../representative_genomes/representative_genomes.fna $contig >> RF00177_files/RF00177_rep_seqs_${file_count}.fna
     
   fi;  
   
