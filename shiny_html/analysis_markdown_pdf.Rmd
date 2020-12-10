@@ -2332,6 +2332,760 @@ At this point genome alignments are done using MAUVE.
 
 *progressiveMauve --output=NAME.xmfa --output-guide-tree=NAME.tree --backbone-output=NAME.backbone GENOME_1 GENOME_2*
 
+## Search for known ncRNAs and get phylogenetic distance matrix
+
+-   cmscan run with commands
+    
+    - rfamscan() is the command called.
+    - cmscan -Z $counts --cut_ga --rfam --nohmmonly --tblout $1.tblout --fmt 2 --clanin ~/phd/RNASeq/Rfam.clanin.txt ~/phd/RNASeq/Rfam.cm $1
+  
+###run_csmscan_across_multiple_files
+
+```{bash run_csmscan_across_multiple_files, eval=F}
+for file in *.fna; 
+do 
+
+  runname=`basename $file .fna`;  
+
+  if [ -f "check_files/${runname}.tmp.out" ]; then 
+    echo "Already exists: $runname"; 
+    continue;
+  else 
+    echo "$runname";  
+  fi;  
+  
+  rfamscan $file;  
+  > check_files/$runname.tmp.out;  
+
+done
+
+```
+
+-   output combined with 'cat *.tblout >> ../representative_genomes.tblout'
+
+-   reformatted for R with 'cat representative_genomes.tblout | sed 's/  /\t/g' | tr -s '\t' | sed 's/\t /\t/g' | sed 's/ \t/\t/g' | sed 's/ /\t/3' | sed 's/ /\t/' | sed 's/ /\t/' | sed 's/ /_/g' | sed 's/_!/\t!/g' | tr -s '\t' | sed 's/Pseudomonas\t/Pseudomonas_/g' > representative_genomes.tab'
+
+-   get a list of contigs and the corresponding genomes
+
+###genome_contig_pairs
+```{bash genome_contig_pairs, eval=F}
+#done from ~/phd/RNASeq/representative_genomes/
+> ../genome_contig_pairs.txt
+for file in GC*.fna;  
+do   
+
+  ID=`echo $file | cut -d '.' -f1,2 | cut -d "_" -f1,2`;   
+  grep ^">" $file | cut -d ' ' -f1 | sort | uniq | sed 's/>//g' | sed -e "s/$/   $ID/" >> ../genome_contig_pairs.txt;   
+done
+```
+
+
+
+###cmsearch_res_pc
+```{r cmsearch_res_pc, eval=F}
+
+##file made with cat RF00177.tbl | sed 's/  /\t/g' | tr -s '\t' | sed 's/\t /\t/g' | sed 's/ \t/\t/g' | sed 's/ /\t/3' | sed 's/ /\t/' | sed 's/ /\t/' | sed 's/ /_/g' | sed 's/_!/\t!/g' | tr -s '\t' | sed 's/Pseudomonas\t/Pseudomonas_/g' > RF00177.tab along with manually replacing some incorrect _ and \t 
+dat <- read.table("~/phd/RNASeq/representative_genomes.tab", sep = "", quote = "", comment.char = "#", fill = T)
+
+contig_labels <- read.table("~/phd/RNASeq/genome_contig_pairs.txt")
+colnames(contig_labels) <- c("query.name", "genome")
+
+dat <- dat[,2:18]
+
+colnames(dat) <- c("description.of.target", "target.name", "query.name", "accession", "accession.2", "mdl", "mdl.from", "mdl.to", "seq.from", "seq.to", "strand", "trunc", "pass", "gc", "bias", "score", "e.value")
+
+dat <- dat %>% filter(!is.na(e.value))
+
+dat <- dat %>% group_by(target.name, query.name) %>% 
+  arrange(as.numeric(e.value)) %>% 
+  mutate(order.num = row_number()) %>% 
+  filter(order.num == 1) %>% 
+  ungroup()
+
+
+
+
+
+smalldat <- dat %>% 
+  select(target.name, query.name, seq.from, seq.to, strand, e.value, mdl.from, mdl.to)
+
+smalldat <- smalldat %>% left_join(contig_labels, by = 'query.name') %>% 
+  group_by(genome, target.name) %>% 
+  arrange(as.numeric(e.value)) %>%
+  mutate(order.num = row_number()) %>% 
+  filter(order.num == 1) %>% 
+  ungroup()
+
+RF00177 <- smalldat %>% filter(target.name == "RF00177") 
+
+
+for(item in unique(smalldat$target.name)){
+  print(item)
+  modelDat <- smalldat %>% filter(target.name == item)
+  if(nrow(modelDat) == 0){
+    continue
+  }
+  modelDat <- modelDat %>% select(query.name, seq.from, seq.to, strand)
+  
+write.table(x = modelDat, file = paste("~/phd/RNASeq/rfam_files/locations/", item,"_locations.txt", sep = ""), row.names = F, col.names = F, quote = F, sep = "\t")
+  
+
+}
+
+  write.table(x = RF00177 %>% select(query.name, seq.from, seq.to, strand), file = "~/phd/RNASeq/rfam_files/RF00177_locations.txt", row.names = F, col.names = F, quote = F, sep = "\t")
+
+
+```
+
+-   RF00177 (Ribosome SSU) saved as above.
+
+-   Other models also saved
+
+-   'esl-sfetch --index representative_genomes.fna' used to index the fasta file
+
+
+###get_nucelotide_sequences
+
+```{bash get_nucelotide_sequences, eval = F}   
+
+##from ~/phd/RNASeq/rfam_files/
+
+# > RF00177_rep_seqs.fna
+
+i=0
+file_count=1
+> RF00177_files/RF00177_rep_seqs_${file_count}.fna
+while read line; 
+do 
+  i=`expr $i + 1`
+  if (( $i > 50 )); then
+  i=0
+  file_count=`expr $file_count + 1`
+  > RF00177_files/RF00177_rep_seqs_${file_count}.fna
+  fi
+
+  
+  contig=`echo $line | cut -d ' ' -f1`; 
+  contig_start=`echo $line | cut -d ' ' -f2`; 
+  contig_end=`echo $line | cut -d ' ' -f3`; 
+  contig_strand=`echo $line | cut -d ' ' -f4`;  
+  
+  length=`expr $contig_end - $contig_start`
+  
+  length=`echo $length | tr -d '-'`
+  
+  if (( $length < 1400 )); then
+  echo "$contig too short" 
+  continue
+  fi
+
+    esl-sfetch -c ${contig_start}..${contig_end} ../representative_genomes/representative_genomes.fna $contig        >> RF00177_files/RF00177_rep_seqs_${file_count}.fna;
+
+done < RF00177_locations.txt
+
+
+##from ~/phd/RNASeq/rfam_files/locations
+for file in *_locations.txt;
+do
+outname=`basename $file _locations.txt`
+
+echo $outname
+
+> ../${outname}_seqs.fna
+while read line;
+do
+
+contig=`echo $line | cut -d ' ' -f1`
+contig_start=`echo $line | cut -d ' ' -f2`
+contig_end=`echo $line | cut -d ' ' -f3`
+contig_strand=`echo $line | cut -d ' ' -f4`
+
+
+esl-sfetch -c ${contig_start}..${contig_end} ~/phd/RNASeq/representative_genomes/representative_genomes.fna $contig >> ../${outname}_seqs.fna
+
+
+
+done < $file
+done
+
+
+```
+
+
+-   Build covariance models (on server)
+
+###make cm files
+```{bash make_cm_files, eval=F}
+for folder in *_files; 
+do 
+  
+  cmmodel=`basename $folder _files`;  
+  cmfetch  ~/phd/RNASeq/Rfam.cm $cmmodel > current.cm;
+  > $folder/ali_files.txt; 
+  
+  for file in $folder/*.fna; 
+  do
+  
+    shortname=`basename $file`;
+    outname=`basename $shortname .fna`;  
+    cmalign -g --dnaout -o $folder/$outname.cm current.cm $file;  
+    echo "$outname.cm" >> $folder/ali_files.txt;  
+    
+  done;  
+  
+done
+
+```
+
+```{bash remove_empty_files}
+for folder in *_files; 
+do
+  cd $folder
+  
+  > ali_files_2.txt
+  
+  while read line; 
+  do
+  
+    line_length=`wc -l $line | cut -d ' ' -f1`
+    
+    if (( $line_length > 0 )); then
+      echo $line >> ali_files_2.txt
+    fi
+    
+  done < ali_files.txt
+  mv ali_files_2.txt ali_files.txt
+  cd ..
+
+done
+```
+
+-   Mask to reference and combine the alignments
+
+```{bash combine_alignments, eval=F}
+for folder in *_files;
+do
+  cd $folder
+  outname=`basename $folder _files`
+  echo $outname
+  esl-alimerge --list ali_files.txt | esl-alimask --rf-is-mask - > $outname.stk
+  cd ..
+  
+done
+```
+
+-   phylip files shorten IDs to 10 characters. This means there needs to be a lookup table to reverse this in later steps.
+
+rename_alignment_ids
+```{r rename_alignment_ids, eval=F}
+dat <- read.table("~/phd/RNASeq/RF00177.stk", sep = "\t", fill = T, comment.char = "", quote = "", header = F)
+
+dat <- dat %>% separate(V1, into = c("a", "b", "c"), sep = " ", extra = 'merge', remove = F)
+
+dat <- dat %>% mutate(id_test = ifelse(grepl(pattern = "/",x = b), T, F))
+
+
+current_ids <- dat %>% filter(id_test) %>% select(b) %>% unique()
+
+current_ids <- current_ids %>% separate(col = b, into = "id", extra = "drop", remove=F, sep = "/") %>% mutate(phylip_id = substr(x = b, start = 1, stop = 10))
+
+write.csv(x = current_ids, file = "~/phd/RNASeq/uids_RF00177_alignment.txt", quote = F, row.names = F)
+save(current_ids, file = "~/bin/r_git/R/r_files/current_ids.Rda")
+
+```
+
+    -   RF00177.stk was the name of the file containing the RF00177 alignments for the ~1500 genomes
+    
+    -   esl-reformat phylip RF00177.stk > RF00177_rep_seqs_all.phylip
+
+-   the .phylip file is used with dnadist to create the RF00177_rep_seqs_all.dists file
+
+
+
+###reformat_matrix
+No longer being used.
+```{python reformat_matrix, eval=F}
+infile=open('/Users/thomasnicholson/phd/RNASeq/RF00177_rep.dists', 'r')
+
+contig_dat = pd.read_csv("/Users/thomasnicholson/phd/RNASeq/contig_descriptions.txt", sep = "\t")
+
+contigs = contig_dat.iloc[:,0].to_list()
+
+df = pd.DataFrame(index=range(0,296),columns=range(0,296))
+
+i = 0
+row_counter = 0
+col_colunter = -1
+
+row_names =[]
+
+for line in infile:
+    i += 1
+#     print(i)
+    if i == 1:
+        continue
+#     elif i > 1000:
+#         break
+    elif i % 100 == 0:
+        print(i)
+    line = line.rstrip()
+    words = line.split(' ')
+    if words[0] != '':
+        increment = 7
+        col_counter = 0
+        row_counter += 1
+        row_names.append(words[0])
+        df.iloc[row_counter - 1,col_counter:(col_counter + increment)] = words[1:]
+        col_counter += increment
+    else:
+        increment = len(words[1:])
+        df.iloc[row_counter - 1,col_counter:(col_counter + increment)] = words[1:]
+        col_counter += increment
+
+print(df.iloc[:10,:10])
+
+df.index = row_names
+df.columns = row_names
+
+df.to_csv('/Users/thomasnicholson/phd/RNASeq/RF00177_rep_MATRIX.dists', index=True)
+```
+
+-   output from dnadist changed into useable matrix
+
+    -   cat  RF00177_rep_seqs_all.dists | tr '\n' ' ' | sed 's/ N/\nN/g' > RF00177_rep_MATRIX_all.dists
+
+-   get the complete list of all query-target so that all contigs in each sRNA are listed.
+
+###query_target_pairs
+```{bash query_target_pairs, eval=F}
+#done in the alignments file (such as ~/phd/RNASeq/srnas/predicted/combined_alignments_ids/alignments)
+#saved on MacBook to .../predicted/
+> ../query_target_pairs.txt
+for file in *.stk; 
+do 
+  
+  echo $file; 
+  ID=`echo $file | cut -d '.' -f1,2 | cut -d "_" -f1,2`; 
+  ID_2=`echo $file | cut -d '.' -f1,2 `;  
+  grep ^"#=GS" $file | sort | uniq | cut -d "/" -f1 | cut -d ' ' -f2 | cut -d '|' -f2 | sed -e "s/$/   $ID   $ID_2/" >> ../query_target_pairs.txt;  
+  
+done
+```
+
+not beingt used
+###get_genome_names
+```{bash get_genome_names, eval=F}
+#done in /representative_genomes/
+> ../genome_accession_names.txt;
+for file in GC*.fna; 
+do  
+  
+  ID=`basename $file .fna | cut -d '_' -f1,2`; 
+  echo $ID; 
+  
+  grep ^">" $file | sed 's/>//' | sed -e "s/$/   $ID/" >> ../genome_accession_names.txt;
+  
+done
+
+```
+
+###dna_dists
+```{r dna_dists, eval=F}
+run_all <- F
+if(run_all){
+dat <- read.table("~/phd/RNASeq/RF00177_rep_MATRIX_all.dists", sep = "", header = F, fill = T, stringsAsFactors = F, as.is = T)
+
+dat <- dat %>% filter(!is.na(V2))
+
+
+colnames(dat)[1] <- "phylip_id"
+
+"NC_009791." %in% colnames(dat)
+
+colnames(dat) <- c("names", dat$phylip_id)
+
+dat[1:10,1:10]
+
+
+
+
+# rownames(dat) <- colnames(dat)
+
+for(i in 1:nrow(dat)){
+  for(j in 2:ncol(dat)){
+    # if(dat[i,1] == colnames(dat)[j]){
+    #   if(dat[i,j] != 0){
+    #     print(paste(i, j))
+    #   }
+    # }
+    if(i + 1 == j){
+      print(dat[i,j])
+    }
+  }
+}
+
+
+
+
+
+
+meltDat <- melt(dat)
+
+colnames(meltDat) <- c("phylip_id", "query.name", "distance")
+
+load(file = "~/bin/r_git/R/r_files/current_ids.Rda")
+current_ids <- current_ids %>% unique()
+
+current_ids <- current_ids %>% separate(col = id, into = c("t1", "t2"), sep = "\\|", remove = F, extra = 'warn') 
+
+current_ids <- current_ids %>% mutate(id = ifelse(is.na(t2), t1, t2)) %>% 
+  select(-t1, -t2)
+
+
+contig_labels <- read.table("~/phd/RNASeq/genome_contig_pairs.txt")
+colnames(contig_labels) <- c("id", "target.genome")
+
+contig_labels <- contig_labels %>% left_join(current_ids, by = "id") %>% select(-b)
+
+
+colnames(contig_labels) <- c("target.id", "target.genome", "phylip_id")
+
+
+# colnames(contig_labels) <- c("target.name", "target.genome")
+# contig_labels <- contig_labels %>% 
+  # mutate(target.name = substr(x = target.name, start = 1, stop = 10)) %>% 
+  # unique()
+
+
+meltDat <- meltDat %>% left_join(contig_labels, by = 'phylip_id')
+
+colnames(meltDat)[1:2] <- c("target.name", "phylip_id")
+
+colnames(contig_labels) <- c("query.id", "query.genome", "phylip_id")
+
+meltDat <- meltDat %>% left_join(contig_labels, by = 'phylip_id')
+
+ggplot() +
+  geom_freqpoly(data = meltDat, aes(x = distance, y = ..count..), binwidth = 0.05)
+
+tmp <- meltDat %>% filter(distance > 0)
+
+
+ggplot() +
+  geom_freqpoly(data = tmp, aes(x = distance, y = ..count..), binwidth = 0.05)
+
+colnames(meltDat)[2] <- c("query.name")
+
+
+meltDat <- meltDat %>% filter(!is.na(query.genome), !is.na(target.genome))%>% group_by(target.genome, query.genome) %>% arrange(-as.numeric(distance)) %>% mutate(row_num = row_number()) %>% filter(row_num == 1) %>% select(-row_num)
+
+mat <- reshape2::acast(data = meltDat %>% select(target.genome, query.genome, distance), formula = target.genome ~ query.genome)
+
+distanceMat <- as.data.frame(mat)
+
+save(distanceMat, file = "~/phd/RNASeq/distanceMat.Rda")
+
+pairs <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/query_target_pairs.txt")
+colnames(pairs) <- c("target.name", "query.genome", "ID")
+contig_labels <- read.table("~/phd/RNASeq/genome_contig_pairs.txt")
+colnames(contig_labels) <- c("target.name", "target.genome")
+pairs <- pairs %>% left_join(contig_labels, by = 'target.name')
+
+pairs <- pairs %>% select(target.genome, ID) %>% unique()
+
+pairs <- pairs %>% mutate_all(as.character)
+
+srnas <- unique(pairs$ID)
+max_val <- 0
+max_dists <- data.frame(id = srnas, distance = NA)
+counter <- 0
+
+
+max_dists <- max_dists %>% mutate(complete = ifelse(is.na(distance), F, T))
+length(unique(pairs$target.genome))
+
+
+item <- 1
+
+for(item in 1:nrow(max_dists)){
+  printRemaining(i = item, length = nrow(max_dists), increment = 1)
+  # counter <- counter + 1
+  # if(counter > 5){
+  #   break
+  # }
+  if(max_dists$complete[item] == T){
+    print(paste(max_dists$id[item], "already done."))
+    next
+  }
+  max_val <- 0
+  # print(as.character(max_dists$id[item]))
+  df <- pairs %>% filter(ID == as.character(max_dists$id[item])) %>% unique()
+  
+
+  if(nrow(df) == 1){
+    max_val <- 0
+    max_dists$distance[item] <- max_val
+    max_dists$complete[item] <- T
+    next
+  }
+genomes <- df$target.genome
+rows <- match(x = genomes, table = rownames(distanceMat))
+cols <- match(x = genomes, table = colnames(distanceMat))
+rows <- rows[!is.na(rows)]
+cols <- cols[!is.na(cols)]
+
+max_val <- max(c(max(distanceMat[rows, cols]),max_val))
+
+  max_dists$distance[item] <- max_val
+  max_dists$complete[item] <- T
+}
+
+max_dists_pred <- max_dists
+save(max_dists_pred, file = "~/bin/r_git/R/r_files/max_dists_pred.Rda")
+
+
+
+pairs <- read.table("~/phd/RNASeq/query_target_pairs_pc.txt")
+
+colnames(pairs) <- c("target.name", "ID")
+
+pairs <- pairs %>% left_join(contig_labels, by = "target.name")
+
+pairs <- pairs %>% mutate_all(as.character)
+
+srnas <- unique(pairs$ID)
+max_val <- 0
+max_dists <- data.frame(id = srnas, distance = NA)
+counter <- 0
+
+
+max_dists <- max_dists %>% mutate(complete = ifelse(is.na(distance), F, T))
+length(unique(dat$target.genome))
+
+
+item <- 1
+
+for(item in 1:nrow(max_dists)){
+  printRemaining(i = item, length = nrow(max_dists), increment = 1)
+  # counter <- counter + 1
+  # if(counter > 5){
+  #   break
+  # }
+  if(max_dists$complete[item] == T){
+    print(paste(max_dists$id[item], "already done."))
+    next
+  }
+  max_val <- 0
+  # print(as.character(max_dists$id[item]))
+  df <- pairs %>% filter(ID == as.character(max_dists$id[item])) %>% unique()
+  
+
+  if(nrow(df) == 1){
+    max_val <- 0
+    max_dists$distance[item] <- max_val
+    max_dists$complete[item] <- T
+    next
+  }
+genomes <- df$target.genome
+rows <- match(x = genomes, table = rownames(distanceMat))
+cols <- match(x = genomes, table = colnames(distanceMat))
+rows <- rows[!is.na(rows)]
+cols <- cols[!is.na(cols)]
+
+max_val <- max(c(max(distanceMat[rows, cols]),max_val))
+
+  max_dists$distance[item] <- max_val
+  max_dists$complete[item] <- T
+}
+
+max_dists_pc <- max_dists
+save(max_dists_pc, file = "~/bin/r_git/R/r_files/max_dists_pc.Rda")
+
+
+
+
+pairs <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/query_target_pairs.txt")
+colnames(pairs) <- c("target.name", "query.genome", "ID")
+contig_labels <- read.table("~/phd/RNASeq/genome_contig_pairs.txt")
+colnames(contig_labels) <- c("target.name", "target.genome")
+pairs <- pairs %>% left_join(contig_labels, by = 'target.name')
+
+pairs <- pairs %>% select(target.genome, ID) %>% unique()
+
+pairs <- pairs %>% mutate_all(as.character)
+
+srnas <- unique(pairs$ID)
+max_val <- 0
+max_dists <- data.frame(id = srnas, distance = NA)
+counter <- 0
+
+
+max_dists <- max_dists %>% mutate(complete = ifelse(is.na(distance), F, T))
+length(unique(pairs$target.genome))
+
+
+item <- 1
+
+for(item in 1:nrow(max_dists)){
+  printRemaining(i = item, length = nrow(max_dists), increment = 1)
+  # counter <- counter + 1
+  # if(counter > 5){
+  #   break
+  # }
+  if(max_dists$complete[item] == T){
+    print(paste(max_dists$id[item], "already done."))
+    next
+  }
+  max_val <- 0
+  # print(as.character(max_dists$id[item]))
+  df <- pairs %>% filter(ID == as.character(max_dists$id[item])) %>% unique()
+  
+
+  if(nrow(df) == 1){
+    max_val <- 0
+    max_dists$distance[item] <- max_val
+    max_dists$complete[item] <- T
+    next
+  }
+genomes <- df$target.genome
+rows <- match(x = genomes, table = rownames(distanceMat))
+cols <- match(x = genomes, table = colnames(distanceMat))
+rows <- rows[!is.na(rows)]
+cols <- cols[!is.na(cols)]
+
+max_val <- max(c(max(distanceMat[rows, cols]),max_val))
+
+  max_dists$distance[item] <- max_val
+  max_dists$complete[item] <- T
+}
+
+max_dists_nc <- max_dists
+save(max_dists_nc, file = "~/bin/r_git/R/r_files/max_dists_nc.Rda")
+
+
+
+
+pairs <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/old/query_target_pairs_nr.txt")
+colnames(pairs) <- c("target.name", "query.genome", "ID")
+contig_labels <- read.table("~/phd/RNASeq/genome_contig_pairs.txt")
+colnames(contig_labels) <- c("target.name", "target.genome")
+pairs <- pairs %>% left_join(contig_labels, by = 'target.name')
+
+pairs <- pairs %>% select(target.genome, ID) %>% unique()
+
+pairs <- pairs %>% mutate_all(as.character)
+
+srnas <- unique(pairs$ID)
+max_val <- 0
+max_dists <- data.frame(id = srnas, distance = NA)
+counter <- 0
+
+
+max_dists <- max_dists %>% mutate(complete = ifelse(is.na(distance), F, T))
+length(unique(pairs$target.genome))
+
+
+item <- 1
+
+for(item in 1:nrow(max_dists)){
+  printRemaining(i = item, length = nrow(max_dists), increment = 1)
+  # counter <- counter + 1
+  # if(counter > 5){
+  #   break
+  # }
+  if(max_dists$complete[item] == T){
+    print(paste(max_dists$id[item], "already done."))
+    next
+  }
+  max_val <- 0
+  # print(as.character(max_dists$id[item]))
+  df <- pairs %>% filter(ID == as.character(max_dists$id[item])) %>% unique()
+  
+
+  if(nrow(df) == 1){
+    max_val <- 0
+    max_dists$distance[item] <- max_val
+    max_dists$complete[item] <- T
+    next
+  }
+genomes <- df$target.genome
+rows <- match(x = genomes, table = rownames(distanceMat))
+cols <- match(x = genomes, table = colnames(distanceMat))
+rows <- rows[!is.na(rows)]
+cols <- cols[!is.na(cols)]
+
+max_val <- max(c(max(distanceMat[rows, cols]),max_val))
+
+  max_dists$distance[item] <- max_val
+  max_dists$complete[item] <- T
+}
+
+max_dists_pred_nr <- max_dists
+save(max_dists_pred_nr, file = "~/bin/r_git/R/r_files/max_dists_pred_nr.Rda")
+
+}
+load("~/bin/r_git/R/r_files/max_dists_pred.Rda")
+# load("~/bin/r_git/R/r_files/max_dists_pred_nr.Rda")
+load("~/bin/r_git/R/r_files/max_dists_pc.Rda")
+load("~/bin/r_git/R/r_files/max_dists_nc.Rda")
+
+
+cumulativeCounts <- function(dists, smooth = T){
+
+  groups <- unique(dists$group)
+  for(i in groups){
+    dat <- dists %>% filter(group == i)
+    dat <- dat %>% mutate(count = 1) %>% 
+    arrange(-max_dist) %>% group_by(group) %>% 
+    mutate(cumulativeCount = cumsum(count)) %>% ungroup() %>% 
+    group_by(group, max_dist) %>% summarise(cumulative_prop = max(cumulativeCount)/ nrow(dat))
+    
+    if(smooth){
+      dat <- as.data.frame(spline(x = dat$max_dist,y =  dat$cumulative_prop))
+    }
+    dat <- dat %>% ungroup() %>% mutate(group = i)
+    if(exists('combinedDat')){
+      combinedDat <- combinedDat %>% bind_rows(dat)
+    }else{
+      combinedDat <- dat 
+    }
+  }
+  return(combinedDat)  
+
+}
+
+max_dists_pred <- max_dists_pred %>% mutate(group = "Predicted")
+# max_dists_pred_nr <- max_dists_pred_nr %>% mutate(group = "Predicted NR")
+max_dists_pc <- max_dists_pc %>% mutate(group = "Positive Control")
+max_dists_nc <- max_dists_nc %>% mutate(group = "Negative Control")
+
+
+dists <- max_dists_pred %>% bind_rows(max_dists_pc, max_dists_nc) %>% dplyr::rename(max_dist = distance) %>% filter(max_dist != 0)
+
+
+distsCumulativeCount <- cumulativeCounts(dists = dists, smooth = F)
+
+p <- ggplot() +
+  geom_line(data = distsCumulativeCount, aes(x= max_dist, y = cumulative_prop, group = group, colour = group))
+p
+ggsave(filename = "~/phd/RNASeq/figures/max_conservation_distance_4.svg", plot = p)
+```
+
+###large_tree
+
+```{r large_tree, eval=F}
+  # tree <- read.tree("~/bin/r_git/R/r_files/large_labelled_tree.tree")
+  tree <- read.tree("~/bin/r_git/R/r_files/all_taxa.tree")
+  p <-ggtree(tree) + 
+  geom_tiplab() +
+  xlim(0,0.8)
+  p
+  ggsave(filename = "~/phd/RNASeq/figures/large_tree.svg", device = 'svg', width = 50, height = 50, limitsize = FALSE)
+```
+
+
+
+
 ##Build families of sRNAs
 
 Each individual sRNA was searched against the complete list of sRNAs in order to cluster the related sRNAs into families. These families were then used to search through all of the genomes in the clade to improve on the number of sequences per family. 
@@ -2421,6 +3175,146 @@ test_d
 
 Checking the distribution of overlap %.
 
+-   each of the predicted sRNAs have been used in a searh of ~1500 genomes.
+    
+    - this was done on the server
+    
+    - files will need to be transfered to the MacBook for python analysis
+    
+-   A check for redundancy of sRNAs is needed
+    
+    -   this will be done by getting the coordinates of each match for each contig and checking for overlapping regions
+    
+    -   overlapping regions will be merged.
+
+###contigs_and_cordinates_of_matches
+```{bash contigs_and_cordinates_of_matches, eval=F}
+> ../../predicted_genomic_sequence_matches.txt
+for file in *.stk;
+do 
+
+  ID=`echo $file | cut -d '.' -f1,2`
+  grep ^"#=GS" $file | sort | uniq | cut -d "[" -f1 | sed -e "s/$/   $ID/" | cut -d ' ' -f2- | cut -d '|' -f2 >> ../../predicted_genomic_sequence_matches.txt
+
+done
+ 
+```
+
+-   get the number of sequences in each model for analysis of the distributions in later steps
+
+###get_stats_on_alignments
+```{bash get_stats_on_alignments, eval=F}
+> ../../original_stats_all.txt
+
+for file in *;
+do 
+
+echo $file
+esl-alistat $file | sed 's/%//g' | sed 's/Alignment /Alignment_/g' | sed 's/Average /Average_/g' | sed 's/Format: /Format:_/g' | sed 's/Number of sequences/Number_of_sequences/g' | sed -e "s/$/ $file/" >> ../../original_stats_all.txt
+
+done
+
+
+```
+
+-   there is a faster way of doing these steps with GRanges, however there are thresholds and variables that cannot be controlled so it is nopt being used. It might be possible, however the current method is good enough.
+
+###attempt_in_r 
+```{r redundancy_1}
+
+dat <- read.table("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/negative_control/nc_genomic_sequence_matches.txt")
+
+dat <- dat %>% separate(col = V1, into = c("contig", "coordinates"), sep = "\\/", remove = F)
+
+dat <- dat %>% separate(col = coordinates, into = c("start", "stop"), sep = "-", remove = F)
+
+dat <- dat %>% dplyr::rename(srna = V3) %>% select(contig, srna, start, stop) %>% mutate(strand = "+")
+
+dat <- dat %>% mutate(start = as.numeric(start), stop = as.numeric(stop))
+
+dat <- dat %>% mutate(tmpstart = ifelse(start < stop, start, stop),
+                      tmpend = ifelse(start > stop, start, stop))
+
+query <- GRanges(seqnames = dat$contig,
+                 ranges = IRanges(start = dat$tmpstart, end = dat$tmpend),
+                  strand = dat$strand, query_name = dat$srna)
+
+
+lookup1 <- data.frame(id1 = dat$srna, queryHits = c(1:length(dat$srna)))
+lookup2 <- data.frame(id2 = dat$srna, subjectHits = c(1:length(dat$srna)))
+
+
+tmp <- findOverlaps(query, query, type = 'start')
+
+tmp <- as.data.frame(tmp)
+
+tmp <- tmp %>% left_join(lookup1) %>% left_join(lookup2)
+
+tmp <- tmp %>% filter(id1 != id2)
+
+smallDat <- tmp %>% select(id1, id2) %>% unique()
+smallDat <- smallDat %>% mutate_all(as.character)
+
+s2 <- smallDat
+s2$id1 <- smallDat$id2
+s2$id2 <- smallDat$id1
+
+smallDat <- smallDat %>% bind_rows(s2) %>% unique()
+
+ids <- as.character(unique(dat$srna))
+item <- ids[68]
+item2 <- "alignments_GCA_000017765.1_689"
+
+groupOverlapItems <- function(smallDat, item, current_ids){
+  # print(length(current_ids))
+  # print(item)
+  if(length(current_ids) == 0){
+    current_ids <- item
+  }
+  df <- smallDat %>% filter(id1 == item)
+
+  if(nrow(df) == 0){
+    return(current_ids)
+  }
+  df$seen <- df$id2 %in% current_ids
+  df <- df %>% filter(seen == F)
+
+  if(nrow(df) == 0){
+    return(current_ids)
+  }
+  for(item2 in df$id2){
+    current_ids <- unique(c(current_ids, item2))
+    current_ids <- groupOverlapItems(smallDat, item2, current_ids)
+  }
+  return(current_ids)
+}
+
+item <- ids[ids == "alignments_GCA_000006945.2_2627"]
+tmp <- groupOverlapItems(smallDat, item, current_ids = c())
+
+checked_ids <- c()
+for(item in ids){
+  if(item %in% checked_ids){
+    next
+  }
+  print(item)
+  current_ids <- groupOverlapItems(smallDat, item, current_ids = c())
+ 
+  checked_ids <- c(checked_ids, current_ids)
+  
+    write.table(x = current_ids, file = paste("~/phd/RNASeq/srna_seqs/version_1/negative_control/combined_alignments_ids/", current_ids[1], "_combined_list.txt", sep = ""), append = T, quote = F, row.names = F, col.names = F)
+
+  # mat <- as.data.frame(t(as.matrix(current_ids)))
+  # write.table(mat, file = "~/phd/RNASeq/tmp/nc_overlaps", append = T, quote = F, col.names = F, row.names = F, sep = "\t")
+}
+
+```
+
+###redundancy_1 in python
+
+This takes a long time to run.
+Not sure that this is needed for anything more than a figure.
+
 ```{python redundancy_1}
 alignment_file_counts = pd.read_csv("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/original_stats_all.txt", 
                                     header=None, delim_whitespace=True, names=list('abcdef'))
@@ -2432,7 +3326,7 @@ alignment_file_counts.set_index('id', inplace=True)
 target_counts = alignment_file_counts.to_dict()
 
 alignDat = pd.read_csv("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/predicted_genomic_sequence_matches.txt", header=None, delim_whitespace=True)
-alignDat = alignDat.iloc[:,[1,3]]
+alignDat = alignDat.iloc[:,[0,2]]
 alignDat.columns = ["details", "query_id"]
 alignDat[["target_contig", "coord"]] = alignDat.details.str.split("/", expand = True)
 alignDat[["target_start", "target_end"]] = alignDat.coord.str.split("-", expand = True)
@@ -2458,7 +3352,7 @@ if run_all == True:
     df.to_csv('/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/overlaps_data.csv', index=False)
 else:
   overlaps = pd.read_csv("/Users/thomasnicholson/bin/python_git/python_files/overlaps_data.csv",
-  header=None, delim_whitespace=True)
+  header=None, delim_whitespace=True) #might be too big for github
 
 overlaps[:10]
 
@@ -2474,6 +3368,7 @@ knitr::include_graphics("/Users/thomasnicholson/phd/RNASeq/figures/displot.svg")
 
 Group sRNAs if there is enough of an overlap and write out files. 
 
+###redundancy_2
 ```{python redundancy_2}
 if run_all == True:
     d = {}
@@ -2573,6 +3468,9 @@ else:
         combined_d = json.load(read_file)      
 ```
 
+Not sure if there is a purpose to this section.
+
+###redundancy_2
 ```{python overlapping_scores, eval=F}
 outfile = open('/Users/thomasnicholson/bin/python_git/python_files/ids_and_overlaps.csv', 'a')
 for key, value in query_matches.items():
@@ -2584,8 +3482,9 @@ for key, value in query_matches.items():
     outfile.write('%s,%s,%s\n' % (id1, id2, value))
 ```
 
-Take the overlapping sRNAs, extract the fasta sequences and align the sequences.
+-   List all the overlapping sRNAs in files
 
+###output_of_list_of_sRNAs_to_combine
 ```{r output_of_list_of_sRNAs_to_combine, eval = F}
 json_file <- "~/bin/python_git/python_files/combined_d.json"
 json_data <- fromJSON(file=json_file)
@@ -2607,7 +3506,14 @@ for(key in json_data){
 
 ```
 
+-   Take the overlapping sRNAs, extract the fasta sequences and align the sequences.
+
+###combine_sRNAs_bash
 ```{bash combine_sRNAs_bash, eval=F}
+mkdir -p fasta
+mkdir -p hmm
+mkdir -p alignments
+
 for file in *.txt;
 do
 max_num="0"
@@ -2617,22 +3523,22 @@ echo $outname
 while read line; 
 do 
 
-esl-reformat fasta ../alignments_filtered/$line.stk >> fasta/$outname.fa
+esl-reformat fasta ../large_alignments/alignments/$line.fna.stk.stk.stk >> fasta/$outname.fa
 
-current_num=`esl-alistat ../alignments_filtered/$line.stk | grep "Number of sequences" | cut -d ' ' -f 4`
+current_num=`esl-alistat ../large_alignments/alignments/$line.fna.stk.stk.stk | grep "Number of sequences" | cut -d ' ' -f 4`
 
 if(( $current_num > $max_num ));
 then
 
-max_seq="$line.stk"
+max_seq="$line.fna.stk.stk.stk"
 max_num="$current_num"
 fi
 
 done < $file
 
-hmmbuild hmm/$outname.hmm ../alignments_filtered/$max_seq
+hmmbuild hmm/$outname.hmm ../large_alignments/alignments/$max_seq
 
-hmmalign --informat fasta hmm/$outname.hmm fasta/$outname.fa | esl-alimask -g --gapthresh 0.8 -p --pfract 0.5 --pthresh 0.5 - | esl-alimanip   --lnfract 0.6 --lxfract 1.4 --lmin 50 --lmax 500 --detrunc 50 - > combined_alignments_2/$outname.stk
+hmmalign --informat fasta hmm/$outname.hmm fasta/$outname.fa | esl-alimask -g --gapthresh 0.8 -p --pfract 0.5 --pthresh 0.5 - | esl-alimanip   --lnfract 0.6 --lxfract 1.4 --lmin 50 --lmax 500 --detrunc 50 - > alignments/$outname.stk
 
 done
 
@@ -2833,388 +3739,6 @@ cormat <- cormat %>% mutate(keep = ifelse(number.of.sequences >= 100 & average.i
 
 cormat %>% filter(!is.na(keep)) %>% select(-keep) %>% head()
 
-```
-
-
-## Search for known ncRNAs and get phylogenetic distance matrix
-
--   cmscan run with commands
-    
-    - rfamscan() is the command called.
-    - cmscan -Z $counts --cut_ga --rfam --nohmmonly --tblout $1.tblout --fmt 2 --clanin ~/phd/RNASeq/Rfam.clanin.txt ~/phd/RNASeq/Rfam.cm $1
-  
-###run_csmscan_across_multiple_files
-
-```{bash run_csmscan_across_multiple_files, eval=F}
-for file in *.fna; 
-do 
-
-  runname=`basename $file .fna`;  
-
-  if [ -f "check_files/${runname}.tmp.out" ]; then 
-    echo "Already exists: $runname"; 
-    continue;
-  else 
-    echo "$runname";  
-  fi;  
-  
-  rfamscan $file;  
-  > check_files/$runname.tmp.out;  
-
-done
-
-```
-
--   output combined with 'cat *.tblout >> ../representative_genomes.tblout'
-
--   reformatted for R with 'cat representative_genomes.tblout | sed 's/  /\t/g' | tr -s '\t' | sed 's/\t /\t/g' | sed 's/ \t/\t/g' | sed 's/ /\t/3' | sed 's/ /\t/' | sed 's/ /\t/' | sed 's/ /_/g' | sed 's/_!/\t!/g' | tr -s '\t' | sed 's/Pseudomonas\t/Pseudomonas_/g' > representative_genomes.tab'
-
-###cmsearch_res_pc
-```{r cmsearch_res_pc, eval=F}
-
-##file made with cat RF00177.tbl | sed 's/  /\t/g' | tr -s '\t' | sed 's/\t /\t/g' | sed 's/ \t/\t/g' | sed 's/ /\t/3' | sed 's/ /\t/' | sed 's/ /\t/' | sed 's/ /_/g' | sed 's/_!/\t!/g' | tr -s '\t' | sed 's/Pseudomonas\t/Pseudomonas_/g' > RF00177.tab along with manually replacing some incorrect _ and \t 
-dat <- read.table("~/phd/RNASeq/representative_genomes.tab", sep = "", quote = "", comment.char = "#", fill = T)
-
-contig_labels <- read.table("~/phd/RNASeq/genome_contig_pairs.txt")
-colnames(contig_labels) <- c("query.name", "genome")
-
-dat <- dat[,2:18]
-
-colnames(dat) <- c("description.of.target", "target.name", "query.name", "accession", "accession.2", "mdl", "mdl.from", "mdl.to", "seq.from", "seq.to", "strand", "trunc", "pass", "gc", "bias", "score", "e.value")
-
-dat <- dat %>% filter(!is.na(e.value))
-
-dat <- dat %>% group_by(target.name, query.name) %>% 
-  arrange(as.numeric(e.value)) %>% 
-  mutate(order.num = row_number()) %>% 
-  filter(order.num == 1) %>% 
-  ungroup()
-
-
-
-
-
-smalldat <- dat %>% 
-  select(target.name, query.name, seq.from, seq.to, strand, e.value, mdl.from, mdl.to)
-
-smalldat <- smalldat %>% left_join(contig_labels, by = 'query.name') %>% 
-  group_by(genome, target.name) %>% 
-  arrange(as.numeric(e.value)) %>%
-  mutate(order.num = row_number()) %>% 
-  filter(order.num == 1) %>% 
-  ungroup()
-
-RF00177 <- smalldat %>% filter(target.name == "RF00177") 
-
-
-for(item in unique(smalldat$target.name)){
-  print(item)
-  modelDat <- smalldat %>% filter(target.name == item)
-  if(nrow(modelDat) == 0){
-    continue
-  }
-  modelDat <- modelDat %>% select(query.name, seq.from, seq.to, strand)
-  
-write.table(x = modelDat, file = paste("~/phd/RNASeq/rfam_files/locations/", item,"_locations.txt", sep = ""), row.names = F, col.names = F, quote = F, sep = "\t")
-  
-
-}
-
-  write.table(x = RF00177 %>% select(query.name, seq.from, seq.to, strand), file = "~/phd/RNASeq/rfam_files/RF00177_locations.txt", row.names = F, col.names = F, quote = F, sep = "\t")
-
-
-```
-
--   RF00177 (Ribosome SSU) saved as above.
-
--   Other models also saved
-
--   'esl-sfetch --index representative_genomes.fna' used to index the fasta file
-
-
-###get_nucelotide_sequences
-
-```{bash get_nucelotide_sequences, eval = F}   
-
-##from ~/phd/RNASeq/rfam_files/
-
-# > RF00177_rep_seqs.fna
-
-i=0
-file_count=1
-> RF00177_files/RF00177_rep_seqs_${file_count}.fna
-while read line; 
-do 
-  i=`expr $i + 1`
-  if (( $i > 50 )); then
-  i=0
-  file_count=`expr $file_count + 1`
-  > RF00177_files/RF00177_rep_seqs_${file_count}.fna
-  fi
-
-  
-  contig=`echo $line | cut -d ' ' -f1`; 
-  contig_start=`echo $line | cut -d ' ' -f2`; 
-  contig_end=`echo $line | cut -d ' ' -f3`; 
-  contig_strand=`echo $line | cut -d ' ' -f4`;  
-  
-  length=`expr $contig_end - $contig_start`
-  
-  length=`echo $length | tr -d '-'`
-  
-  if (( $length < 1400 )); then
-  echo "$contig too short" 
-  continue
-  fi
-  
-  if [[ $contig_strand == "+" ]]; then 
-    
-    esl-sfetch -c ${contig_start}..${contig_end} ../representative_genomes/representative_genomes.fna $contig        >> RF00177_files/RF00177_rep_seqs_${file_count}.fna;
-  else 
-    esl-sfetch -r -c ${contig_start}..${contig_end} ../representative_genomes/representative_genomes.fna $contig >> RF00177_files/RF00177_rep_seqs_${file_count}.fna
-    
-  fi;  
-  
-done < RF00177_locations.txt
-
-
-##from ~/phd/RNASeq/rfam_files/locations
-for file in *_locations.txt;
-do
-outname=`basename $file _locations.txt`
-
-echo $outname
-
-> ../${outname}_seqs.fna
-while read line;
-do
-
-contig=`echo $line | cut -d ' ' -f1`
-contig_start=`echo $line | cut -d ' ' -f2`
-contig_end=`echo $line | cut -d ' ' -f3`
-contig_strand=`echo $line | cut -d ' ' -f4`
-
-if [[ $contig_strand == "+" ]];then
-esl-sfetch -c ${contig_start}..${contig_end} ~/phd/RNASeq/representative_genomes/representative_genomes.fna $contig >> ../${outname}_seqs.fna
-else
-esl-sfetch -r -c ${contig_start}..${contig_end} ~/phd/RNASeq/representative_genomes/representative_genomes.fna $contig >> ../${outname}_seqs.fna
-
-fi
-
-
-done < $file
-done
-
-
-```
-
--   output then aligned with muscle 'muscle -in RF00177_rep_seqs.fna -out RF00177_rep_seqs.mcl'
-
--   also tried with 'cmalign -o RF00177_rep_seqs.cm RF00177.cm RF00177_rep_seqs.fna '
-    
-    -   this took too long with to much memory used
-
--   the .mcl file is converted to phylip format 
-
-    -   esl-reformat phylip RF00177_rep_seqs.mcl > RF00177_rep_seqs.phylip
-
--   the .phylip file is used with dnadist to create the RF00177_rep.dists file
-
-###reformat_matrix
-
-```{python reformat_matrix, eval=F}
-infile=open('/Users/thomasnicholson/phd/RNASeq/RF00177_rep.dists', 'r')
-
-contig_dat = pd.read_csv("/Users/thomasnicholson/phd/RNASeq/contig_descriptions.txt", sep = "\t")
-
-contigs = contig_dat.iloc[:,0].to_list()
-
-df = pd.DataFrame(index=range(0,296),columns=range(0,296))
-
-i = 0
-row_counter = 0
-col_colunter = -1
-
-row_names =[]
-
-for line in infile:
-    i += 1
-#     print(i)
-    if i == 1:
-        continue
-#     elif i > 1000:
-#         break
-    elif i % 100 == 0:
-        print(i)
-    line = line.rstrip()
-    words = line.split(' ')
-    if words[0] != '':
-        increment = 7
-        col_counter = 0
-        row_counter += 1
-        row_names.append(words[0])
-        df.iloc[row_counter - 1,col_counter:(col_counter + increment)] = words[1:]
-        col_counter += increment
-    else:
-        increment = len(words[1:])
-        df.iloc[row_counter - 1,col_counter:(col_counter + increment)] = words[1:]
-        col_counter += increment
-
-print(df.iloc[:10,:10])
-
-df.index = row_names
-df.columns = row_names
-
-df.to_csv('/Users/thomasnicholson/phd/RNASeq/RF00177_rep_MATRIX.dists', index=True)
-```
-
-
-
-###dna_dists
-
-```{r dna_dists, eval=F}
-run_all <- F
-if(run_all){
-dat <- read.csv("~/phd/RNASeq/RF00177_rep_MATRIX.dists")
-
-# rownames(dat) <- colnames(dat)
-
-for(i in 1:nrow(dat)){
-  for(j in 1:ncol(dat)){
-    # if(dat[i,1] == colnames(dat)[j]){
-    #   if(dat[i,j] != 0){
-    #     print(paste(i, j))
-    #   }
-    # }
-    if(i + 1 == j){
-      print(dat[i,j])
-    }
-  }
-}
-
-meltDat <- melt(dat)
-
-colnames(meltDat) <- c("target.name", "query.name", "distance")
-
-contig_labels <- read.table("~/phd/RNASeq/genome_contig_pairs.txt")
-colnames(contig_labels) <- c("target.name", "target.genome")
-contig_labels <- contig_labels %>% 
-  mutate(target.name = substr(x = target.name, start = 1, stop = 10)) 
-
-meltDat <- meltDat %>% left_join(contig_labels, by = 'target.name')
-
-colnames(contig_labels) <- c("query.name", "query.genome")
-meltDat <- meltDat %>% left_join(contig_labels, by = 'query.name')
-
-meltDat <- meltDat %>% filter(!is.na(query.genome), !is.na(target.genome))%>% group_by(target.genome, query.genome) %>% arrange(-as.numeric(distance)) %>% mutate(row_num = row_number()) %>% filter(row_num == 1) %>% select(-row_num)
-
-mat <- reshape2::acast(data = meltDat %>% select(target.genome, query.genome, distance), formula = target.genome ~ query.genome)
-
-distanceMat <- as.data.frame(mat)
-
-
-pairs <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/query_target_pairs_2.txt")
-colnames(pairs) <- c("target.name", "query.genome", "ID")
-contig_labels <- read.table("~/phd/RNASeq/genome_contig_pairs.txt")
-colnames(contig_labels) <- c("target.name", "target.genome")
-pairs <- pairs %>% left_join(contig_labels, by = 'target.name')
-
-pairs <- pairs %>% select(target.genome, ID) %>% unique()
-
-pairs <- pairs %>% mutate_all(as.character)
-
-srnas <- unique(pairs$ID)
-max_val <- 0
-max_dists <- data.frame(id = srnas, distance = NA)
-counter <- 0
-
-
-max_dists <- max_dists %>% mutate(complete = ifelse(is.na(distance), F, T))
-length(unique(pairs$target.genome))
-
-
-item <- 172
-
-
-
-
-for(item in 1:nrow(max_dists)){
-  printRemaining(i = item, length = nrow(max_dists), increment = 1)
-  # counter <- counter + 1
-  # if(counter > 5){
-  #   break
-  # }
-  if(max_dists$complete[item] == T){
-    print(paste(max_dists$id[item], "already done."))
-    next
-  }
-  max_val <- 0
-  # print(as.character(max_dists$id[item]))
-  df <- pairs %>% filter(ID == as.character(max_dists$id[item])) %>% unique()
-  
-
-  if(nrow(df) == 1){
-    max_val <- 0
-    max_dists$distance[item] <- max_val
-    max_dists$complete[item] <- T
-    next
-  }
-genomes <- df$target.genome
-rows <- match(x = genomes, table = rownames(distanceMat))
-cols <- match(x = genomes, table = colnames(distanceMat))
-rows <- rows[!is.na(rows)]
-cols <- cols[!is.na(cols)]
-
-max_val <- max(c(max(distanceMat[rows, cols]),max_val))
-
-  max_dists$distance[item] <- max_val
-  max_dists$complete[item] <- T
-}
-save(max_dists, file = "~/bin/r_git/R/r_files/max_dists.Rda")
-}
-load("~/bin/r_git/R/r_files/max_dists.Rda")
-
-cumulativeCounts <- function(dists, smooth = T){
-
-  groups <- unique(dists$group)
-  for(i in groups){
-    dat <- dists %>% filter(group == i)
-    dat <- dat %>% mutate(count = 1) %>% 
-    arrange(-max_dist) %>% group_by(group) %>% 
-    mutate(cumulativeCount = cumsum(count)) %>% ungroup() %>% 
-    group_by(group, max_dist) %>% summarise(cumulative_prop = max(cumulativeCount)/ nrow(dat))
-    
-    if(smooth){
-      dat <- as.data.frame(spline(x = dat$max_dist,y =  dat$cumulative_prop))
-    }
-    dat <- dat %>% ungroup() %>% mutate(group = i)
-    if(exists('combinedDat')){
-      combinedDat <- combinedDat %>% bind_rows(dat)
-    }else{
-      combinedDat <- dat 
-    }
-  }
-  return(combinedDat)  
-
-}
-dists <- max_dists %>% mutate(group = "Predicted") %>% dplyr::rename(max_dist = distance)
-distsCumulativeCount <- cumulativeCounts(dists = dists, smooth = F)
-
-ggplot() +
-  geom_line(data = distsCumulativeCount, aes(x= max_dist, y = cumulative_prop))
-
-```
-
-###large_tree
-
-```{r large_tree, eval=F}
-  # tree <- read.tree("~/bin/r_git/R/r_files/large_labelled_tree.tree")
-  tree <- read.tree("~/bin/r_git/R/r_files/all_taxa.tree")
-  p <-ggtree(tree) + 
-  geom_tiplab() +
-  xlim(0,0.8)
-  p
-  ggsave(filename = "~/phd/RNASeq/figures/large_tree.svg", device = 'svg', width = 50, height = 50, limitsize = FALSE)
 ```
 
 
