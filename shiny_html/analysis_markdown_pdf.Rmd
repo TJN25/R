@@ -715,7 +715,9 @@ def combined_alignments(query, combined_d, ids_checked, query_matches):
 ```
 
 ##Overview
-###Overview of sRNA RNAs play a critical role in a wide range of biological functions such as:
+###Overview of sRNA 
+
+RNAs play a critical role in a wide range of biological functions such as:
 
 -   Transcription/Translation
 
@@ -895,6 +897,28 @@ sraDatAll[1:20,]
 ```
 
 -   The genome accession for each added genome was looked up on [NCBI](https://www.ncbi.nlm.nih.gov/) using the strain name in the file or by search for the given experiment in the [SRA](https://www.ncbi.nlm.nih.gov/sra/) section.
+
+    -   Take the experiment ID e.g SRR3742546
+    
+    -   Search [SRA](https://www.ncbi.nlm.nih.gov/sra/) or [NCBI](https://www.ncbi.nlm.nih.gov/) and select the SRA result for this ID
+    
+    -   Select the 'Organism:' link
+    
+    -   Select the Genome option from the box of options currently on the upper right of the page. It will probably have a 1 which is a clickable link beside it. Click this link.
+    
+    -   From the reference genome section select the Refseq ID of the Chr option. 
+    
+    -   This will open a genbank file that should list Assembly accession. Select this.
+    
+    -   From the full report copy the GenBank assembly accession: e.g GCA_002504285.1
+    
+    -   Create a folder for the genus
+    
+    -   Create a folder using the GenBank assembly accession e.g. mkdir GCA_002504285.1.data/
+    
+    -   Create an experiments_list.txt file listing all of the SRA experiments for the given genome and save the file in the genus folder.
+    
+    -   Run [*callPeaksforGenome.sh*](#section-callpeaksforgenome.sh) *-g* *\<GCA Accession\>* *-s*
 
 -   A taxonomy table was generated with the code below. This had to be supplemented by going through manually to correct mistakes, or fill in missing data.
 
@@ -2322,14 +2346,19 @@ write.table(x = complete_genomes$species, file = "~/phd/RNASeq/all_taxa_names.tx
   p
 ```
 
--   cmscan run with commands
+-   cmscan run with commands in a file containing the nucleotide files which need to be searched
     
+    - mkdir checkfiles
     - *rfamscan()* is the command called.
     - cmscan -Z $counts --cut_ga --rfam --nohmmonly --tblout $1.tblout --fmt 2 --clanin ~/phd/RNASeq/Rfam.clanin.txt ~/phd/RNASeq/Rfam.cm $1
   
 ###run_csmscan_across_multiple_files
 
 ```{bash run_csmscan_across_multiple_files, eval=F, include=T}
+#in ~/phd/RNASeq/representative_genomes
+#in ~/phd/RNASeq/analysed_genomes
+
+mkdir check_files
 for file in *.fna; 
 do 
 
@@ -2349,15 +2378,23 @@ done
 
 ```
 
--   output combined with 'cat *.tblout >> ../representative_genomes.tblout'
+-   group="representative_genomes"
 
--   reformatted for R with 'cat representative_genomes.tblout | sed 's/  /\t/g' | tr -s '\t' | sed 's/\t /\t/g' | sed 's/ \t/\t/g' | sed 's/ /\t/3' | sed 's/ /\t/' | sed 's/ /\t/' | sed 's/ /_/g' | sed 's/_!/\t!/g' | tr -s '\t' | sed 's/Pseudomonas\t/Pseudomonas_/g' > representative_genomes.tab'
+-   group="analysed_genomes"
+
+-   output combined with 'cat *.tblout >> ../${group}.tblout'
+
+    -   a second version is now being run across all of the analysed genomes with plot files. This will enable a better analysis of the read depths.
+
+-   reformatted for R with 'cat ${group}.tblout | sed 's/  /\t/g' | tr -s '\t' | sed 's/\t /\t/g' | sed 's/ \t/\t/g' | sed 's/ /\t/3' | sed 's/ /\t/' | sed 's/ /\t/' | sed 's/ /_/g' | sed 's/_!/\t!/g' | tr -s '\t' | sed 's/Pseudomonas\t/Pseudomonas_/g' > ${group}.tab'
 
 -   get a list of contigs and the corresponding genomes
+
 
 ###genome_contig_pairs
 ```{bash genome_contig_pairs, eval=F}
 #done from ~/phd/RNASeq/representative_genomes/
+#repeat from ~/phd/RNASeq/${group}
 > ../genome_contig_pairs.txt
 for file in GC*.fna;  
 do   
@@ -2366,6 +2403,12 @@ do
   grep ^">" $file | cut -d ' ' -f1 | sort | uniq | sed 's/>//g' | sed -e "s/$/   $ID/" >> ../genome_contig_pairs.txt;   
 done
 ```
+
+-   copy from server with:
+
+    -   scp bioc:./phd/RNASeq/genome_contig_pairs.txt ./
+    -   scp bioc:./phd/RNASeq/${group}.tab ./
+
 
 ###cmsearch_res_pc
 ```{r cmsearch_res_pc, eval=F}
@@ -4595,6 +4638,105 @@ rfam <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/rfam_descr
 
 ```
 
+
+
+###sRNA read depths
+
+####sRNA_read_depths
+```{bash sRNA_read_depths, eval=F, include=F}
+##Done in ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/alignments_rnaalifold
+group='negative_control'
+cd ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/alignments_rnaalifold
+> ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/${group}_read_depths_summary.txt
+
+#file=alignments_GCA_000006765.1_12.stk
+for file in *.stk;
+  do
+  genome_name=`echo $file | cut -d '_' -f2,3`
+  ID=`echo $file | cut -d '_' -f2,3,4 | sed 's/\.stk//g'`
+  
+  cat $file | grep -v ^"#" | grep "/" | grep -v "//" | cut -d ' ' -f1 > ~/phd/RNASeq/tmp/tmp.txt
+  while read line; 
+    do
+    contig=`echo $line | cut -d '/' -f1`
+    coord=`echo $line | cut -d '/' -f2`
+    realstart=`echo $coord | cut -d '-' -f1`
+    realstop=`echo $coord | cut -d '-' -f2`
+    start=`echo $coord | cut -d '-' -f1`
+    stop=`echo $coord | cut -d '-' -f2`    
+    #echo $contig
+    genome=`grep $contig ~/phd/RNASeq/sequences/contig_ids_accession.lookup | cut -f2`
+    genus=`grep $contig ~/phd/RNASeq/contig_descriptions.txt | cut -f2 | cut -d '_' -f1`
+#    if [[ $genome != $genome_name ]]; then
+#      continue
+#    fi
+    stats=`esl-seqstat -a ~/phd/RNASeq/sequences/${genome}.fna`
+    esl-seqstat -a ~/phd/RNASeq/sequences/${genome}.fna | grep "=" > ~/phd/RNASeq/tmp/tmp.stats
+    current_count=0
+    while read stat_line;
+      do
+      chromosome=`echo "$stat_line" | grep $contig | wc -l | cut -d ' ' -f8`
+      if (( $chromosome > 0 ));
+        then
+        tmpstart=$(($start + $current_count))
+        tmpstop=$(($stop + $current_count))
+        if (( $tmpstart < $tmpstop  )); then
+          start=$tmpstart
+          stop=$tmpstop
+        else
+          stop=$tmpstart
+          start=$tmpstop
+        fi
+        
+        if [[ ! -d ~/phd/RNASeq/genera/${genus}/${genome}.data/plot_files ]];
+          then
+          echo "Genome: ${genome} has no plot files"
+          continue
+        fi
+        echo "~/phd/RNASeq/genera/${genus}/${genome}.data/plot_files $start $stop"
+        > ~/phd/RNASeq/tmp/test.plot
+        counter="1"
+        for plotfile in ~/phd/RNASeq/genera/${genus}/${genome}.data/plot_files/*_ncRNA.plot;
+          do
+          #echo "$plotfile $genus $genome"
+          sed -n "${start},${stop}{p;${stop}q;}"  $plotfile > ~/phd/RNASeq/tmp/tmp.plot
+          if [[  $counter ==  "1" ]];
+          then
+            cat ~/phd/RNASeq/tmp/tmp.plot > ~/phd/RNASeq/tmp/test.plot
+            counter="2"
+          else
+            cat ~/phd/RNASeq/tmp/test.plot > ~/phd/RNASeq/tmp/tmp2.plot 
+            paste ~/phd/RNASeq/tmp/tmp2.plot ~/phd/RNASeq/tmp/tmp.plot > ~/phd/RNASeq/tmp/test.plot
+          fi
+        done
+        #cp test.plot ~/phd/RNASeq/tmp
+        summarise_sRNA_read_depths.R
+        cat ~/phd/RNASeq/tmp/test.values | sed -e "s/$/ $ID $genus $genome_name $genome $contig $realstart $realstop $start $stop/" >> ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/${group}_read_depths_summary.txt
+      else
+        length=`echo $stat_line | cut -d ' ' -f3`
+        current_count=$(($current_count + $length))
+      fi
+      
+    done < ~/phd/RNASeq/tmp/tmp.stats
+  done < ~/phd/RNASeq/tmp/tmp.txt
+done
+```
+
+####summarise_sRNA_read_depths.R
+```{r summarise_sRNA_read_depths.R, eval=F, include=F}
+#!/usr/bin/env Rscript
+library(dplyr, quietly = T, warn.conflicts = F)
+dat <- read.table("~/phd/RNASeq/tmp/test.plot")
+
+valuesDat <- dat %>%
+  summarise_all(list(max)) %>% as.matrix() %>% t()
+
+values <- valuesDat[,1]
+outDat <- data.frame(mean = mean(values), max  = max(values))
+
+write.table(x = outDat, file = "~/phd/RNASeq/tmp/test.values", row.names = F, col.names = F, quote = F)
+```
+
 ##Results 
 
 -   Analysis of the evolutionary distance of all the sequences in a given sRNA
@@ -4764,6 +4906,52 @@ UpSetR::upset(upsetSubset, sets = colnames(upsetSubset), mb.ratio = c(0.55, 0.45
 dev.off()
 }
 
+```
+
+
+###read_depths
+```{r read_depths_setup, eval=F, include=F}
+ncRDepth <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/negative_control_read_depths_summary.txt")
+pcRDepth <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/positive_control_read_depths_summary.txt")
+predRDepth <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/predicted_read_depths_summary.txt")
+
+colnames(ncRDepth) <- c("mean.val", "max.val", "srna", "genus", "srna.genome.accession", "target.genome.accession",
+                        "target.contig", "target.start", "target.end", "adj.target.start", "adj.target.end")
+colnames(pcRDepth) <- c("mean.val", "max.val", "srna", "genus", "srna.genome.accession", "target.genome.accession",
+                        "target.contig", "target.start", "target.end", "adj.target.start", "adj.target.end")
+colnames(predRDepth) <- c("mean.val", "max.val", "srna", "srna.genome.accession", "target.genome.accession",
+                        "target.contig", "target.start", "target.end", "adj.target.start", "adj.target.end")
+
+ncRDepth <- ncRDepth %>% select(-genus)
+pcRDepth <- pcRDepth %>% select(-genus)
+
+save(ncRDepth, file = "ncRDepth.Rda")
+save(pcRDepth, file = "pcRDepth.Rda")
+save(predRDepth, file = "predRDepth.Rda")
+
+
+```
+
+
+```{r read_depths}
+load("ncRDepth.Rda")
+load("pcRDepth.Rda")
+load("predRDepth.Rda")
+
+
+ggplot() +
+  geom_freqpoly(data = pcRDepth, aes(x = mean.val, y = log(..density..)), binwidth = 50) +
+  geom_freqpoly(data = ncRDepth, aes(x = mean.val, y = log(..density..)), binwidth = 50, colour = "blue") +
+  geom_freqpoly(data = predRDepth, aes(x = mean.val, y = log(..density..)), binwidth = 50, colour = "red")
+
+pcRDepth <- pcRDepth %>% mutate(response = 1)
+ncRDepth <- ncRDepth %>% mutate(response = 0)
+rocData <- pcRDepth %>% bind_rows(ncRDepth) 
+
+rocDataMaxMax <- rocData %>% group_by(srna, response) %>% summarise(max.max.val = max(max.val))
+
+roc.curve(response = rocDataMaxMax$response, predicted = rocDataMaxMax$max.max.val, 
+          main="ROC curve for Covariation Scores")
 ```
 
 
