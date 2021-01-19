@@ -2388,6 +2388,14 @@ done
 
 -   reformatted for R with 'cat ${group}.tblout | sed 's/  /\t/g' | tr -s '\t' | sed 's/\t /\t/g' | sed 's/ \t/\t/g' | sed 's/ /\t/3' | sed 's/ /\t/' | sed 's/ /\t/' | sed 's/ /_/g' | sed 's/_!/\t!/g' | tr -s '\t' | sed 's/Pseudomonas\t/Pseudomonas_/g' > ${group}.tab'
 
+-   cat *.fna >> ../${group}.fna
+
+-   mkdir done
+
+-   mv *.fna done/
+
+-   mv *.tblout done/
+
 -   get a list of contigs and the corresponding genomes
 
 
@@ -2404,16 +2412,13 @@ do
 done
 ```
 
--   copy from server with:
-
-    -   scp bioc:./phd/RNASeq/genome_contig_pairs.txt ./
-    -   scp bioc:./phd/RNASeq/${group}.tab ./
 
 
 ###cmsearch_res_pc
 ```{r cmsearch_res_pc, eval=F}
 
 ##file made with cat RF00177.tbl | sed 's/  /\t/g' | tr -s '\t' | sed 's/\t /\t/g' | sed 's/ \t/\t/g' | sed 's/ /\t/3' | sed 's/ /\t/' | sed 's/ /\t/' | sed 's/ /_/g' | sed 's/_!/\t!/g' | tr -s '\t' | sed 's/Pseudomonas\t/Pseudomonas_/g' > RF00177.tab along with manually replacing some incorrect _ and \t 
+
 dat <- read.table("~/phd/RNASeq/representative_genomes.tab", sep = "", quote = "", comment.char = "#", fill = T)
 
 contig_labels <- read.table("~/phd/RNASeq/genome_contig_pairs.txt")
@@ -2466,11 +2471,68 @@ write.table(x = modelDat, file = paste("~/phd/RNASeq/rfam_files/locations/", ite
 
 ```
 
+###cmsearch_res_analysed_genomes
+```{r cmsearch_res_analysed_genomes, eval=F}
+
+##file made with cat RF00177.tbl | sed 's/  /\t/g' | tr -s '\t' | sed 's/\t /\t/g' | sed 's/ \t/\t/g' | sed 's/ /\t/3' | sed 's/ /\t/' | sed 's/ /\t/' | sed 's/ /_/g' | sed 's/_!/\t!/g' | tr -s '\t' | sed 's/Pseudomonas\t/Pseudomonas_/g' > RF00177.tab along with manually replacing some incorrect _ and \t 
+
+dat <- read.table("~/phd/RNASeq/analysed_genomes.tab", sep = "", quote = "", comment.char = "#", fill = T)
+
+contig_labels <- read.table("~/phd/RNASeq/genome_contig_pairs.txt")
+colnames(contig_labels) <- c("query.name", "genome")
+
+dat <- dat[,2:18]
+
+colnames(dat) <- c("description.of.target", "target.name", "query.name", "accession", "accession.2", "mdl", "mdl.from", "mdl.to", "seq.from", "seq.to", "strand", "trunc", "pass", "gc", "bias", "score", "e.value")
+
+dat <- dat %>% filter(!is.na(e.value))
+
+dat <- dat %>% group_by(target.name, query.name) %>% 
+  arrange(as.numeric(e.value)) %>% 
+  mutate(order.num = row_number()) %>% 
+  filter(order.num == 1) %>% 
+  ungroup()
+
+
+
+
+
+smalldat <- dat %>% 
+  select(target.name, query.name, seq.from, seq.to, strand, e.value, mdl.from, mdl.to)
+
+smalldat <- smalldat %>% left_join(contig_labels, by = 'query.name') %>% 
+  group_by(genome, target.name) %>% 
+  arrange(as.numeric(e.value)) %>%
+  mutate(order.num = row_number()) %>% 
+  filter(order.num == 1) %>% 
+  ungroup()
+
+RF00177 <- smalldat %>% filter(target.name == "RF00177") 
+
+
+for(item in unique(smalldat$target.name)){
+  print(item)
+  modelDat <- smalldat %>% filter(target.name == item)
+  if(nrow(modelDat) == 0){
+    continue
+  }
+  modelDat <- modelDat %>% select(query.name, seq.from, seq.to, strand)
+  
+write.table(x = modelDat, file = paste("~/phd/RNASeq/analysed_genomes_rfam_files/locations/", item,"_locations.txt", sep = ""), row.names = F, col.names = F, quote = F, sep = "\t")
+  
+
+}
+
+  write.table(x = RF00177 %>% select(query.name, seq.from, seq.to, strand), file = "~/phd/RNASeq/rfam_files/RF00177_locations.txt", row.names = F, col.names = F, quote = F, sep = "\t")
+
+
+```
+
 -   RF00177 (Ribosome SSU) saved as above.
 
 -   Other models also saved
 
--   'esl-sfetch --index representative_genomes.fna' used to index the fasta file
+-   'esl-sfetch --index ${group}.fna' used to index the fasta file
 
 
 ###get_nucelotide_sequences
@@ -2514,6 +2576,8 @@ done < RF00177_locations.txt
 
 
 ##from ~/phd/RNASeq/rfam_files/locations
+##or
+##from ~/phd/RNASeq/analysed_genomes_rfam_files/locations
 for file in *_locations.txt;
 do
 outname=`basename $file _locations.txt`
@@ -2522,6 +2586,7 @@ echo $outname
 
 i=0
 file_count=1
+mkdir -p ../${outname}_files/
 > ../${outname}_files/${outname}_rep_seqs_${file_count}.fna
 while read line; 
 do 
@@ -2544,7 +2609,7 @@ do
   
 
 
-    esl-sfetch -c ${contig_start}..${contig_end} ../../representative_genomes/representative_genomes.fna $contig        >> ../${outname}_files/${outname}_rep_seqs_${file_count}.fna;
+    esl-sfetch -c ${contig_start}..${contig_end} ../../${group}.fna $contig        >> ../${outname}_files/${outname}_rep_seqs_${file_count}.fna;
 
 done < ${outname}_locations.txt
 
@@ -2562,6 +2627,8 @@ done
 ###make cm files
 ```{bash make_cm_files, eval=F}
 ##from ~/phd/RNASeq/rfam_files/
+##or
+##~/phd/RNASeq/analysed_genomes_rfam_files
 
 for folder in *_files; 
 do 
