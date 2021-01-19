@@ -2627,6 +2627,8 @@ done
 ###make cm files
 ```{bash make_cm_files, eval=F}
 ##from ~/phd/RNASeq/rfam_files/
+##or
+##~/phd/RNASeq/analysed_genomes_rfam_files
 
 for folder in *_files; 
 do 
