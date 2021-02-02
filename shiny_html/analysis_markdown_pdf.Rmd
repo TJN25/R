@@ -7,7 +7,9 @@ output:
     toc: true
 runtime: shiny
 ---
+
 ##setup
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 # suppressMessages(library(comparativeSRA))
@@ -15,6 +17,7 @@ library(tidyverse)
 library(VennDiagram)
 library(shiny)
 library(ggplot2)
+library(gplots)
 library(viridis)
 library(RColorBrewer)
 #library(stringr)
@@ -47,6 +50,7 @@ library(rjson)
 filePath <- "~/phd/RNASeq/r_files/"
 # use_python("/Users/thomasnicholson/anaconda3/bin/python")
 # use_condaenv("comparativesrna")
+source('~/bin/r_git/R/render_toc.R')
 ```
 
 ```{r functions, include=F}
@@ -87,10 +91,6 @@ if(not_zero){
                      category = c("", "")
   )
 }
-
-
-
-
 
 assignConservationLevel <- function(ids_lookup, main_col = 7, genera_col, species_col, any_col = c(7:ncol(ids_lookup))){
   ids_lookup <- ids_lookup%>%mutate(type = "")
@@ -714,8 +714,36 @@ def combined_alignments(query, combined_d, ids_checked, query_matches):
 
 ```
 
-##Overview
-###Overview of sRNA 
+```{r toc, echo=FALSE, include=F} 
+render_toc("~/bin/r_git/R/shiny_html/analysis_markdown_pdf.Rmd")
+```
+
+
+##Overview {#overview}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Overview of sRNA*](#section-srna_overview)
+
+-   [*Overview of Methods*](#section-methods)
+
+-   [*Current Figures*](#section-current_figures)
+
+-   [*Summary of strains used*](#section-strains_used)
+
+***
+
+###Overview of sRNA {#srna_overview} 
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Overview*](#section-overview)
+
+***
 
 RNAs play a critical role in a wide range of biological functions such as:
 
@@ -735,7 +763,17 @@ RNAs play a critical role in a wide range of biological functions such as:
 
 ![Figure 1. Examples of ncRNAs in bacteria](sRNA_examples.png)
 
-###Overview of Methods
+###Overview of Methods {#methods}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Overview*](#section-overview))
+
+-----------------
+
+Description:
 
 -   Take RNA-Seq data from multiple genomes
 
@@ -763,7 +801,16 @@ RNAs play a critical role in a wide range of biological functions such as:
 
 ![Figure 4. Workflow of methods](method_scripts_workflow.png)
 
-###Current Figures
+###Current Figures {#current_figures}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Overview*](#section-overview)
+
+***
+
 
 ![Figure 1. Maximum conserved evolutionary distance per sRNA (cumulative))](max_conservation_distance.png)
 
@@ -775,9 +822,15 @@ RNAs play a critical role in a wide range of biological functions such as:
 
 ![Figure 4. Random forest importance plot](random_forest_importance_plot.png)
 
-###Summary of strains used
+###Summary of strains used {#strains_used}
 
+Go to:
 
+-   [*Top*](#top)
+
+-   [*Overview*](#section-overview)
+
+***
 
 
 How to get the summary table for the genera for the RNA-seq data:
@@ -974,8 +1027,62 @@ for item in genera.iloc[:,0]:
 
 ```
 
-##Predicting sRNAs
-###Download data and map reads
+##Predicting sRNAs {#predicting_srnas}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Download data and map reads*](#section-data_download)
+
+-   [*Call peaks on individual RNA-Seq experiments*](#section-call_peaks)
+
+-   [*callPeaksforGenome.sh*](#section-callpeaksforgenome)
+
+    -   [*fetch_genomes_from_GCA.sh*](#section-fetch_genomes_from_gca.sh)
+
+    -   [*sra2plot.1.0.3.sh*](#section-sra2plot.1.0.3.sh)
+
+    -   [*removeProteinCodingRNA.R*](#section-removeproteincodingrna.r)
+    
+    -   [*run_rnaPeakCalling.R*](#section-run_rnapeakcalling.r)
+    
+    -   [*rfamscan*](#section-rfamscan)
+    
+    -   [*cmscanToGFFWrapper.R*](#section-cmscantogffwrapper.r)
+
+    -   [*cmscanToLookupTable.R*](#section-cmscantolookuptable.r)
+
+    -   [*combine_gff_files.R*](#section-combine_gff_files.r)
+
+-   [*fix_peak_calling*](#section-fix_peak_calling)
+
+-   [*Summary of Output Data*](#section-summary_of_output_data)
+
+-   [*Combining GFF file*](#section-combining_gff_files)
+
+-   [*Get sRNA Sequences*](#section-get_srnas)
+
+    -   [*get_sRNA_sequences.py*](#section-get_sRNA_sequencespy)
+    
+    -   [*get_sRNA_sequences*](#section-get_sRNA_sequences)
+    
+    -   [*get_random_srna_sequences_loop*](#section-get_random_srna_sequences_loop)
+    
+    -   [*get_random_srna_sequence*](#section-get_random_srna_sequence)
+    
+***
+    
+###Download data and map reads {#data_download}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Section*](#section-predicting_srnas)
+
+***
+
 
 **Scripts involved for each Accession**
 
@@ -1011,10 +1118,20 @@ for item in genera.iloc[:,0]:
 
     -   [*combine_gff_files.R*](#section-combine_gff_files.r) -f *./gff_files/* *-o* *\<GCA Accession\>*
 
-------------------------------------------------------------------------
+***
 
 
-###Call peaks on individual RNA-Seq experiments
+###Call peaks on individual RNA-Seq experiments {#call_peaks}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
+
+Description:
 
 -   A plot file is produced. This contains a number for each nucleotide that indicates read depth.
 
@@ -1026,11 +1143,20 @@ for item in genera.iloc[:,0]:
 
     -   Threshold is set to the equivalent of \~15 nt read depth before normalisation
 
-###callPeaksforGenome.sh
+###callPeaksforGenome.sh {#callpeaksforgenome}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
+
 
 Wrapper for a series of scripts that downloads genomes and fastq files, maps reads and calls peaks for a given genome. The fastq files are downloaded from SRA using a list of available experiment IDs.
 
-```{bash callPeaksforGenome.sh, eval = F, echo=F}
+```{bash callPeaksforGenome.sh, eval = F, echo=T}
 #!/bin/bash
 
 ##-----------------------------------------------------------------##
@@ -1205,11 +1331,19 @@ echo "Finished."
 rm tmp1
 ```
 
-###fetch_genomes_from_GCA.sh
+####fetch_genomes_from_GCA.sh
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
 
 Downloads a given genome and corresponding annotation file (GFF3 format).
 
-```{bash fetch_genomes_from_GCA.sh, eval = F, echo=F}
+```{bash fetch_genomes_from_GCA.sh, eval = F, echo=T}
 #!/bin/bash
 
 ##-----------------------------------------------------------------##
@@ -1367,11 +1501,19 @@ fi
 
 ```
 
-###sra2plot.1.0.3.sh
+####sra2plot.1.0.3.sh
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
 
 Script that maps reads from fastq file to genome and produces a plot file with read depths for each nucleotide.
 
-```{bash sra2plot.1.0.3.sh, eval=F, echo=F}
+```{bash sra2plot.1.0.3.sh, eval=F, echo=T}
 #!/bin/sh
 #Downloads fastq files from SRA, trims, maps and generates plotfiles for visualisation in artemis
 
@@ -1522,11 +1664,19 @@ fi
 
 ```
 
-###removeProteinCodingRNA.R
+####removeProteinCodingRNA.R
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
 
 In order to call non-coding RNA expression, expression of coding regions must be ignored as not all of the RNA-Seq experiemtns are focused on ncRNA. This script does this by setting coding regions (defined based on the annotation file) to a read depth of 0.
 
-```{r removeProteinCodingRNA.R, eval = F, echo=F}
+```{r removeProteinCodingRNA.R, eval = F, echo=T}
 #!/usr/bin/env Rscript
 suppressMessages(library('getopt'))
 
@@ -1599,11 +1749,19 @@ write.table(plotDat%>%select(V1,V2), file = paste(filePath, "/", opt$out_name, "
 
 ```
 
-###run_rnaPeakCalling.R
+####run_rnaPeakCalling.R
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
 
 Regions of expression are called on each individual RNA-Seq experiment by looking for regions where read depths are > 15 for atleast 50nt.
 
-```{r run_rnaPeakCalling.R, eval = F, echo=F}
+```{r run_rnaPeakCalling.R, eval = F, echo=T}
 #!/usr/bin/env Rscript
 suppressMessages(library('getopt'))
 
@@ -1819,19 +1977,352 @@ write.table(x = gff, file = paste(filePath, "/", opt$out_name, "_sra_calls.gff",
 
 ```
 
-###rfamscan
+
+```{r test_rnaPeakCalling, eval=F}
+genera_list <- list.files("~/phd/RNASeq/genera/")
+
+genera <- "Acinetobacter"
+
+for(genera in genera_list){
+  print(genera)
+  if(genera == "Escherichia"){
+    next
+  }
+
+
+accession_list <- list.files(paste("~/phd/RNASeq/genera/",  genera, "/", sep = ""), pattern = ".data$")
+accessionsDat <- data.frame(accession_list = accession_list)
+
+accessionsDat <- accessionsDat %>% mutate_all(as.character)
+accession_folder <-  accessionsDat$accession_list[1]
+
+
+for(accession_folder in accessionsDat$accession_list){
+  accession <- unlist(strsplit(accession_folder, "\\."))[c(1,2)]
+  accession <- paste(accession, collapse = ".")
+  files <- list.files(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/plot_files/", sep = ""), pattern = ".plot$")
+
+filesDat <- data.frame(files = files)
+
+filesDat <- filesDat %>% filter(grepl(pattern = "ncRNA", x = files)==F,
+                                grepl(pattern = "fwd", x = files)==F,
+                                grepl(pattern = "rev", x = files)==F,
+                                grepl(pattern = accession, x = files)==F) %>% mutate_all(as.character)
+
+
+if(nrow(filesDat) == 0){
+  next
+}
+print(accession)
+
+gffDat <- read.table(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", accession, ".gff", sep = ""), sep = "\t", fill = T, comment.char = "#", quote = "")
+colnames(gffDat) <- c("sequence", "source", "feature", "start", "end", "score", "strand", "phase", "Atrribute")
+
+regions <- gffDat %>% filter(feature == "region", start == "1") %>% select(sequence, start, end)
+
+current_pos <- 0
+for(i in 1:nrow(regions)){
+  # print(regions$start[i])
+  regions$end[i] <- regions$end[i] + current_pos
+  regions$start[i] <- regions$start[i] + current_pos
+  current_pos <- regions$end[i]
+
+}
+
+file_name <-  filesDat$files[1]
+
+for(file_name in filesDat$files){
+  print(file_name)
+  sra_id <- unlist(strsplit(file_name, "\\."))[1]
+  
+    plotFile <- read.table(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/plot_files/", file_name, sep = ""))
+
+
+
+
+
+
+cdsDat <- gffDat %>% filter(feature == "CDS")
+
+for(i in 1:nrow(regions)){
+  contig <- regions$sequence[i]
+  increase_val <- regions$start[i]
+  cdsDat <- cdsDat %>% mutate(start = ifelse(sequence == contig, start + increase_val, start),
+  end = ifelse(sequence == contig, end + increase_val, end))
+  
+}
+
+
+
+positions <- cdsDat %>% select(sequence,start, end) %>% mutate(start = start - 149) %>% mutate(start = ifelse(start < 1, 1, start))  %>% mutate(end = end + 149) %>% mutate(end = ifelse(end > max(regions$end), max(regions$end), end))
+
+
+
+
+
+
+positions$new <- do.call(paste, c(positions, sep=":")) 
+positions$new <- Map(":", positions$start, positions$end)
+
+
+values <- unlist(positions$new[1:1000])
+
+
+positions <- data.frame(rowNum = values, type="CDS")
+
+starts <- data.frame(rowNum = cdsDat$start, type2 ="start")
+stops <- data.frame(rowNum = cdsDat$end, type2 ="stop")
+starts <- starts %>% mutate(rowNum = rowNum - 149) %>% mutate(rowNum = ifelse(rowNum < 1, 1, rowNum))
+stops <- stops %>% mutate(rowNum = rowNum + 149) %>% mutate(rowNum = ifelse(rowNum > max(regions$end), max(regions$end), rowNum))
+
+starts_and_stops <- starts %>% bind_rows(stops)
+
+positions <- positions %>% 
+  left_join(starts_and_stops, by = "rowNum") %>% 
+  mutate(type2 = ifelse(is.na(type2), "remove", type2))
+
+plotDat <- plotFile %>% mutate(value = ifelse(V1 > V2, V1, V2)) %>% select(value) %>% mutate(rowNum = row_number())
+
+plotDat <- plotDat %>% left_join(positions, by = "rowNum") %>% mutate(type2 = ifelse(is.na(type2), "intergenic", type2)) %>% 
+  filter(type2 != "remove")
+
+
+plotDat <- plotDat %>% unique()
+
+
+
+plotDat <- plotDat %>% mutate(type = ifelse(is.na(type), "intergenic", "CDS"))
+
+total <- sum(plotDat$value)/1000000
+
+plotDat$value <- plotDat$value/total
+
+# save(plotDat, file = "~/phd/RNASeq/tmp/plotDat.Rda")
+# 
+# load("~/phd/RNASeq/tmp/plotDat.Rda")
+
+checkDat <- plotDat %>% filter(value > 15/total & type == "intergenic" )
+
+
+# checkDat <- data.frame(value = "0.04", rowNum = c(1,2,3,4,5,15,16,17,18,21,22,23,50,51,52,56,61,62,63,64,100,101,102,103),
+#                        type = "intergenic")
+# checkDat <- checkDat %>% mutate(type = ifelse(rowNum > 15 & rowNum < 30, "CDS", "intergenic"))
+
+plotDat <- checkDat
+
+callsDat <- data.frame(start = rep(as.character("0"), 20000), stop = rep(as.character("0"), 20000), stringsAsFactors = F)
+start <- 0
+stop <- 0
+current_feature <- F
+cds <- F
+id_pos <- 0
+
+
+i <- 1
+for(i in 1:nrow(plotDat)){
+  printRemaining(i = i, length = nrow(plotDat))
+  if(i == nrow(plotDat)){
+    if(current_feature){
+    if((plotDat$rowNum[i] - 25) < stop){
+    stop <- plotDat$rowNum[i]
+    if(plotDat$type[i] == "CDS"){
+        cds <- T
+    }
+    }
+      if(cds){
+        current_feature <- F
+        cds <- F
+        next
+      }
+    id_pos <- id_pos + 1
+    # print(paste(start,stop, id_pos))
+    callsDat$start[id_pos] <- start
+    callsDat$stop[id_pos] <- stop
+    current_feature <- F
+    cds <- F
+    }
+  }
+  
+  if(current_feature == F){
+      start <- plotDat$rowNum[i]
+      stop <- plotDat$rowNum[i]
+      if(plotDat$type[i] == "CDS"){
+          cds <- T
+      }
+      current_feature <- T
+      next
+  }
+  
+  if(plotDat$type2[i] == "stop"){
+    stop <- plotDat$rowNum[i]
+    cds <- T
+    next
+  }
+  
+  if((plotDat$rowNum[i] - 25) < stop){
+    stop <- plotDat$rowNum[i]
+    if(plotDat$type[i] == "CDS"){
+        cds <- T
+    }
+    next
+  }else{
+     if(cds){
+      current_feature <- F
+      cds <- F
+      start <- plotDat$rowNum[i]
+      stop <- plotDat$rowNum[i]
+      next
+     }
+    id_pos <- id_pos + 1
+    # print(paste(start,stop, id_pos))
+    callsDat$start[id_pos] <- start
+    callsDat$stop[id_pos] <- stop
+    current_feature <- F
+    cds <- F 
+  }
+}  
+  
+  
+
+
+
+
+combinedCalls <- callsDat %>% filter(start != 0) %>% mutate_all(as.numeric) %>% filter((stop - start) > 50)
+
+
+
+
+gffMain <- readLines(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", accession, ".gff", sep = ""))
+gffMain <- data.frame(text = gffMain)
+genomeInfo <- as.character(gffMain[8,1])
+genomeBuild <- as.character(gffMain[4,1])
+genomeSpecies <- as.character(gffMain[9,1])
+accession_contig <- strsplit(genomeInfo, " ")[[1]][2]
+
+
+
+gffFwd <- combinedCalls%>%mutate(strand = "+",
+                                                 source = "sraAlignedncRNAExpression",
+                                                 seqname = accession_contig,
+                                                 median.val = 0,
+                                                 feature = "ncRNA",
+                                                 frame = ".",
+                                                 attribute = paste("ID=rna_fwd_", row_number(), sep = ""))%>%
+  select(seqname, source, feature, start, stop, median.val, strand, frame, attribute)
+
+
+
+
+fileConn<-file(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", sra_id, "_snra_calls.gff", sep = ""))
+writeLines(c("##gff-version 3",
+             "#!gff-spec-version 1.21",
+             "#!processor R script (local) with manual add of top section",
+             genomeBuild,
+             paste("#!genome-build-accession NCBI_Assembly:", "GCA_000017745.1", sep = ""),
+             paste("#!annotation-date ", Sys.Date(), sep = ""),
+             "#!annotation-source snraCalls (local version)",
+             genomeInfo,
+             genomeSpecies), fileConn)
+close(fileConn)
+
+ print(paste("Writing to ~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", sra_id, "_snra_calls.gff", sep = ""))
+write.table(x = gffFwd, file = paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", sra_id, "_snra_calls.gff", sep = ""), row.names = F, col.names = F, quote = F, sep = "\t", append = T)
+
+
+# plotDat <- plotDat %>% mutate(value = ifelse(is.na(type), value, 0))
+# 
+# 
+# outDat <- plotDat %>% select(value)
+# 
+# 
+# write.table(outDat, paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/plot_files/", file_name, "_ncRNA_no_buffer.plot", sep = ""), quote = F, row.names = F, col.names = F)
+}
+
+
+}
+}
+```
+
+```{bash move_old_calls, eval=F}
+##done in ~/phd/RNASeq/genera/
+
+cd ~/phd/RNASeq/genera/
+for genus in *;
+do
+#genus="Escherichia"
+
+
+cd ~/phd/RNASeq/genera/${genus}
+
+
+for folder in *.data;
+do
+
+cd ~/phd/RNASeq/genera/${genus}/${folder}/gff_files/
+
+mkdir -p old
+
+mv *_sra_calls.gff old
+
+
+done
+done
+```
+
+```{bash run_combine_gff_over_all_accessions, eval=F}
+
+cd ~/phd/RNASeq/genera/
+for genus in *;
+do
+#genus="Escherichia"
+
+
+cd ~/phd/RNASeq/genera/${genus}
+
+
+for folder in *.data;
+do
+accession=`basename $folder .data`
+echo $genus $accession
+cd ~/phd/RNASeq/genera/${genus}/${folder}/
+
+combine_gff_files.R -f ./gff_files/ -o $accession
+
+done
+done
+
+```
+
+####rfamscan
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
 
 Annotations of known sRNAs in the downloaded annotation file were supplemented by searching for known rFam families in each genome.
 
-```{bash rfamscan, eval = F, echo=F}
+```{bash rfamscan, eval = F, echo=T}
 rfamscan() { counts=$( bc -l <<< "scale=2;$(esl-seqstat $1.fna | grep ^"Total" | tr -s ' ' | cut -d ' ' -f4)*2/1000000"); cmscan -Z $counts  --cut_ga --rfam --nohmmonly --tblout $1.tblout --fmt 2 --clanin ~/Downloads/Rfam.clanin.txt ~/Downloads/Rfam.cm $1.fna; cmscanToGffWrapper.R -f $1.tblout -g $1;}
 ```
 
-###cmscanToGFFWrapper.R
+####cmscanToGFFWrapper.R
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
+
 
 The output from running cmscan needs to be in the same format as the rest of the data (GFF3).
 
-```{r cmscanToGFFWrapper.R, eval=F, echo=F}
+```{r cmscanToGFFWrapper.R, eval=F, echo=T}
 #!/usr/bin/env Rscript
 library('getopt')
 
@@ -1908,11 +2399,114 @@ write.table(x = gff, file = paste(opt$file_path, "/",opt$output, "_ncRNA.gff", s
 
 ```
 
-###combine_gff_files.R
+####cmscanToLookupTable.R
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
+
+
+The output from running cmscan needs to be in the same format as the rest of the data (GFF3).
+
+```{r cmscanToLookupTable.R, eval=F, echo=T}
+#!/usr/bin/env Rscript
+library('getopt')
+
+cmscanToLookup <- function(rfamRes){
+  colnames(rfamRes) <- c("idx", "target.name", "accession1", "query.name", "accession2", "clan.name", "mdl", "mdl.from",  "mdl.to", "seq.from",   "seq.to",
+                         "strand", "trunc", "pass",   "gc",  "bias",  "score",   "E.value", "inc", "olp", "anyidx", "afrct1", "afrct2", "winidx", "wfrct1", "wfrct2", "description.of.target")
+  
+  rfamRes <- rfamRes%>%
+    mutate(seq.from2 = seq.from)%>%
+    mutate(seq.from = ifelse(seq.from > seq.to, seq.to, seq.from))%>%
+    mutate(seq.to = ifelse(seq.from2 > seq.to, seq.from2, seq.to))
+  
+  gff <- data.frame(seqname = rfamRes$query.name,
+                    source = rep("rfam", nrow(rfamRes)),
+                    feature = rep("ncRNA", nrow(rfamRes)),
+                    start = rfamRes$seq.from,
+                    end = rfamRes$seq.to,
+                    score = rfamRes$score,
+                    strand = rfamRes$strand,
+                    frame = rep(".", nrow(rfamRes)),
+                    attribute = rfamRes$accession1)
+  return(gff)
+}
+
+
+spec = matrix(c(
+  'cmscanOutput', 'f', 1, "character",
+  'gcf', 'g', 1, "character",
+  'help' , 'h', 0, "logical",
+  'file_path', 'p', 2, "character",
+  'out_name', 'o', 2, "character"
+), byrow=TRUE, ncol=4)
+
+
+opt = getopt(spec)
+#
+# opt$cmscanOutput <- "GCA_000017745.1.tblout"
+# opt$gcf <- "GCA_000017745.1"
+# opt$file_path <- "~/phd/RNASeq/escherichia/"
+# opt$output <- "escherichia_test"
+
+if ( !is.null(opt$help) ) {
+  cat("cmscanToGffWrapper.R version 1.0\n\n")
+  cat("Use cmscanToGffWrapper.R <options> -f <cmscan ouptut file> -g <gff file>\n\n")
+  cat("Options:\n")
+  cat("  -f <cmscan ouptut file> The file that contains the cmscan output\n")
+  cat("  -g <gff file> The file that contains the gff data. Do not inclue the gff file extension\n")
+  cat("  -f <file path> The location of the other files and the output file\n")
+  cat("  -o <output file name> The name of the output file. Do not inclue the gff file extension. The default is the same as the gca input\n")
+  q(status=1)
+}
+
+if ( is.null(opt$cmscanOutput) ) {
+  cat("Error: -f <cmscan ouptut file> is required.\n")
+  q(status=1)
+}
+if ( is.null(opt$gcf) ) {
+  cat("Error: -g <gff file> is required.\n")
+  q(status=1)
+}
+
+library(tidyverse)
+library(tjnFunctions)
+
+if ( is.null(opt$file_path ) ) { opt$file_path = "." }
+if ( is.null(opt$output ) ) { opt$output = opt$gcf }
+
+rfamRes <- read.table(paste(opt$file_path, opt$cmscanOutput, sep = "/"), header = F, comment.char = "#",quote = "", fill = T)
+
+
+gff <- cmscanToLookup(rfamRes = rfamRes)
+gff <- gff %>% arrange(start)
+
+
+write.table(x = gff, file = paste(opt$file_path, "/",opt$output, "_ncRNA.lookup", sep = ""), row.names = F, col.names = F, quote = F, sep = "\t")
+
+```
+
+
+
+####combine_gff_files.R
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
+
 
 For each genome all of the individual annotation files are combined into a single file with the description column incuding details of the origin of each annotation.
 
-```{r combine_gff_files.R, eval=F, echo=F}
+```{r combine_gff_files.R, eval=F, echo=T}
 #!/usr/bin/env Rscript
 suppressMessages(library('getopt'))
 
@@ -2150,8 +2744,19 @@ write.table(x = mergedDat, file = paste(file_path, "/", opt$out_name, "_new_call
 ```
 
 
-###Summary of Output Data
 
+
+###Summary of Output Data {#summary_of_output_data}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
+
+Description:
 
 -   From >21 strains and 11 genera, there were >292 RNA-Seq files.
 
@@ -2161,9 +2766,18 @@ write.table(x = mergedDat, file = paste(file_path, "/", opt$out_name, "_new_call
 
 -   There were ??? known ncRNAs included in the analysis.
 
-------------------------------------------------------------------------
+***
 
-###Combining GFF file
+###Combining GFF file {#combining_gff_files}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
+
 
 At this stage each individual RNA-Seq file has a corresponding gff file of SRA calls. There is also the original GFF file containing ncRNAs (along with CDS). Predictions of ncRNAs are made using rfam models and the output is made into a GFF file. There are 2 GFF files containing *known* ncRNAs and a number of GFF files containing predicted SRAs.
 
@@ -2182,15 +2796,207 @@ At this stage each individual RNA-Seq file has a corresponding gff file of SRA c
 
 -   There were 15,072 random regions chosen
 
-###get_random_srna_sequences.py
 
 A set of 'RNAs' were predicted based on selecting random regions of genomes of the equavilent size to the predicted set in order to give a baseline of what is expected from different sRNA prediction approaches. 
 
-```{bash get_random_srna_sequences_loop, eval = F, echo=F}
+-   All ${accession}_new_calls.txt files are moved to ~/phd/RNASeq/new_calls/
+
+
+###Get sRNA Sequences {#get_srnas}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
+
+
+####get_sRNA_sequences.py {#get_sRNA_sequencespy}
+
+[*Back to top (section)*](#section-get_srnas)
+
+```{python get_sRNA_sequences.py, eval=F, include=T}
+#!/usr/bin/python
+import sys
+from Bio import SeqIO
+from Bio.Alphabet import generic_dna
+import getopt
+import os
+
+
+
+help = '''
+    get_sRNA_sequences.py v 0.1 (August 2020) is a script for taking predicted sRNA regions and extracting the DNA sequence from 
+    fasta files.
+    Usage:
+     get_sRNA_sequences.py <accession>
+    
+    Options:
+        -h	Display this help
+        -q  Supress messages
+    Input
+        -a	<accession> the genome accession to use for the input and output files
+
+    
+'''
+
+def usage():
+    print help
+
+def rungetopts():
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "a:qh", ["accession", "quiet", "help"])
+    except getopt.GetoptError as err:
+        print(err)
+        usage()
+        sys.exit(2)
+    accession = ""
+    for o, a in opts:
+            if o in ("-h", "--help"):
+                usage()
+                sys.exit()
+            elif o in ("-a", "--accession"):
+                accession = a
+            else:
+                assert False, "unhandled option"
+    if accession == "":
+        print "-a <accession> missing. For more help use -h"
+        sys.exit(2)
+    return(accession)
+
+
+
+
+#
+# def makeoutputdirectory(write_path):
+#     if os.path.isdir(write_path) == False:
+#         try:
+#             os.mkdir(write_path)
+#         except OSError:
+#             print ("Creation of the directory %s failed" % accession)
+#             sys.exit(2)
+#     directory = os.listdir(write_path)
+#     if len(directory) != 0:
+#         print "Examples of files in %s" % write_path
+#         print directory[0:4]
+#         query_user = raw_input("%s is not an empty directory. Continue anyway y/n (this may write over existing files): " % write_path)
+#         if query_user == "y":
+#             print "Using %s as directory" % write_path
+#         else:
+#             print "Exiting script"
+#             sys.exit(2)
+#
+# def concatenateSequence(fastaFile):
+#     my_seq = fastaFile[0].seq
+#     i = 0
+#     for seq in fastaFile:
+#         if i == 0:
+#             i += 1
+#             continue
+#         i += 1
+#         my_seq = my_seq + seq.seq
+#     return my_seq
+#
+# def writeSequences(inFile,my_seq,accession,write_path):
+#     i = 0
+#     for line in inFile:
+#         i += 1
+#         words = line.rstrip()
+#         words = words.split("\t")
+#         srna = words[-1]
+#         start = words[2]
+#         try:
+#             start = int(start)
+#         except ValueError:
+#             continue
+#         end = words[3]
+#         end = int(end)
+#         if end - start > 50:
+#             strand = words[4]
+#             new_feature = words[8]
+#             feature = words[1]
+#             overlap = words[7]
+#             if new_feature == "FALSE":
+#                 srna_type = "known"
+#             else:
+#                 srna_type = "novel"
+#             srnaSeq = my_seq[start:end]
+#             srnaSeqRev = srnaSeq.reverse_complement()
+#             if strand == "-":
+#                 srnaSeq = srnaSeqRev
+#             if srna_type == "known":
+#                 srnaPCFile = open("%s/positive_control/%s.fna" % (write_path, accession), "a")
+#                 srnaPCFile.write(">%s[%s-%s,%s,%s,%s,%s]\n%s\n" % (srna, start, end, strand, srna_type, feature, overlap, srnaSeq))
+#             else:
+#                 srnaPredictedFile = open("%s/predicted/%s.fna" % (write_path, accession), "a")
+#                 srnaPredictedFile.write(">%s[%s-%s,%s,%s,%s,%s]\n%s\n" % (srna, start, end, strand, srna_type, feature, overlap, srnaSeq))
+def main():
+
+    accession = rungetopts()
+
+    try:
+        inFile = open("/Users/thomasnicholson/phd/RNASeq/new_calls/%s_new_calls.txt" % accession, 'r')
+    except IOError:
+        print "/Users/thomasnicholson/phd/RNASeq/new_calls/%s_new_calls.txt not found" % accession
+        sys.exit(2)
+    try:
+        fastaFile = list(SeqIO.parse("/Users/thomasnicholson/phd/RNASeq/sequences/%s.fna" % accession, "fasta"))
+    except IOError:
+        print "/Users/thomasnicholson/phd/RNASeq/sequences/%s.fna not found" % accession
+        sys.exit(2)
+
+
+    write_path = "/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1"
+
+    print "Combining contigs"
+    my_seq = srna.concatenateSequence(fastaFile)
+
+    print "Writing sequences"
+    srna.writeSequences(inFile,my_seq,accession,write_path)
+
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+
+
+```
+
+####get_sRNA_sequences
+
+[*Back to top (section)*](#section-get_srnas)
+
+```{bash get_sRNA_sequences_loop, eval=F, include=T}
+##done in ~/phd/RNASeq/new_calls/
+for file in *.txt; 
+do 
+  accession=`basename $file _new_calls.txt`; 
+  echo $accession; get_sRNA_sequences.py -a $accession; 
+done
+
+```
+
+####get_random_srna_sequences_loop
+
+[*Back to top (section)*](#section-get_srnas)
+
+
+```{bash get_random_srna_sequences_loop, eval = F}
+##done in ~/phd/RNASeq/new_calls/
 for file in *.txt; do accession=`basename $file _new_calls.txt`; echo $accession; get_random_srna_sequences.py -a $accession; done
 ```
 
-```{python get_random_srna_sequences.py, eval = F, python.reticulate = FALSE, echo=F}
+####get_random_srna_sequence
+
+[*Back to top (section)*](#section-get_srnas)
+
+
+```{python get_random_srna_sequences.py, eval = F, python.reticulate = FALSE, echo=T}
 #!/usr/bin/python
 
 '''
@@ -2290,9 +3096,54 @@ if __name__ == "__main__":
 
 For each genome there is now a single file containing all the SRA calls and whether they were previously found/predicted.
 
-## Search for known ncRNAs and get phylogenetic distance matrix
+## Search for known ncRNAs and get phylogenetic distance matrix {#known_srna}
 
-###Run over subset of genomes for all genera
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Run over subset of genomes for all genera*](#section-subest_of_all_genomes)
+
+-   [*run_csmscan_across_multiple_files*](#section-run_csmscan_across_multiple_files)
+
+-   [*genome_contig_pairs*](#section-genome_contig_pairs)
+
+-   [*cmsearch_res_pc*](#section-cmsearch_res_pc)
+
+-   [*cmsearch_res_analysed_genomes*](#section-cmsearch_res_analysed_genomes)
+
+-   [*get_nucelotide_sequences*](#section-get_nucelotide_sequences)
+
+-   [*make_cm_files*](#section-make_cm_files)
+
+-   [*remove_empty_files*](#section-remove_empty_files)
+
+-   [*combine_alignments*](#section-combine_alignments)
+
+-   [*rename_alignment_ids*](#section-rename_alignment_ids)
+
+-   [*reformat_matrix*](#section-reformat_matrix)
+
+-   [*query_target_pairs*](#section-query_target_pairs)
+
+-   [*dna_dists*](#section-dna_dists)
+
+
+    -   [*get_sRNA_sequences.py*](#section-get_sRNA_sequencespy)
+
+***
+
+
+###Run over subset of genomes for all genera {#subest_of_all_genomes}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Known sRNAs and distance matrix*](#section-known_srna)
+
+***
+
 
 ```{r get_genomes_for_analysis, eval=F}
 assembly_summary <- read.table("/Volumes/scratch/brownlab/chrisbr/DB/REFSEQ_REPREF/bacteria/assembly_summary_repref.txt", sep = "\t", fill = T, quote = "", comment.char = "")
@@ -2354,6 +3205,15 @@ write.table(x = complete_genomes$species, file = "~/phd/RNASeq/all_taxa_names.tx
   
 ###run_csmscan_across_multiple_files
 
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Known sRNAs and distance matrix*](#section-known_srna)
+
+***
+
+
 ```{bash run_csmscan_across_multiple_files, eval=F, include=T}
 #in ~/phd/RNASeq/representative_genomes
 #in ~/phd/RNASeq/analysed_genomes
@@ -2400,6 +3260,16 @@ done
 
 
 ###genome_contig_pairs
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Known sRNAs and distance matrix*](#section-known_srna)
+
+***
+
+
 ```{bash genome_contig_pairs, eval=F}
 #done from ~/phd/RNASeq/representative_genomes/
 #repeat from ~/phd/RNASeq/${group}
@@ -2415,6 +3285,17 @@ done
 
 
 ###cmsearch_res_pc
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Known sRNAs and distance matrix*](#section-known_srna)
+
+
+***
+
+
 ```{r cmsearch_res_pc, eval=F}
 
 ##file made with cat RF00177.tbl | sed 's/  /\t/g' | tr -s '\t' | sed 's/\t /\t/g' | sed 's/ \t/\t/g' | sed 's/ /\t/3' | sed 's/ /\t/' | sed 's/ /\t/' | sed 's/ /_/g' | sed 's/_!/\t!/g' | tr -s '\t' | sed 's/Pseudomonas\t/Pseudomonas_/g' > RF00177.tab along with manually replacing some incorrect _ and \t 
@@ -2472,6 +3353,16 @@ write.table(x = modelDat, file = paste("~/phd/RNASeq/rfam_files/locations/", ite
 ```
 
 ###cmsearch_res_analysed_genomes
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Known sRNAs and distance matrix*](#section-known_srna)
+
+***
+
+
 ```{r cmsearch_res_analysed_genomes, eval=F}
 
 ##file made with cat RF00177.tbl | sed 's/  /\t/g' | tr -s '\t' | sed 's/\t /\t/g' | sed 's/ \t/\t/g' | sed 's/ /\t/3' | sed 's/ /\t/' | sed 's/ /\t/' | sed 's/ /_/g' | sed 's/_!/\t!/g' | tr -s '\t' | sed 's/Pseudomonas\t/Pseudomonas_/g' > RF00177.tab along with manually replacing some incorrect _ and \t 
@@ -2536,6 +3427,16 @@ write.table(x = modelDat, file = paste("~/phd/RNASeq/analysed_genomes_rfam_files
 
 
 ###get_nucelotide_sequences
+
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Known sRNAs and distance matrix*](#section-known_srna)
+
+***
+
 
 ```{bash get_nucelotide_sequences, eval = F}   
 
@@ -2624,7 +3525,18 @@ done
 
 -   Build covariance models (on server)
 
-###make cm files
+###make_cm_files
+
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Known sRNAs and distance matrix*](#section-known_srna)
+
+***
+
+
 ```{bash make_cm_files, eval=F}
 ##from ~/phd/RNASeq/rfam_files/
 ##or
@@ -2656,6 +3568,16 @@ done
 
 
 ###remove_empty_files
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Known sRNAs and distance matrix*](#section-known_srna)
+
+***
+
+
 ```{bash remove_empty_files, eval=F}
 for folder in *_files; 
 do
@@ -2682,6 +3604,17 @@ done
 -   Mask to reference and combine the alignments
 
 ###combine_alignments
+
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Known sRNAs and distance matrix*](#section-known_srna)
+
+***
+
+
 ```{bash combine_alignments, eval=F}
 for folder in *_files;
 do
@@ -2701,6 +3634,16 @@ done
 -   phylip files shorten IDs to 10 characters. This means there needs to be a lookup table to reverse this in later steps.
 
 ###rename_alignment_ids
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Known sRNAs and distance matrix*](#section-known_srna)
+
+***
+
+
 ```{r rename_alignment_ids, eval=F}
 dat <- read.table("~/phd/RNASeq/RF00177.stk", sep = "\t", fill = T, comment.char = "", quote = "", header = F)
 
@@ -2728,6 +3671,17 @@ save(current_ids, file = "~/bin/r_git/R/r_files/current_ids.Rda")
 
 ###reformat_matrix
 
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Known sRNAs and distance matrix*](#section-known_srna)
+
+***
+
+
+Summary:
+
 -   output from dnadist changed into useable matrix
 
     -   cat  RF00177_rep_seqs_all.dists | tr '\n' ' ' | sed 's/ N/\nN/g' > RF00177_rep_MATRIX_all.dists
@@ -2735,6 +3689,16 @@ save(current_ids, file = "~/bin/r_git/R/r_files/current_ids.Rda")
 -   get the complete list of all query-target so that all contigs in each sRNA are listed.
 
 ###query_target_pairs
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Known sRNAs and distance matrix*](#section-known_srna)
+
+***
+
+
 ```{bash query_target_pairs, eval=F}
 #done in the alignments file (such as ~/phd/RNASeq/srnas/predicted/combined_alignments_ids/alignments)
 #saved on MacBook to .../predicted/
@@ -2751,6 +3715,16 @@ done
 ```
 
 ###dna_dists
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Known sRNAs and distance matrix*](#section-known_srna)
+
+***
+
+
 ```{r dna_dists_setup, eval=F, include=F}
 run_all <- F
 if(run_all){
@@ -3119,6 +4093,16 @@ ggsave(filename = "~/phd/RNASeq/figures/max_conservation_distance_4.svg", plot =
 
 
 ###large_tree
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Known sRNAs and distance matrix*](#section-known_srna)
+
+***
+
+
 ```{r large_tree, eval=F, include=F}
   # tree <- read.tree("~/bin/r_git/R/r_files/large_labelled_tree.tree")
   tree <- read.tree("~/bin/r_git/R/r_files/all_taxa.tree")
@@ -3132,17 +4116,257 @@ ggsave(filename = "~/phd/RNASeq/figures/max_conservation_distance_4.svg", plot =
 
 
 
-##Build families of sRNAs
+##Build families of sRNAs {#build_families_of_srnas}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Check negative control for matches to known elements*](#section-check_negaitves)
+
+-   [*compare_groups_for_overlap*](#section-compare_groups_for_overlap)
+
+-   [*remove_not_nc*](#section-remove_not_nc)
+
+***
+
 
 Each individual sRNA was searched against the complete list of sRNAs in order to cluster the related sRNAs into families. These families were then used to search through all of the genomes in the clade to improve on the number of sequences per family. 
 
 ![Figure a. show the clade]()
 
-##Remove redundancy
+
+###Check negative control for matches to known elements {#check_negaitves}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Build families of sRNAs*](#section-build_families_of_srnas)
+
+***
+
+
+```{bash get_ids_and_positions, eval=F, include=T}
+##done in ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/alignments_rnaalifold
+
+group='predicted'
+cd ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/alignments_rnaalifold
+> ../${group}_contig_pos.txt
+for file in *.stk;
+do 
+
+  ID=`echo $file | cut -d '.' -f1,2`
+  echo $ID
+  grep "/" $file | grep -v "//" | cut -d ' ' -f1 | sed 's/\// /g' | sed 's/-/ /g'| cut -d '|' -f2 | sort | uniq | sed -e "s/$/ $ID/" >> ../${group}_contig_pos.txt
+
+done
+
+```
+
+###compare_groups_for_overlap
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Build families of sRNAs*](#section-build_families_of_srnas)
+
+***
+
+
+```{r compare_groups_for_overlap, eval=F}
+library(GenomicRanges)
+ncdat <- read.table("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/negative_control_contig_pos.txt", sep = " ", fill = T, as.is = T)
+
+pcdat <- read.table("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/positive_control_contig_pos.txt", fill = T, as.is = T)
+
+preddat <- read.table("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/predicted_contig_pos.txt", fill = T, as.is = T)
+
+
+reformat_data <- function(dat){
+
+colnames(dat) <- c("contig", "start", "stop", "srna")
+dat <- dat  %>% select(contig, srna, start, stop) %>% mutate(strand = "+")
+
+dat <- dat %>% mutate(start = as.numeric(start), stop = as.numeric(stop))
+
+dat <- dat %>% mutate(tmpstart = ifelse(start < stop, start, stop),
+                      tmpend = ifelse(start > stop, start, stop))
+dat <- dat %>% filter(!is.na(tmpstart))
+return(dat)
+}
+
+pcdat <- reformat_data(dat = pcdat)
+ncdat <- reformat_data(dat = ncdat)
+preddat <- reformat_data(dat = preddat)
+
+getOverlapIDs <- function(queryDat, targetDat){
+  queryDat <- queryDat %>% arrange(start)
+  targetDat <- targetDat %>% arrange(start)
+query <- GRanges(seqnames = queryDat$contig,
+                 ranges = IRanges(start = queryDat$tmpstart, end = queryDat$tmpend),
+                  strand = queryDat$strand, query_name = queryDat$srna)
+
+target <- GRanges(seqnames = targetDat$contig,
+                 ranges = IRanges(start = targetDat$tmpstart, end = targetDat$tmpend),
+                  strand = targetDat$strand, query_name = targetDat$srna)
+
+
+lookup1NC <- data.frame(id1 = queryDat$srna, queryHits = c(1:length(queryDat$srna)))
+lookup2PC <- data.frame(id2 = targetDat$srna, subjectHits = c(1:length(targetDat$srna)))
+
+tmp <- GenomicRanges::findOverlaps(query, target, type = 'any')
+
+tmp <- as.data.frame(tmp)
+
+tmp <- tmp %>% left_join(lookup1NC) %>% left_join(lookup2PC)
+tmp <- tmp %>% mutate_all(as.character)
+tmp <- tmp %>% filter(id1 != id2)
+
+smallDat <- tmp %>% select(id1, id2) %>% unique()
+return(smallDat)
+}
+
+nc.pc.Dat <- getOverlapIDs(queryDat =ncdat, targetDat = pcdat)
+nc.pred.Dat <- getOverlapIDs(queryDat =ncdat, targetDat = preddat)
+pc.pred.Dat <- getOverlapIDs(queryDat =preddat, targetDat = pcdat)
+
+dat <- data.frame(ids = c(nc.pc.Dat$id1, nc.pred.Dat$id1))
+
+write.table(dat, file = "~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/not_negative_control_ids.txt", row.names = F, col.names = F, quote = F)
+
+dat2 <- data.frame(ids =  pc.pred.Dat$id1)
+
+write.table(dat2, file = "~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/predicted_matches_positive_control_ids.txt", row.names = F, col.names = F, quote = F)
+
+```
+
+###remove_not_nc
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Build families of sRNAs*](#section-build_families_of_srnas)
+
+***
+
+
+```{bash remove_not_nc, eval=F, include=T}
+##done in ~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/combined_alignments_ids
+
+
+cd ~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/
+
+mkdir -p RNAAlifold/keep
+mkdir -p alifold/keep
+mkdir -p alignments_rnaalifold/keep
+mkdir -p rscape_out/keep
+
+mkdir -p RNAAlifold/ignore_2
+mkdir -p alifold/ignore_2
+mkdir -p alignments_rnaalifold/ignore_2
+mkdir -p rscape_out/ignore_2
+
+
+
+
+while read line;
+do
+
+mv ./RNAAlifold/$line* ./RNAAlifold/ignore_2
+mv ./alifold/$line* ./alifold/ignore_2
+mv ./alignments_rnaalifold/$line* ./alignments_rnaalifold/ignore_2
+mv ./rscape_out/$line* ./rscape_out/ignore_2
+
+done < not_negative_control_ids.txt
+
+```
+
+does not work
+```{bash remove_pc_predicted, eval=F, include=T}
+##done in ~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/combined_alignments_ids
+
+
+cd ~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/
+
+mkdir -p RNAAlifold/keep
+mkdir -p alifold/keep
+mkdir -p alignments_rnaalifold/keep
+mkdir -p rscape_out/keep
+
+mkdir -p RNAAlifold/ignore_2
+mkdir -p alifold/ignore_2
+mkdir -p alignments_rnaalifold/ignore_2
+mkdir -p rscape_out/ignore_2
+
+
+
+
+while read line;
+do
+
+mv ./RNAAlifold/$line* ./RNAAlifold/ignore_2
+mv ./alifold/$line* ./alifold/ignore_2
+mv ./alignments_rnaalifold/$line* ./alignments_rnaalifold/ignore_2
+mv ./rscape_out/$line* ./rscape_out/ignore_2
+
+done < predicted_matches_positive_control_ids.txt
+
+```
+
+
+-   move the files in keep/ back into the original folder 
+    
+    -   *mv* *./keep/\** *./*
+
+
+##Remove redundancy {#remove_redundancy}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*redundancy_check*](#section-redundancy_check)
+
+-   [*redundancy_test_example*](#section-redundancy_test_example)
+
+-   [*contigs_and_cordinates_of_matches*](#section-contigs_and_cordinates_of_matches)
+
+-   [*get_stats_on_alignments*](#section-get_stats_on_alignments)
+
+-   [*redundancy_1_R*](#section-redundancy_1_R)
+
+-   [*move_nc_quickly*](#section-move_nc_quickly)
+
+-   [*redundancy_1_in_python*](#section-redundancy_1_in_python)
+
+-   [*redundancy_2*](#section-redundancy_2)
+
+-   [*redundancy_2_overlapping_scores*](#section-redundancy_2_overlapping_scores)
+
+-   [*output_of_list_of_sRNAs_to_combine*](#section-output_of_list_of_sRNAs_to_combine)
+
+-   [*combine_sRNAs_bash*](#section-combine_sRNAs_bash)
+
+***
+
 
 As there are many sRNAs each comntributing to each model, it is important to enusre that each sequence only shows up in one model rather than several. This means combining the duplicated models to remove redundancy. 
 
-```{r redundancy_check, eval = F, include=F}
+###redundancy_check
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Remove redundancy*](#section-remove_redundancy)
+
+***
+
+
+```{r redundancy_check, eval = F, include=T}
 
 
 load("~/bin/r_git/R/r_files/overlapping_models_ids.Rda") #made from ~/phd/RNASeq/srna_seqs/version_1/positive_control/overlapping_models/overlapping_models_ids.txt
@@ -3192,6 +4416,18 @@ plot(g, edge.color="gray30", vertex.size = 5)
 
 Checking that the overlapping sRNAs will be combined correctly.
 
+
+###redundancy_test_example
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Remove redundancy*](#section-remove_redundancy)
+
+***
+
+
 ```{python redundacy_test_example}
 test_contigs = ['N1', 'N2', 'N3', 'N4']
 test_data = {'query_id':['G1', 'G2', 'G3', 'G1', 'G2', 'G3', 'G1', 'G1', 'G3', 'G3', 'G2', 'G3'], 
@@ -3229,6 +4465,16 @@ Checking the distribution of overlap %.
     -   overlapping regions will be merged.
 
 ###contigs_and_cordinates_of_matches
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Remove redundancy*](#section-remove_redundancy)
+
+***
+
+
 ```{bash contigs_and_cordinates_of_matches, eval=F}
 > ../../predicted_genomic_sequence_matches.txt
 for file in *.stk;
@@ -3244,6 +4490,16 @@ done
 -   get the number of sequences in each model for analysis of the distributions in later steps
 
 ###get_stats_on_alignments
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Remove redundancy*](#section-remove_redundancy)
+
+***
+
+
 ```{bash get_stats_on_alignments, eval=F}
 > ../../original_stats_all.txt
 
@@ -3263,20 +4519,38 @@ done
     - I have used this for the negative control group as it is so much faster. Any repeats will use this method
 
 ###redundancy_1_R 
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Remove redundancy*](#section-remove_redundancy)
+
+***
+
+
 ```{r redundancy_1_R, eval=F}
 
-dat <- read.table("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/negative_control/nc_genomic_sequence_matches.txt")
-
-dat <- dat %>% separate(col = V1, into = c("contig", "coordinates"), sep = "\\/", remove = F)
-
-dat <- dat %>% separate(col = coordinates, into = c("start", "stop"), sep = "-", remove = F)
-
-dat <- dat %>% dplyr::rename(srna = V3) %>% select(contig, srna, start, stop) %>% mutate(strand = "+")
+dat <- read.table("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/negative_control_contig_pos.txt", sep = " ", fill = T, as.is = T)
+colnames(dat) <- c("contig", "start", "stop", "srna")
+dat <- dat  %>% select(contig, srna, start, stop) %>% mutate(strand = "+")
 
 dat <- dat %>% mutate(start = as.numeric(start), stop = as.numeric(stop))
 
 dat <- dat %>% mutate(tmpstart = ifelse(start < stop, start, stop),
                       tmpend = ifelse(start > stop, start, stop))
+dat <- dat %>% filter(!is.na(tmpstart))
+
+# dat <- dat %>% separate(col = V1, into = c("contig", "coordinates"), sep = "\\/", remove = F)
+# 
+# dat <- dat %>% separate(col = coordinates, into = c("start", "stop"), sep = "-", remove = F)
+# 
+# dat <- dat %>% dplyr::rename(srna = V3) %>% select(contig, srna, start, stop) %>% mutate(strand = "+")
+# 
+# dat <- dat %>% mutate(start = as.numeric(start), stop = as.numeric(stop))
+# 
+# dat <- dat %>% mutate(tmpstart = ifelse(start < stop, start, stop),
+#                       tmpend = ifelse(start > stop, start, stop))
 
 query <- GRanges(seqnames = dat$contig,
                  ranges = IRanges(start = dat$tmpstart, end = dat$tmpend),
@@ -3287,7 +4561,7 @@ lookup1 <- data.frame(id1 = dat$srna, queryHits = c(1:length(dat$srna)))
 lookup2 <- data.frame(id2 = dat$srna, subjectHits = c(1:length(dat$srna)))
 
 
-tmp <- findOverlaps(query, query, type = 'start')
+tmp <- GenomicRanges::findOverlaps(query, query, type = 'any')
 
 tmp <- as.data.frame(tmp)
 
@@ -3345,7 +4619,7 @@ for(item in ids){
  
   checked_ids <- c(checked_ids, current_ids)
   
-    write.table(x = current_ids, file = paste("~/phd/RNASeq/srna_seqs/version_1/negative_control/combined_alignments_ids/", current_ids[1], "_combined_list.txt", sep = ""), append = T, quote = F, row.names = F, col.names = F)
+    write.table(x = current_ids, file = paste("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/combined_alignments_ids/", current_ids[1], "_combined_list.txt", sep = ""), append = T, quote = F, row.names = F, col.names = F)
 
   # mat <- as.data.frame(t(as.matrix(current_ids)))
   # write.table(mat, file = "~/phd/RNASeq/tmp/nc_overlaps", append = T, quote = F, col.names = F, row.names = F, sep = "\t")
@@ -3353,7 +4627,69 @@ for(item in ids){
 
 ```
 
-###redundancy_1 in python
+###move_nc_quickly
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Remove redundancy*](#section-remove_redundancy)
+
+***
+
+
+```{bash move_nc_quickly, eval=F, include=F}
+##done in ~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/combined_alignments_ids
+
+
+cd ~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/
+
+mkdir -p RNAAlifold/keep
+mkdir -p alifold/keep
+mkdir -p alignments_rnaalifold/keep
+mkdir -p rscape_out/keep
+
+mkdir -p RNAAlifold/ignore_2
+mkdir -p alifold/ignore_2
+mkdir -p alignments_rnaalifold/ignore_2
+mkdir -p rscape_out/ignore_2
+
+
+cd ~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/combined_alignments_ids
+
+for file in *.txt;
+do
+idname=`basename $file _combined_list.txt`
+
+mv ../RNAAlifold/$idname* ../RNAAlifold/keep
+mv ../alifold/$idname* ../alifold/keep
+mv ../alignments_rnaalifold/$idname* ../alignments_rnaalifold/keep
+mv ../rscape_out/$idname* ../rscape_out/keep
+
+while read line;
+do
+
+mv ../RNAAlifold/$line* ../RNAAlifold/ignore_2
+mv ../alifold/$line* ../alifold/ignore_2
+mv ../alignments_rnaalifold/$line* ../alignments_rnaalifold/ignore_2
+mv ../rscape_out/$line* ../rscape_out/ignore_2
+
+
+done < $file
+
+done
+```
+
+###redundancy_1_in_python
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Remove redundancy*](#section-remove_redundancy)
+
+***
+
 
 This takes a long time to run.
 Not sure that this is needed for anything more than a figure.
@@ -3412,6 +4748,16 @@ knitr::include_graphics("/Users/thomasnicholson/phd/RNASeq/figures/displot.svg")
 Group sRNAs if there is enough of an overlap and write out files. 
 
 ###redundancy_2
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Remove redundancy*](#section-remove_redundancy)
+
+***
+
+
 ```{python redundancy_2, eval=F}
 run_all = False
 if run_all == True:
@@ -3514,7 +4860,17 @@ else:
 
 Not sure if there is a purpose to this section.
 
-###redundancy_2
+###redundancy_2_overlapping_scores
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Remove redundancy*](#section-remove_redundancy)
+
+***
+
+
 ```{python overlapping_scores, eval=F}
 outfile = open('/Users/thomasnicholson/bin/python_git/python_files/ids_and_overlaps.csv', 'a')
 for key, value in query_matches.items():
@@ -3529,6 +4885,16 @@ for key, value in query_matches.items():
 -   List all the overlapping sRNAs in files
 
 ###output_of_list_of_sRNAs_to_combine
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Remove redundancy*](#section-remove_redundancy)
+
+***
+
+
 ```{r output_of_list_of_sRNAs_to_combine, eval = F}
 json_file <- "~/bin/python_git/python_files/combined_d.json"
 json_data <- fromJSON(file=json_file)
@@ -3553,7 +4919,18 @@ for(key in json_data){
 -   Take the overlapping sRNAs, extract the fasta sequences and align the sequences.
 
 ###combine_sRNAs_bash
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Remove redundancy*](#section-remove_redundancy)
+
+***
+
+
 ```{bash combine_sRNAs_bash, eval=F}
+##done in ~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/combined_alignments_ids
 mkdir -p fasta
 mkdir -p hmm
 mkdir -p alignments
@@ -3567,20 +4944,20 @@ echo $outname
 while read line; 
 do 
 
-esl-reformat fasta ../large_alignments/alignments/$line.fna.stk.stk.stk >> fasta/$outname.fa
+esl-reformat fasta ../alignments_rnaalifold/$line.stk >> fasta/$outname.fa
 
-current_num=`esl-alistat ../large_alignments/alignments/$line.fna.stk.stk.stk | grep "Number of sequences" | cut -d ' ' -f 4`
+current_num=`esl-alistat ../alignments_rnaalifold/$line.stk | grep "Number of sequences" | cut -d ' ' -f 4`
 
 if(( $current_num > $max_num ));
 then
 
-max_seq="$line.fna.stk.stk.stk"
+max_seq="$line.stk"
 max_num="$current_num"
 fi
 
 done < $file
 
-hmmbuild hmm/$outname.hmm ../large_alignments/alignments/$max_seq
+hmmbuild hmm/$outname.hmm ../alignments_rnaalifold/$max_seq
 
 hmmalign --informat fasta hmm/$outname.hmm fasta/$outname.fa | esl-alimask -g --gapthresh 0.8 -p --pfract 0.5 --pthresh 0.5 - | esl-alimanip   --lnfract 0.6 --lxfract 1.4 --lmin 50 --lmax 500 --detrunc 50 - > alignments/$outname.stk
 
@@ -3595,13 +4972,54 @@ done
 
 
 
-##Check negative controls
+##Check negative controls {#check_negaitve_controls}
+
+NOT SURE THIS IS USED
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*check_high_scoring_negative_control_sequences*](#section-check_high_scoring_negative_control_sequences)
+
+-   [*build_hmm*](#section-build_hmm)
+
+-   [*fetch_all_negative_control_seqs*](#section-fetch_all_negative_control_seqs)
+
+-   [*run_hmmscan*](#section-run_hmmscan)
+
+-   [*hmmscan_summary*](#section-hmmscan_summary)
+
+-   [*hmmscan_analysis*](#section-hmmscan_analysis)
+
+-   [*run_RNAcode.sh*](#section-run_rnacode.sh)
+
+    -   [*rnacode_summary*](#section-rnacode_summary)
+
+    -   [*protein_coding_filter*](#section-protein_coding_filter)
+
+-   [*remove_negative_controls_matching_features*](#section-remove_negative_controls_matching_features)
+
+***
+
+
+Description:
 
 -   I want to remove negative control models that match either positive controls or predicted data as these are not true negative controls
 
 -   manually saved a list of IDs (saved from the ncCovRNA file above) for the negative control set where the mean score >= 100 to a file called high_scoring_rnas.txt
 
 ###check_high_scoring_negative_control_sequences
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Check negative controls*](#section-check_negaitve_controls)
+
+***
+
+
 ```{bash check_high_scoring_negative_control_sequences, eval=F}
 
 > high_scoring_rnas.fna
@@ -3620,6 +5038,16 @@ done < high_scoring_rnas.txt
 -   build an hmm database for positive control and predicted
 
 ###build_hmm
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Check negative controls*](#section-check_negaitve_controls)
+
+***
+
+
 ```{bash build_hmm, eval=F}
 
 ##done in ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/alignments_rnaalifold
@@ -3648,6 +5076,16 @@ hmmpress ${group}.hmm
 -   Get all of the fasta sequences
 
 ###fetch_all_negative_control_seqs
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Check negative controls*](#section-check_negaitve_controls)
+
+***
+
+
 ```{bash fetch_all_negative_control_seqs, eval=F}
 ##done in ~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/alignments_rnaalifold
 for file in *.stk;
@@ -3663,6 +5101,16 @@ done
 -   Compare the hmm database to the fasta files of negative controls
 
 ###run_hmmscan
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Check negative controls*](#section-check_negaitve_controls)
+
+***
+
+
 ```{bash run_hmmscan, eval=F}
 
 ##done in ~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/fasta
@@ -3682,6 +5130,16 @@ done
 ```
 
 ###hmmscan_summary
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Check negative controls*](#section-check_negaitve_controls)
+
+***
+
+
 ```{bash hmmscan_summary, eval=F}
 ##done in ~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/fasta/${group}_output/
 group='predicted'
@@ -3699,6 +5157,16 @@ done
 ```
 
 ###hmmscan_analysis
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Check negative controls*](#section-check_negaitve_controls)
+
+***
+
+
 ```{r hmmscan_analysis}
 pcdat <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/fasta/positive_control_hmmscan.tbl")
 
@@ -3728,6 +5196,16 @@ write.table(x = predSummary %>% select(V20), file = "~/phd/RNASeq/srna_seqs/vers
 
 
 ###run_RNAcode.sh
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Check negative controls*](#section-check_negaitve_controls)
+
+***
+
+
 ```{bash run_RNAcode.sh, eval=F, include=F}
 #!/bin/bash
 
@@ -3826,6 +5304,16 @@ done
 ```
 
 ####rnacode_summary
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Check negative controls*](#section-check_negaitve_controls)
+
+***
+
+
 ```{bash rnacode_summary, eval=F}
 #done on server from ~/phd/RNASeq/srna_seqs/version_1/${group}/combined_alignments_ids/rnacode_out/
 
@@ -3848,6 +5336,16 @@ done
     -   cat positive_control.rnacode | sed 's/N/\tN/g' | grep -v "HSS" | grep -v "====" | grep -v "alignment(s) scored in" | grep -v "Delta" > tmp.rnacode
 
 ####protein_coding_filter
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Check negative controls*](#section-check_negaitve_controls)
+
+***
+
+
 ```{r protein_coding_filter, eval=F}
 ncDat <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/tmp.rnacode",
                     col.names = c("hss.id", "frame", "length", "from", "to", "seq.name", "start", "end", "score", "p.value", "srna"), fill = T)
@@ -3890,6 +5388,16 @@ save(pcRNAcode, file = "~/bin/r_git/R/r_files/pcRNAcode.Rda")
 -   cat foobar | sed 's/alignments_//g' | sort | uniq > remove_ALL.txt
 
 ###remove_negative_controls_matching_features
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Check negative controls*](#section-check_negaitve_controls)
+
+***
+
+
 ```{bash remove_negative_controls_matching_features, eval=F}
 ##done in ~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/
 mkdir -p rscape_out/ignore
@@ -3927,7 +5435,50 @@ done < $file
 
 ```
 
-##Score sRNAs
+##Score sRNAs {#score_rnas}
+
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*run_RNAAlifold.sh*](#section-run_rnaalifold.sh)
+
+    -   [*rnaalifold_summary*](#section-rnaalifold_summary)
+    
+    -   [*positive_control_alignments*](#section-positive_control_alignments)
+    
+    -   [*negative_control_alignments*](#section-negative_control_alignments)
+
+-   [*run_rscape.sh*](#section-run_rscape.sh)
+
+    -   [*rscape_summary*](#section-rscape_summary)
+
+-   [*run_alifold.sh*](#section-run_alifold.sh)
+
+    -   [*alifold_summary*](#section-alifold_summary)
+
+-   [*run_rmfamscan.sh*](#section-run_rmfamscan.sh)
+
+-   [*gc_content*](#section-gc_content)
+
+    -   [*get_fasta_sequence*](#section-get_fasta_sequence)
+    
+    -   [*get_reference_fasta*](#section-get_reference_fasta)
+    
+    -   [*sRNAGCPercentage.py*](#section-srnagcpercentage.py)
+
+-   [*get RNA labels from Rfam*](#section-get_rna_labels)
+
+    -   [*view_rfam_descriptions*](#section-view_rfam_descriptions)
+
+-   [*sRNA_read_depths*](#section-srna_read_depths)
+
+    -   [*sRNA_read_depths_script*](#section-srna_read_depths_script)
+    
+    -   [*summarise_sRNA_read_depths.R*](#section-summarise_srna_read_depths.r)  
+
+***
 
 
 **Scripts involved for scoring the sRNAs**
@@ -3948,7 +5499,7 @@ done < $file
     
     - Looks for motifs in the sRNAs
 
-------------------------------------------------------------------------
+***
 
 -   Runs RNAAlifold on all *.stk files in an alignments/ folder
     
@@ -3960,7 +5511,16 @@ done < $file
     
 
 ###run_RNAAlifold.sh
-```{bash run_RNAAlifold.sh, eval=F, include=F}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
+
+```{bash run_RNAAlifold.sh, eval=F, include=T}
 #!/bin/bash
 
 ##makes alignments and running alifoldz and r-scape
@@ -4081,6 +5641,15 @@ done
 -   Combine the output from RNAAlifold into single files for further analysis
 
 ####rnaalifold_summary
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
+
 ```{bash rnaalifold_summary, eval=F}
 #done from ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/RNAALifold
 group="negative_control"
@@ -4102,6 +5671,15 @@ done
 -   Positive control set has different naming and needs the files moved with another step
 
 ####positive_control_alignments
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
+
 ```{bash move_positive_control_alignments, eval=F}
 for file in alignments_R*;
 do
@@ -4113,6 +5691,15 @@ done
 -   Negative control set has different naming and needs the files moved with another step
 
 ####negative_control_alignments
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
+
 ```{bash move_negative_control_alignments, eval=F}
 for file in alignments_a*;
 do
@@ -4122,8 +5709,46 @@ tmpname=`echo $file | cut -d '_' -f2,3,4,5`
 done
 ```
 
-###run_R-scape.sh
-```{bash run_R-scape.sh, eval=F, include=F}
+
+
+```{bash rnaalifold_outputs, eval=F}
+group="predicted"
+
+cd ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/RNAALifold
+
+> ../${group}_alifold_score.txt;
+> ../${group}_mfe.txt;
+
+for file in *.rnaalifold;
+do   
+  
+  if [ $file == *"\.stk\.stk\.rnaalifold" ]; then 
+    ID=`basename $file .stk.stk.rnaalifold`; 
+  else 
+    ID=`basename $file .stk.rnaalifold`; 
+  fi; 
+  
+  MFE=`grep "=" $file | rev | cut -d "(" -f1 | rev | cut -d "=" -f1`; echo "$ID $MFE" >> ../${group}_alifold_score.txt; 
+  MFE=`grep "=" $file | rev | cut -d "(" -f1 | rev | cut -d "=" -f2 | cut -d "+" -f1`; echo "$ID $MFE" >> ../${group}_mfe.txt; 
+
+  MFE=`grep "=" $file | rev | cut -d "(" -f1 | rev | cut -d "=" -f2 | cut -d "+" -f2 | tr -d ")"`; echo "$ID $MFE" >> ../${group}_alifold_covariation.txt; 
+
+done
+
+
+```
+
+###run_rscape.sh
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
+
+```{bash run_R-scape.sh, eval=F, include=T}
 #!/bin/bash
 
 ##makes alignments and running alifoldz and r-scape
@@ -4192,6 +5817,15 @@ done
 -   Combine the output from Rscape into single files for further analysis
 
 ####rscape_summary
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
+
 ```{bash rscape_summary,eval=F}
 #done from ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/rscape_out/
 
@@ -4207,8 +5841,17 @@ done
 ```
 
 
-###run_Alifold.sh
-```{bash run_Alifold.sh, eval=F, include=F}
+###run_alifold.sh
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
+
+```{bash run_Alifold.sh, eval=F, include=T}
 #!/bin/bash
 
 ##makes alignments and running alifoldz and r-scape
@@ -4353,6 +5996,15 @@ done
 
 
 ####alifold_summary
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
+
 ```{bash alifold_summary, eval=F}
 
 #done in ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/alifold 
@@ -4370,7 +6022,21 @@ done
 ```
 
 ### run_rmfamscan.sh
-```{bash run_rmfamscan.sh, eval=F, include=F}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
+
+####rmfamscan_script
+
+-   Done in ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/alignments_rnaalifold
+
+
+```{bash run_rmfamscan.sh, eval=F, include=T}
 #!/bin/bash
 
 ##Run rmfam over all fasta files
@@ -4572,16 +6238,51 @@ done
 
 ```
 
+####rmfamscan_summary
+
+```{bash rmfamscan_summary, eval=F}
+##done in ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/rmfam_gff_files
+
+group='predicted'
+cd ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/alignments_rnaalifold/rmfam_gff_files
+> ../../${group}.rmfam;  
+for file in *.gff;    
+do    
+tmpname=`echo $file | sed 's/\.clustal//g'`;  
+ID=`basename $tmpname .stk.stk.gff`;  
+grep -v "#" $file | sed -e "s/$/   $ID/" >> ../../${group}.rmfam;  
+done
+
+```
+
 
 ###gc_content
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
+
 
 -   In order to get gc content info a fasta file is created for each alignment
 
 -   Along with this file, the reference sequence is written to another main file.
 
 ####get_fasta_sequence
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
+
 ```{bash get_fasta_sequence, eval=F}
-#done from ~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/alignments 
+#done from ~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/alignments_rnaalifold 
 for file in *.stk;
 do
 outname=`basename $file .stk`
@@ -4591,8 +6292,18 @@ done
 
 
 ####get_reference_fasta
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
+
+
 ```{bash get_reference_fasta, eval=F}
-#done from ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/alignments 
+#done from ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/alignments_rnaalifold
 group='nc'
 > ../${group}_rf.fna
 for file in *.stk;
@@ -4605,10 +6316,19 @@ done
 
 -   GC percentage is calculated from the _rf.fna file using:
 
-    -   sRNAGCPercentage.py -i ${group}_rf.fna -o {group}_rf.gc
+    -   sRNAGCPercentage.py -i ${group}_rf.fna -o ${group}_rf.gc
 
 ####sRNAGCPercentage.py
-```{python sRNAGCPercentage.py, eval=F, include=F}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
+
+```{python sRNAGCPercentage.py, eval=F, include=T}
 #!/usr/bin/python
 
 
@@ -4685,7 +6405,16 @@ if __name__ == "__main__":
 
 
 
-###get RNA labels from Rfam
+###get RNA labels from Rfam {#get_rna_labels}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
+
 ```{bash get_rna_labels, eval=F}
 > rfam_descriptions.txt
 for folder in *_files;
@@ -4700,6 +6429,15 @@ done
 ```
 
 ####view_rfam_descriptions
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
+
 ```{r view_rfam_descriptions}
 rfam <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/rfam_descriptions.txt", sep = " ")
 
@@ -4707,14 +6445,37 @@ rfam <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/rfam_descr
 
 
 
-###sRNA read depths
+###sRNA_read_depths
 
-####sRNA_read_depths
-```{bash sRNA_read_depths, eval=F, include=F}
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
+
+####sRNA_read_depths_script
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
+
+```{bash sRNA_read_depths, eval=F, include=T}
 ##Done in ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/alignments_rnaalifold
-group='negative_control'
+group='predicted'
+if [[ $group ==  'positive_control' ]];
+then
+cd ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/analysed_genomes/alignments
+> ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/${group}_read_depths_summary_ALL_reads.txt
+else
 cd ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/alignments_rnaalifold
 > ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/${group}_read_depths_summary.txt
+fi
 
 #file=alignments_GCA_000006765.1_12.stk
 for file in *.stk;
@@ -4760,12 +6521,19 @@ for file in *.stk;
           echo "Genome: ${genome} has no plot files"
           continue
         fi
-        echo "~/phd/RNASeq/genera/${genus}/${genome}.data/plot_files $start $stop"
+        #echo "~/phd/RNASeq/genera/${genus}/${genome}.data/plot_files $start $stop"
         > ~/phd/RNASeq/tmp/test.plot
         counter="1"
-        for plotfile in ~/phd/RNASeq/genera/${genus}/${genome}.data/plot_files/*_ncRNA.plot;
+        for plotfile in ~/phd/RNASeq/genera/${genus}/${genome}.data/plot_files/*.plot;
           do
-          #echo "$plotfile $genus $genome"
+          if [[ $plotfile == *"ncRNA"* ]]; then
+            continue
+          elif [[ $plotfile == *"rev"* ]]; then
+            continue
+          elif [[ $plotfile == *"fwd"* ]]; then
+            continue            
+          fi
+          echo "$plotfile $genus $genome"
           sed -n "${start},${stop}{p;${stop}q;}"  $plotfile > ~/phd/RNASeq/tmp/tmp.plot
           if [[  $counter ==  "1" ]];
           then
@@ -4778,7 +6546,7 @@ for file in *.stk;
         done
         #cp test.plot ~/phd/RNASeq/tmp
         summarise_sRNA_read_depths.R
-        cat ~/phd/RNASeq/tmp/test.values | sed -e "s/$/ $ID $genus $genome_name $genome $contig $realstart $realstop $start $stop/" >> ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/${group}_read_depths_summary.txt
+        cat ~/phd/RNASeq/tmp/test.values | sed -e "s/$/ $ID $genus $genome_name $genome $contig $realstart $realstop $start $stop/" >> ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/${group}_read_depths_summary_reads.txt
       else
         length=`echo $stat_line | cut -d ' ' -f3`
         current_count=$(($current_count + $length))
@@ -4789,8 +6557,196 @@ for file in *.stk;
 done
 ```
 
+
+-   Get read depths for the originally predicted sRNAs
+
+```{bash sRNA_read_depths_predicted, eval=F, include=T}
+##done in ~/phd/RNASeq/genera/
+#${genera}/${accession}.data
+
+#cd ~/phd/RNASeq/genera/
+#> ~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/predicted_read_depths_summary_reads_from_new_calls.txt
+#for genera in *;
+#do
+genera="Serratia"
+echo $genera
+
+> ~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/predicted_read_depths_summary_reads_${genera}.txt
+
+
+cd ~/phd/RNASeq/genera/${genera}/
+
+for folder in *.data;
+do
+  accession=`basename $folder .data`
+  cd ~/phd/RNASeq/genera/${genera}/${accession}.data
+  echo $accession
+  
+  while read line;
+  do
+    #echo $line
+    contig=`echo $line | cut -d ' ' -f1`
+    if [[ $contig == "sequence"  ]]; then
+      continue
+    fi
+    #coord=`echo $line | cut -d '/' -f2`
+    realstart=`echo $line | cut -d ' ' -f3`
+    realstop=`echo $line | cut -d ' ' -f4`
+    start=`echo $line | cut -d ' ' -f3`
+    stop=`echo $line | cut -d ' ' -f4` 
+    ID=`echo $line | cut -d ' ' -f13`
+    genome=`echo $ID | cut -d "_" -f1,2`
+    echo "${genome} ${contig} (${ID}): ${realstart}-${realstop}"
+    stats=`esl-seqstat -a ~/phd/RNASeq/sequences/${genome}.fna`
+    esl-seqstat -a ~/phd/RNASeq/sequences/${genome}.fna | grep "=" > ~/phd/RNASeq/tmp/${genera}_tmp.stats
+    current_count=0
+    while read stat_line;
+      do
+      chromosome=`echo "$stat_line" | grep $contig | wc -l | cut -d ' ' -f8`
+      if (( $chromosome > 0 ));
+        then
+        tmpstart=$(($start + $current_count))
+        tmpstop=$(($stop + $current_count))
+        if (( $tmpstart < $tmpstop  )); then
+          start=$tmpstart
+          stop=$tmpstop
+        else
+          stop=$tmpstart
+          start=$tmpstop
+        fi
+        
+        if [[ ! -d ~/phd/RNASeq/genera/${genera}/${genome}.data/plot_files ]];
+          then
+          echo "Genome: ${genome} has no plot files"
+          continue
+        fi
+        #echo "~/phd/RNASeq/genera/${genus}/${genome}.data/plot_files $start $stop"
+        > ~/phd/RNASeq/tmp/test.plot
+        counter="1"
+        for plotfile in ~/phd/RNASeq/genera/${genera}/${genome}.data/plot_files/*.plot;
+          do
+          if [[ $plotfile == *"ncRNA"* ]]; then
+            continue
+          elif [[ $plotfile == *"rev"* ]]; then
+            continue
+          elif [[ $plotfile == *"fwd"* ]]; then
+            continue            
+          fi
+          echo "$plotfile $genera $genome"
+          sed -n "${start},${stop}{p;${stop}q;}"  $plotfile > ~/phd/RNASeq/tmp/${genera}_tmp.plot
+          if [[  $counter ==  "1" ]];
+          then
+            cat ~/phd/RNASeq/tmp/${genera}_tmp.plot > ~/phd/RNASeq/tmp/${genera}_test.plot
+            counter="2"
+          else
+            cat ~/phd/RNASeq/tmp/${genera}_test.plot > ~/phd/RNASeq/tmp/${genera}_tmp2.plot 
+            paste ~/phd/RNASeq/tmp/${genera}_tmp2.plot ~/phd/RNASeq/tmp/${genera}_tmp.plot > ~/phd/RNASeq/tmp/${genera}_test.plot
+          fi
+        done
+        #cp test.plot ~/phd/RNASeq/tmp
+        summarise_sRNA_read_depths.R ~/phd/RNASeq/tmp/${genera}_test.plot
+        cat ~/phd/RNASeq/tmp/test.values | sed -e "s/$/ $ID $genera $genome_name $genome $contig $realstart $realstop $start $stop/" >> ~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/predicted_read_depths_summary_reads_${genera}.txt
+      else
+        length=`echo $stat_line | cut -d ' ' -f3`
+        current_count=$(($current_count + $length))
+      fi
+      
+    done < ~/phd/RNASeq/tmp/${genera}_tmp.stats
+  done < ${accession}_new_calls.txt
+  
+done
+
+#done
+
+```
+
+
+```{bash combine_predicted_read_depths, eval=F}
+##done in ~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments
+
+cd ~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments
+> predicted_read_depths_summary_new_calls.txt
+cat predicted_read_depths_summary_reads_* | cut -d ' ' -f1,2,3 >> predicted_read_depths_summary_new_calls.txt
+
+
+```
+
+
+####srna_read_depths_new_calls_pc
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
+
+```{bash srna_read_depths_new_calls_pc, eval = F}
+
+genera="Escherichia"
+echo $genera
+
+
+
+cd ~/phd/RNASeq/genera/${genera}/
+
+for folder in *.data;
+do
+  accession=`basename $folder .data`
+  cd ~/phd/RNASeq/genera/${genera}/${accession}.data
+  echo $accession
+  
+  cp gff_files/${accession}.gff ./
+  
+  cmscanToGffWrapper.R -f ${accession}.tblout -g ${accession}
+  
+  mv *.gff gff_files
+  
+  combine_gff_files.R -f ./gff_files/ -o ${accession}
+  
+done
+
+```
+
+```{bash match_pc_pred_ids, eval=F}
+##done in ~/phd/RNASeq/genera
+
+cd ~/phd/RNASeq/genera
+cat */*/*_new_calls.txt | cut -f12- | grep "RF0" > ../new_calls/all_new_calls.txt
+
+##done in ~/phd/RNASeq/genera
+cd ~/phd/RNASeq/new_calls
+
+while read line;
+do
+#echo $line
+
+
+pcids=`echo $line | rev | cut -d ' ' -f2- | rev`
+predid=`echo $line | rev | cut -d ' ' -f1 | rev`
+
+echo $pcids | tr , '\n' | sed -e "s/$/   $predid/" | grep -v "=" | grep "RF" | sort | uniq >> ~/phd/RNASeq/pc_pred_ids.txt
+
+done < ../new_calls/all_new_calls.txt
+
+```
+
+
+
 ####summarise_sRNA_read_depths.R
-```{r summarise_sRNA_read_depths.R, eval=F, include=F}
+
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
+
+
+```{r summarise_sRNA_read_depths.R, eval=F, include=T}
 #!/usr/bin/env Rscript
 library(dplyr, quietly = T, warn.conflicts = F)
 dat <- read.table("~/phd/RNASeq/tmp/test.plot")
@@ -4806,19 +6762,128 @@ write.table(x = outDat, file = "~/phd/RNASeq/tmp/test.values", row.names = F, co
 
 ##Results 
 
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*conservation_distance*](#section-conservation_distance)
+
+    -   [*conservation_distance_roc_curve*](#section-conservation_distance_roc_curve)
+    
+    -   [*predicted_data_upsetr*](#section-predicted_data_upsetr)
+    
+    -   [*pc_data_upsetr*](#section-pc_data_upsetr)
+
+-   [*read_depths*](#section-read_depths)
+
+-   [*Covariation*](#section-covariation)
+
+    -   [*rscape_setup*](#section-rscape_setup)
+
+    -   [*rscape*](#section-rscape)
+
+-   [*GC Content*](#section-gc_content_results)
+
+-   [*Secondary Structure*](#section-secondary_structure_results)
+
+    -   [*alifold_setup*](#section-alifold_setup)
+    
+    -   [*alifold_results*](#section-alifold_results)
+    
+    -   [*MFE*](#section-mfe)
+
+-   [*ncRNA motifs*](#section-ncrna_motifs)
+
+-   [*RandomForest*](#section-randomforest)
+
+-   [*Examples*](#section-examples)
+
+
+
+
+***
+
+
 -   Analysis of the evolutionary distance of all the sequences in a given sRNA
 
     -   the maximum distance between sequences in an sRNA was selected 
     
     -   this is then plotted below in a cumulative proportion plot for each of PC, NC and Predicted datasets.
 
+```{bash number_of_sRNAs_predicted, eval=F}
+##done in ~/phd/RNASeq/genera
+
+cd ~/phd/RNASeq/genera
+
+cat */*/*_new_calls.txt |  grep "_sra_calls.gff" | wc -l ##rnas
+ls */*/*_new_calls.txt | wc -l ##genomes
+
+ls | wc -l ##genera
+
+ls */*/plot_files/*_ncRNA.plot | wc -l ##experiments
+
+
+cd ~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/alignments_rnaalifold
+
+> ../predicted_ids.txt
+ls alignments_GCA_* | sed 's/alignments_//g' |  sed 's/.stk//g' >> ../predicted_ids.txt
+
+wc -l ../predicted_ids.txt
+
+
+
+cd ~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/alignments_rnaalifold
+
+> ../predicted_ids.txt
+ls alignments_GCA_* | sed 's/alignments_//g' |  sed 's/.stk//g' >> ../negative_control_ids.txt
+
+wc -l ../negative_control_ids.txt
+
+```
+
+```{r number_of_sRNAs_predicted_r, eval=F}
+load("~/bin/r_git/R/r_files/predDat.Rda")
+
+remaining_pred_srnas <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/predicted_ids.txt", sep = "\t", fill =  T)
+
+remaining_pred_srnas <- remaining_pred_srnas %>% dplyr::rename(ID = V1) %>% mutate(keep =T)
+
+new_calls <- read.table("~/phd/RNASeq/genera/new_calls_simple.txt", sep = "\t", fill =  T)
+new_calls <- new_calls %>% filter(V5 != "", V5 != "id")
+colnames(new_calls) <- c("contig", "start", "stop", "new_feature", "ID")
+newCalls <- new_calls %>% select(ID, new_feature)
+
+predDat <- predDat %>% left_join(newCalls, by = "ID") %>% full_join(remaining_pred_srnas, by = "ID")
+
+predDat <- predDat %>% filter(!is.na(keep))
+
+table(predDat$new_feature)
+
+```
+
 ###conservation_distance 
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
 ```{r conservation_distance, eval=T}
 load("~/bin/r_git/R/r_files/max_dists_pred.Rda")
 # load("~/bin/r_git/R/r_files/max_dists_pred_nr.Rda")
 load("~/bin/r_git/R/r_files/max_dists_pc.Rda")
 load("~/bin/r_git/R/r_files/max_dists_nc.Rda")
 
+
+not_nc <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/not_negative_control_ids.txt")
+
+not_nc <- not_nc %>% mutate(remove = T) %>% dplyr::rename(id = V1)
+
+max_dists_nc <- max_dists_nc %>% left_join(not_nc, by = "id") %>%  filter(is.na(remove))
 
 
 max_dists_pred <- max_dists_pred %>% mutate(group = "Predicted")
@@ -4844,11 +6909,26 @@ ggsave(filename = "~/phd/RNASeq/figures/max_conservation_distance_5.svg", plot =
 
 -   The ROC curve using conservation distance as a predictor
 
-###conservation_distance_roc_curve
+####conservation_distance_roc_curve
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
 ```{r conservation_distance_roc_curve, eval = T}
 load( file = "~/bin/r_git/R/r_files/max_dists_pred.Rda")
 load(file = "~/bin/r_git/R/r_files/max_dists_pc.Rda")
 load(file = "~/bin/r_git/R/r_files/max_dists_nc.Rda")
+
+not_nc <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/not_negative_control_ids.txt")
+
+not_nc <- not_nc %>% mutate(remove = T) %>% dplyr::rename(id = V1)
+
+max_dists_nc <- max_dists_nc %>% left_join(not_nc, by = "id") %>%  filter(is.na(remove))
 
 max_dists_pred <- max_dists_pred %>% mutate(group = "Predicted")
 max_dists_pc <- max_dists_pc %>% mutate(group = "Positive Control")
@@ -4863,8 +6943,55 @@ rocData <- dists %>% filter(group != "Predicted") %>% mutate(response = ifelse(g
 roc.curve(response = rocData$response, predicted = rocData$max_dist,
           main="ROC curve for Maximum Phylogenetic Distance")
 
+
+write_data <- T
+if(write_data){
+svg(filename="~/phd/RNASeq/figures/distance_roc.svg",
+     width=20,
+     height=20,
+     pointsize=12)
+roc.curve(response = rocData$response, predicted = rocData$max_dist,
+          main="ROC curve for Maximum Phylogenetic Distance")
+
+
+dev.off()
+}
+
 ```
 
+```{r distance_check, eval = T}
+load( file = "~/bin/r_git/R/r_files/max_dists_pred.Rda")
+load(file = "~/bin/r_git/R/r_files/max_dists_pc.Rda")
+load(file = "~/bin/r_git/R/r_files/max_dists_nc.Rda")
+
+not_nc <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/not_negative_control_ids.txt")
+
+not_nc <- not_nc %>% mutate(remove = T) %>% dplyr::rename(id = V1)
+
+max_dists_nc <- max_dists_nc %>% left_join(not_nc, by = "id") %>%  filter(is.na(remove))
+
+max_dists_pred <- max_dists_pred %>% mutate(group = "Predicted")
+max_dists_pc <- max_dists_pc %>% mutate(group = "Positive Control")
+max_dists_nc <- max_dists_nc %>% mutate(group = "Negative Control")
+
+
+dists <- max_dists_pred %>% bind_rows(max_dists_pc, max_dists_nc) %>% dplyr::rename(max_dist = distance) %>% filter(max_dist > 0)
+
+head(dists)
+
+rocData <- dists %>% filter(group != "Predicted") %>% mutate(response = ifelse(group == "Positive Control", 1, 0))
+
+library(ROCR)
+data(ROCR.simple)
+pred <- prediction( rocData$max_dist, rocData$response)
+perf <- performance(pred,"tpr","fpr")
+plot(perf)
+str(perf)
+
+cutoffs <- data.frame(cut=perf@alpha.values[[1]], fpr=perf@x.values[[1]], 
+                      tpr=perf@y.values[[1]])
+
+```
 
 -   Tree generated by taking all_taxa_names.txt (made from an earlier section) and using the commontree section of Taxonomy on ncbi and downloading the phylip tree.
 
@@ -4879,8 +7006,17 @@ roc.curve(response = rocData$response, predicted = rocData$max_dist,
     -   further \n\n was removed in bbedit
 
 
-###predicted_data_upsetr
-```{r predicted_data_upsetr}
+####predicted_data_upsetr
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
+```{r predicted_data_upsetr, eval=F}
 
 pairs <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/query_target_pairs.txt")
 colnames(pairs) <- c("target.name", "query.genome", "ID")
@@ -4929,7 +7065,16 @@ dev.off()
 
 ```
 
-###pc_data_upsetr
+####pc_data_upsetr
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
 ```{r pc_data_upsetr}
 
 pairs <- read.table("~/phd/RNASeq/query_target_pairs_pc.txt")
@@ -4960,6 +7105,10 @@ colVals <- colVals[!is.na(colVals)]
 
 upsetSubset <- upsetDat[,colVals]
 
+sumsUpset <- rowSums(upsetSubset)
+
+sumsDat <- data.frame(ID = row.names(upsetSubset), sums = sumsUpset)
+
 UpSetR::upset(upsetSubset, sets = colnames(upsetSubset), mb.ratio = c(0.55, 0.45), order.by = "freq", nintersects = 15, keep.order = T)
 
 write_data <- F
@@ -4977,10 +7126,31 @@ dev.off()
 
 
 ###read_depths
-```{r read_depths_setup, eval=F, include=F}
-ncRDepth <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/negative_control_read_depths_summary.txt")
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
+```{r read_depths_setup, eval=F, include=T}
+ncRDepth <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/negative_control_read_depths_summary_reads.txt")
 pcRDepth <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/positive_control_read_depths_summary.txt")
 predRDepth <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/predicted_read_depths_summary.txt")
+
+predRDepthnewcalls <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/predicted_read_depths_summary_new_calls.txt", fill = T)
+
+
+predRDepthnewcalls$V2 <- as.numeric(as.character(predRDepthnewcalls$V2))
+predRDepthnewcalls <- predRDepthnewcalls %>% mutate(V4 = as.numeric(as.character(V1))) %>% mutate(V4 = ifelse(V2 > V4, V4, 0.5*V2)) %>% select(V4, V2, V3)
+
+predRDepthnewcalls <- predRDepthnewcalls %>% filter(!is.na(V2))
+
+pcpredids <- read.table("~/phd/RNASeq/pc_pred_ids.txt", fill = T)
+
+
 
 colnames(ncRDepth) <- c("mean.val", "max.val", "srna", "genus", "srna.genome.accession", "target.genome.accession",
                         "target.contig", "target.start", "target.end", "adj.target.start", "adj.target.end")
@@ -4989,21 +7159,43 @@ colnames(pcRDepth) <- c("mean.val", "max.val", "srna", "genus", "srna.genome.acc
 colnames(predRDepth) <- c("mean.val", "max.val", "srna", "srna.genome.accession", "target.genome.accession",
                         "target.contig", "target.start", "target.end", "adj.target.start", "adj.target.end")
 
+colnames(predRDepthnewcalls) <- c("mean.val", "max.val", "srna")
+
+colnames(pcpredids) <- c("pc.id", "srna")
+
+predRDepth <- predRDepth %>% bind_rows(predRDepthnewcalls)
+
+predRDepthnewcalls <- predRDepthnewcalls %>% left_join(pcpredids, by = "srna")
+
+pcRDepthnewcallsMax <- predRDepthnewcalls %>% filter(!is.na(pc.id)) %>% group_by(pc.id) %>% summarise(max.va.newl = max(max.val))
+pcRDepthnewcallsMean <- predRDepthnewcalls %>% filter(!is.na(pc.id)) %>% group_by(pc.id) %>% summarise(mean.val.new = max(mean.val))
+
+
+pcRDepthnewcalls <- predRDepthnewcalls %>% filter(!is.na(pc.id)) %>% select(-srna)%>% dplyr::rename(srna = pc.id)
+
+pcRDepthnewcalls <- pcRDepthnewcalls %>% select(mean.val, max.val, srna)
+
+pcRDepth <- pcRDepth %>% bind_rows(pcRDepthnewcalls)
+
+not_nc <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/not_negative_control_ids.txt")
+
+not_nc <- not_nc %>% separate(V1, into = c("t1", "id"), extra = 'merge', sep = "_") %>% select(-t1)
+
 ncRDepth <- ncRDepth %>% select(-genus)
 pcRDepth <- pcRDepth %>% select(-genus)
 
-save(ncRDepth, file = "ncRDepth.Rda")
-save(pcRDepth, file = "pcRDepth.Rda")
-save(predRDepth, file = "predRDepth.Rda")
+save(ncRDepth, file = "~/bin/r_git/R/r_files/ncRDepth.Rda")
+save(pcRDepth, file = "~/bin/r_git/R/r_files/pcRDepth.Rda")
+save(predRDepth, file = "~/bin/r_git/R/r_files/predRDepth.Rda")
 
 
 ```
 
 
 ```{r read_depths}
-load("ncRDepth.Rda")
-load("pcRDepth.Rda")
-load("predRDepth.Rda")
+load("~/bin/r_git/R/r_files/ncRDepth.Rda")
+load("~/bin/r_git/R/r_files/pcRDepth.Rda")
+load("~/bin/r_git/R/r_files/predRDepth.Rda")
 
 
 ggplot() +
@@ -5011,18 +7203,94 @@ ggplot() +
   geom_freqpoly(data = ncRDepth, aes(x = mean.val, y = log(..density..)), binwidth = 50, colour = "blue") +
   geom_freqpoly(data = predRDepth, aes(x = mean.val, y = log(..density..)), binwidth = 50, colour = "red")
 
-pcRDepth <- pcRDepth %>% mutate(response = 1)
+pcRDepth <- pcRDepth %>% mutate(response = 1) %>% filter(max.val > 0)
 ncRDepth <- ncRDepth %>% mutate(response = 0)
 rocData <- pcRDepth %>% bind_rows(ncRDepth) 
 
 rocDataMaxMax <- rocData %>% group_by(srna, response) %>% summarise(max.max.val = max(max.val))
+rocDataMeanSum <- rocData %>% group_by(srna, response) %>% summarise(max.max.val = sum(mean.val))
+rocDataMaxSum <- rocData %>% group_by(srna, response) %>% summarise(max.max.val = sum(max.val))
 
-roc.curve(response = rocDataMaxMax$response, predicted = rocDataMaxMax$max.max.val, 
-          main="ROC curve for Covariation Scores")
+
+
+roc.curve(response = rocDataMaxSum$response, predicted = rocDataMaxSum$max.max.val, 
+          main="ROC curve for Read Depths")
+
+
+
+pcRDepth <- pcRDepth %>% mutate(group = "Positive Control") %>% filter(max.val > 0)
+predRDepth <- predRDepth %>% mutate(group = "Predicted") 
+ncRDepth <- ncRDepth %>% mutate(group = "Negative Control")
+
+dists <- pcRDepth %>% bind_rows(ncRDepth, predRDepth) %>% group_by(srna, group) %>% summarise(max_dist = max(max.val))#%>% dplyr::rename(max_dist = distance) %>% filter(max_dist != 0)
+
+
+distsCumulativeCount <- cumulativeCounts(dists = dists, smooth = F)
+
+distsCumulativeCount <- distsCumulativeCount %>% dplyr::rename(max_read_counts = max_dist)
+
+p <- ggplot() +
+  geom_line(data = distsCumulativeCount, aes(x= max_read_counts, y = cumulative_prop, group = group, colour = group))
+p
+
+
+write_data <- F
+if(write_data){
+  
+  ggsave(filename = "~/phd/RNASeq/figures/max_read_depths.svg", plot = p)
+
+  
+svg(filename="~/phd/RNASeq/figures/reads_max.svg",
+     width=20,
+     height=20,
+     pointsize=12)
+roc.curve(response = rocDataMaxSum$response, predicted = rocDataMaxSum$max.max.val, 
+          main="ROC curve for Read Depths")
+
+dev.off()
+
+svg(filename="~/phd/RNASeq/figures/reads_mean.svg",
+     width=20,
+     height=20,
+     pointsize=12)
+roc.curve(response = rocDataMeanSum$response, predicted = rocDataMeanSum$max.max.val, 
+          main="ROC curve for Read Depths")
+
+dev.off()
+
+}
 ```
 
+```{r read_depths_check, eval=T}
+load("~/bin/r_git/R/r_files/ncRDepth.Rda")
+load("~/bin/r_git/R/r_files/pcRDepth.Rda")
+load("~/bin/r_git/R/r_files/predRDepth.Rda")
+
+pcRDepth <- pcRDepth %>% mutate(response = 1) %>% filter(max.val > 0)
+ncRDepth <- ncRDepth %>% mutate(response = 0)
+rocData <- pcRDepth %>% bind_rows(ncRDepth) 
+
+rocData <- rocData %>% group_by(srna, response) %>% summarise(max.max.val = sum(max.val))
+
+pred <- prediction( rocData$max.max.val, rocData$response)
+perf <- performance(pred,"tpr","fpr")
+plot(perf)
+str(perf)
+
+cutoffs <- data.frame(cut=perf@alpha.values[[1]], fpr=perf@x.values[[1]], 
+                      tpr=perf@y.values[[1]])
+
+```
 
 ###Covariation
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
 
 -   The files need the ID column to be separated out so these lines need running.
 
@@ -5034,7 +7302,16 @@ roc.curve(response = rocDataMaxMax$response, predicted = rocDataMaxMax$max.max.v
 
 
 ####rscape_setup
-```{r rscape_setup, eval = F, include=F}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
+```{r rscape_setup, eval = F, include=T}
 pcCov <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/tmp.cov", sep = "\t", comment.char = "#", as.is = T, header = F, fill = T, col.names = c("V1", "left_pos", "right_pos", "score", "e.value", "substitutions", "V2", "power", "ID"))
 ncCov <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/tmp.cov", sep = "\t", comment.char = "#", as.is = T, header = F, fill = T, col.names = c("V1", "left_pos", "right_pos", "score", "e.value", "substitutions", "V2", "power", "ID"))
 
@@ -5118,7 +7395,7 @@ ncCovMean <- ncCovRNA %>% group_by(ID) %>% summarise(mean_score = mean(score.x))
 ncCovCount <- ncCovRNA %>% group_by(ID) %>% summarise(count = n())
 ncCovMax <- ncCovRNA %>% group_by(ID) %>% summarise(min_eval = min(e.value))
 ncCovRNA <- ncCovMean %>% full_join(ncCovMax, by = "ID") %>% 
-  full_join(ncCovCount, by = "ID") 
+  full_join(ncCovCount, by = "ID") %>% filter(!is.na(mean_score))
 
 predCovMean <- predCovRNA %>% group_by(ID) %>% summarise(mean_score = mean(score.x))
 predCovCount <- predCovRNA %>% group_by(ID) %>% summarise(count = n())
@@ -5126,36 +7403,179 @@ predCovMax <- predCovRNA %>% group_by(ID) %>% summarise(min_eval = min(e.value))
 predCovRNA <- predCovMean %>% full_join(predCovMax, by = "ID") %>% 
   full_join(predCovCount, by = "ID")
 
-save(pcCov, file = "pcCovariation.Rda")
-save(ncCovRNA, file = "ncCovariation.Rda")
-save(predCovRNA, file = "predCovariation.Rda")
+
+nc_ids <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/negative_control_alignment_ids.txt")
+colnames(nc_ids) <- "ID"
+
+ncCovRNA <- ncCovRNA %>% full_join(nc_ids, by = "ID")
+ncCovRNA$mean_score[is.na(ncCovRNA$mean_score)] <- 0
+ncCovRNA$min_eval[is.na(ncCovRNA$min_eval)] <- 10
+ncCovRNA$count[is.na(ncCovRNA$count)] <- 1
+
+# pc_ids <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/positive_control_alignment_ids.txt")
+# colnames(pc_ids) <- "ID"
+# 
+# pcCov <- pcCov %>% full_join(pc_ids, by = "ID")
+# pcCov$mean_score[is.na(pcCov$mean_score)] <- 0
+# pcCov$min_eval[is.na(pcCov$min_eval)] <- 10
+# pcCov$count[is.na(pcCov$count)] <- 0
+
+save(pcCov, file = "~/bin/r_git/R/r_files/pcCovariation.Rda")
+save(ncCovRNA, file = "~/bin/r_git/R/r_files/ncCovariation.Rda")
+save(predCovRNA, file = "~/bin/r_git/R/r_files/predCovariation.Rda")
 
 
 ```
 
+```{r rscape_check, eval=F, include=T}
+load("~/bin/r_git/R/r_files/pcCovariation.Rda")
+load("~/bin/r_git/R/r_files/ncCovariation.Rda")
+
+
+pcCov <- pcCov %>% mutate(response = 1) #%>% filter(mean_score > 0)
+ncCovRNA <- ncCovRNA %>% mutate(response = 0) #%>% filter(mean_score > 0)
+rocData <- pcCov %>% bind_rows(ncCovRNA) %>% mutate(combined_score = count * mean_score) %>% filter(!is.na(combined_score)) 
+
+
+pred <- prediction( (rocData$mean_score * rocData$count), rocData$response)
+perf <- performance(pred,"tpr","fpr")
+
+dat <- data.frame(fpr = perf@x.values[[1]], tpr = perf@y.values[[1]], cutoff = perf@alpha.values[[1]])
+
+plot(perf)
+
+cutoffs <- data.frame(cut=perf@alpha.values[[1]], fpr=perf@x.values[[1]], 
+                      tpr=perf@y.values[[1]])
+
+```
 
 ####rscape
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
 ```{r rscape, eval = T}
-load("~/bin/r_git/R/pcCovariation.Rda")
-load("~/bin/r_git/R/ncCovariation.Rda")
-load("~/bin/r_git/R/predCovariation.Rda")
+load("~/bin/r_git/R/r_files/pcCovariation.Rda")
+load("~/bin/r_git/R/r_files/ncCovariation.Rda")
+load("~/bin/r_git/R/r_files/predCovariation.Rda")
 
 ggplot() +
   geom_freqpoly(data = pcCov, aes(x = mean_score, y = log(..density..)), binwidth = 100) +
   geom_freqpoly(data = ncCovRNA, aes(x = mean_score, y = log(..density..)), binwidth = 100, colour = "blue") +
   geom_freqpoly(data = predCovRNA, aes(x = mean_score, y = log(..density..)), binwidth = 100, colour = "red")
 
-pcCov <- pcCov %>% mutate(response = 1)
+pcCov <- pcCov %>% mutate(response = 1) 
 ncCovRNA <- ncCovRNA %>% mutate(response = 0)
-rocData <- pcCov %>% bind_rows(ncCovRNA) %>% mutate(combined_score = count * mean_score)
+rocData <- pcCov %>% bind_rows(ncCovRNA) %>% mutate(combined_score = count * mean_score) %>% filter(!is.na(combined_score))  #%>%  filter(mean_score > 0)
 roc.curve(response = rocData$response, predicted = rocData$min_eval, 
           main="ROC curve for Covariation Scores")
 roc.curve(response = rocData$response, predicted = rocData$mean_score, 
-          main="ROC curve for Covariation Scores", add.roc = T)
+          main="ROC curve for Covariation Scores", add.roc = F)
 roc.curve(response = rocData$response, predicted = rocData$count, 
-          main="ROC curve for Covariation Scores", add.roc = T)
+          main="ROC curve for Covariation Scores", add.roc = F)
 roc.curve(response = rocData$response, predicted = rocData$combined_score, 
-          main="ROC curve for Covariation Scores", add.roc = T)
+          main="ROC curve for Covariation Scores", add.roc = F)
+
+pcCov <- pcCov %>% mutate(group = "Positive Control")
+predCovRNA <- predCovRNA %>% mutate(group = "Predicted") 
+ncCovRNA <- ncCovRNA %>% mutate(group = "Negative Control")
+
+dists <- pcCov %>% bind_rows(predCovRNA, ncCovRNA) %>% dplyr::rename(max_dist = mean_score) %>% select(ID, max_dist, group) 
+
+
+distsCumulativeCount <- cumulativeCounts(dists = dists, smooth = F)
+
+distsCumulativeCount <- distsCumulativeCount %>% dplyr::rename(rscape_cov_mean_score = max_dist)
+
+p <- ggplot() +
+  geom_line(data = distsCumulativeCount, aes(x= rscape_cov_mean_score, y = cumulative_prop, group = group, colour = group)) + 
+  xlim(min = 0, max = 1500)
+  
+p
+
+dists <- pcCov %>% bind_rows(predCovRNA, ncCovRNA) %>% dplyr::rename(max_dist = min_eval) %>% select(ID, max_dist, group) 
+
+
+distsCumulativeCount <- cumulativeCounts(dists = dists, smooth = F)
+
+distsCumulativeCount <- distsCumulativeCount %>% dplyr::rename(rscape_cov_min_eval = max_dist)
+
+p <- ggplot() +
+  geom_line(data = distsCumulativeCount, aes(x= rscape_cov_min_eval, y = cumulative_prop, group = group, colour = group)) + 
+  xlim(min = 0, max = 0.05)
+  
+p
+
+
+dists <- pcCov %>% bind_rows(predCovRNA, ncCovRNA) %>% dplyr::rename(max_dist = count) %>% select(ID, max_dist, group) 
+
+
+distsCumulativeCount <- cumulativeCounts(dists = dists, smooth = F)
+
+distsCumulativeCount <- distsCumulativeCount %>% dplyr::rename(rscape_cov_count = max_dist)
+
+p <- ggplot() +
+  geom_line(data = distsCumulativeCount, aes(x= rscape_cov_count, y = cumulative_prop, group = group, colour = group)) + 
+  xlim(min = 0, max = 150)
+  
+p
+
+
+write_data <- F
+if(write_data){
+  
+    ggsave(filename = "~/phd/RNASeq/figures/covariation_rscape.svg", plot = p)
+
+  
+svg(filename="~/phd/RNASeq/figures/cov_combined.svg",
+     width=20,
+     height=20,
+     pointsize=12)
+roc.curve(response = rocData$response, predicted = rocData$combined_score, 
+          main="ROC curve for Covariation combined", add.roc = F)
+
+
+dev.off()
+
+
+
+svg(filename="~/phd/RNASeq/figures/cov_count.svg",
+     width=20,
+     height=20,
+     pointsize=12)
+roc.curve(response = rocData$response, predicted = rocData$count, 
+          main="ROC curve for Covariation count", add.roc = F)
+
+
+dev.off()
+
+svg(filename="~/phd/RNASeq/figures/cov_mean.svg",
+     width=20,
+     height=20,
+     pointsize=12)
+roc.curve(response = rocData$response, predicted = rocData$mean_score, 
+          main="ROC curve for Covariation mean", add.roc = F)
+
+
+dev.off()
+
+
+svg(filename="~/phd/RNASeq/figures/cov_min_eval.svg",
+     width=20,
+     height=20,
+     pointsize=12)
+roc.curve(response = rocData$response, predicted = rocData$min_eval, 
+          main="ROC curve for Covariation min eval", add.roc = F)
+
+
+dev.off()
+}
+
 ```
 
 
@@ -5166,7 +7586,79 @@ roc.curve(response = rocData$response, predicted = rocData$combined_score,
 
     - input is the fasta file
 
-###GC Content
+
+####alifold_cov
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
+```{r alifold_cov, eval = F, include=T}
+pcCovAli <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/positive_control_alifold_covariation.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T, col.names = c("ID", "alifold_cov_score"))
+ncCovAli <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/negative_control_alifold_covariation.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T, col.names = c("ID", "alifold_cov_score"))
+predCovAli <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/predicted_alifold_covariation.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T, col.names = c("ID", "alifold_cov_score"))
+
+
+
+
+save(pcCovAli, file = "~/bin/r_git/R/r_files/pcCovAli.Rda")
+save(ncCovAli, file = "~/bin/r_git/R/r_files/ncCovAli.Rda")
+save(predCovAli, file = "~/bin/r_git/R/r_files/predCovAli.Rda")
+
+
+
+load("~/bin/r_git/R/r_files/pcCovAli.Rda")
+load("~/bin/r_git/R/r_files/ncCovAli.Rda")
+load("~/bin/r_git/R/r_files/predCovAli.Rda")
+
+
+pcCovRoc <- pcCovAli %>% mutate(response = 1) 
+ncCovRoc <- ncCovAli %>% mutate(response = 0)
+rocData <- pcCovRoc %>% bind_rows(ncCovRoc) %>% filter(!is.na(alifold_cov_score))
+roc.curve(response = rocData$response, predicted = rocData$alifold_cov_score, 
+          main="ROC curve for Alifold Covariation Scores")
+
+pcCovAli <- pcCovAli %>% mutate(group = "Positive Control")
+predCovAli <- predCovAli %>% mutate(group = "Predicted") 
+ncCovAli <- ncCovAli %>% mutate(group = "Negative Control")
+
+dists <- pcCovAli %>% bind_rows(predCovAli, ncCovAli) %>% dplyr::rename(max_dist = alifold_cov_score) 
+
+
+distsCumulativeCount <- cumulativeCounts(dists = dists, smooth = F)
+
+distsCumulativeCount <- distsCumulativeCount %>% dplyr::rename(alifold_cov_score = max_dist)
+
+p <- ggplot() +
+  geom_line(data = distsCumulativeCount, aes(x= alifold_cov_score, y = cumulative_prop, group = group, colour = group))
+p
+
+
+write_data <- F
+if(write_data){
+  
+  ggsave(filename = "~/phd/RNASeq/figures/covariation_alifold.svg", plot = p)
+}
+
+
+```
+
+
+
+###GC Content {#gc_content_results}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
 ```{r gc_content, eval = T}
 pcGC <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/pc_rf.gc", sep = "\t", comment.char = "#", as.is = T, header = F, fill = T)
 ncGC <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control_no_shuffle.gc", sep = "\t", comment.char = "#", as.is = T, header = F, fill = T)
@@ -5182,6 +7674,17 @@ rocData <- pcGC %>% bind_rows(ncGC)
 
 roc.curve(response = rocData$response, predicted = rocData$V2,
           main="ROC curve for GC%")
+write_data <- T
+if(write_data){
+svg(filename="~/phd/RNASeq/figures/gc.svg",
+     width=20,
+     height=20,
+     pointsize=12)
+roc.curve(response = rocData$response, predicted = rocData$V2,
+          main="ROC curve for GC%")
+
+dev.off()
+}
 
 
 save(pcGC, file= "~/bin/r_git/R/r_files/pcGC.Rda")
@@ -5190,19 +7693,51 @@ save(predGC, file= "~/bin/r_git/R/r_files/predGC.Rda")
 
 ```
 
-###Secondary Structure
+###Secondary Structure {#secondary_structure_results}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
 
 ####alifold_setup
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
+-  Need to run
+
+    - cd ~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments
+
+    - grep "-" positive_control.alifold > positive_control_fixed.alifold
+    
+- It appears fine for the other groups 
+
 ```{r alifold_setup, eval = F}
-pcAlifold<- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/positive_control.alifold", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T, col.names = c( "From",      "To",    "Strand",    "Native.MFE",    "Mean.MFE",     "STDV",      "Z", "ID"))
+pcAlifold<- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/positive_control_fixed.alifold", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T, col.names = c( "From",      "To",    "Strand",    "Native.MFE",    "Mean.MFE",     "STDV",      "Z", "ID"))
 ncAlifold<- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/negative_control.alifold", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T)
+
+predAlifold<- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/predicted.alifold", header = F, comment.char = "#", quote = "", sep = "", fill = T, as.is = T)
 
 colnames(pcAlifold) <- c( "From",      "To",    "Strand",    "Native.MFE",    "Mean.MFE",     "STDV",      "Z", "ID")
 colnames(ncAlifold) <- c( "From",      "To",    "Strand",    "Native.MFE",    "Mean.MFE",     "STDV",      "Z", "ID")
+colnames(predAlifold) <- c( "From",      "To",    "Strand",    "Native.MFE",    "Mean.MFE",     "STDV",      "Z", "ID")
 
 ncAlifold <- ncAlifold %>% filter(grepl(pattern = "GCA_", ID), STDV > 0) 
-pcAlifold <- pcAlifold %>% filter(grepl(pattern = "RF", ID), STDV > 0)
+pcAlifold <- pcAlifold %>% filter(grepl(pattern = "RF", ID))
+predAlifold <- predAlifold %>% filter(grepl(pattern = "GCA_", ID)) 
 
+
+pcAlifoldsd <- pcAlifold %>% select(ID, STDV)
+predAlifoldsd <- predAlifold %>% select(ID, STDV)
 
 pcAlifoldMean <- pcAlifold %>% group_by(ID) %>% summarise(z_mean = mean(as.numeric(Z), na.rm = T))
 pcAlifoldMax <- pcAlifold %>% group_by(ID) %>% summarise(z_max = max(as.numeric(Z), na.rm = T))
@@ -5210,12 +7745,17 @@ pcAlifoldMax <- pcAlifold %>% group_by(ID) %>% summarise(z_max = max(as.numeric(
 ncAlifoldMean <- ncAlifold %>% group_by(ID) %>% summarise(z_mean = mean(as.numeric(Z), na.rm = T))
 ncAlifoldMax <- ncAlifold %>% group_by(ID) %>% summarise(z_max = max(as.numeric(Z), na.rm = T))
 
-pcAlifold <- pcAlifoldMean %>% full_join(pcAlifoldMax, by = "ID")
+predAlifoldMean <- predAlifold %>% group_by(ID) %>% summarise(z_mean = mean(as.numeric(Z), na.rm = T))
+predAlifoldMax <- predAlifold %>% group_by(ID) %>% summarise(z_max = max(as.numeric(Z), na.rm = T))
+
+pcAlifold <- pcAlifoldMean %>% full_join(pcAlifoldMax, by = "ID") %>% full_join(pcAlifoldsd, by = "ID")
 ncAlifold <- ncAlifoldMean %>% full_join(ncAlifoldMax, by = "ID")
+predAlifold <- predAlifoldMean %>% full_join(predAlifoldMax, by = "ID") %>% full_join(predAlifoldsd, by = "ID")
 
 
-save(pcAlifold, file = "~/bin/r_git/R/pcAlifold.Rda")
-save(ncAlifold, file = "~/bin/r_git/R/ncAlifold.Rda")
+save(pcAlifold, file = "~/bin/r_git/R/r_files/pcAlifold.Rda")
+save(ncAlifold, file = "~/bin/r_git/R/r_files/ncAlifold.Rda")
+save(predAlifold, file = "~/bin/r_git/R/r_files/predAlifold.Rda")
 ```
 
 -   The original ROC plot was showing a flat spot near the start. 
@@ -5225,8 +7765,8 @@ save(ncAlifold, file = "~/bin/r_git/R/ncAlifold.Rda")
     -   This was added to the above code and fixed the problem.
 
 ```{r alifold_check}
-load("~/bin/r_git/R/pcAlifold.Rda")
-load("~/bin/r_git/R/ncAlifold.Rda")
+load("~/bin/r_git/R/r_files/pcAlifold.Rda")
+load("~/bin/r_git/R/r_files/ncAlifold.Rda")
 pcAlifold <- pcAlifold %>% mutate(response = 1)
 ncAlifold <- ncAlifold %>% mutate(response = 0)
 
@@ -5234,8 +7774,6 @@ rocData <- pcAlifold %>% bind_rows(ncAlifold)
 rocData <- rocData[!is.na(rocData$z_mean),] 
 rocData <- rocData[!is.na(rocData$z_max),] 
 
-library(ROCR)
-data(ROCR.simple)
 pred <- prediction( rocData$z_mean, rocData$response)
 perf <- performance(pred,"tpr","fpr")
 plot(perf)
@@ -5249,13 +7787,22 @@ tmp <- rocData %>% filter(z_mean > -0.35, z_mean < 0.06)
 ```
 
 
-####alifold
+####alifold_results
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
 
 ```{r alifold, eval = T}
-load("~/bin/r_git/R/pcAlifold.Rda")
-load("~/bin/r_git/R/ncAlifold.Rda")
+load("~/bin/r_git/R/r_files/pcAlifold.Rda")
+load("~/bin/r_git/R/r_files/ncAlifold.Rda")
+load("~/bin/r_git/R/r_files/predAlifold.Rda")
 
-pcAlifold <- pcAlifold %>% mutate(response = 1)
+pcAlifold <- pcAlifold %>% mutate(response = 1) %>% filter(STDV > 0)
 ncAlifold <- ncAlifold %>% mutate(response = 0)
 
 
@@ -5271,13 +7818,74 @@ ggplot() +
 roc.curve(response = rocData$response, predicted = rocData$z_mean,
           main="ROC curve for Z-score Alifoldz")
 
+
+write_data <- T
+if(write_data){
+svg(filename="~/phd/RNASeq/figures/alifold_mean.svg",
+     width=20,
+     height=20,
+     pointsize=12)
+roc.curve(response = rocData$response, predicted = rocData$z_mean,
+          main="ROC curve for Z-score Alifoldz mean")
+
+dev.off()
+
+svg(filename="~/phd/RNASeq/figures/alifold_max.svg",
+     width=20,
+     height=20,
+     pointsize=12)
+roc.curve(response = rocData$response, predicted = rocData$z_max,
+          main="ROC curve for Z-score Alifoldz max")
+
+dev.off()
+}
+
+
 rocData %>% group_by(response) %>% summarise(count = n())
 rocData %>% group_by(response) %>% filter(z_mean <= -1) %>% summarise(count = n())
+
+load("~/bin/r_git/R/r_files/pcAlifold.Rda")
+load("~/bin/r_git/R/r_files/ncAlifold.Rda")
+load("~/bin/r_git/R/r_files/predAlifold.Rda")
+
+
+pcAlifold <- pcAlifold %>% mutate(group = "Positive Control")%>% filter(STDV > 0)
+predAlifold <- predAlifold %>% mutate(group = "Predicted") %>% filter(STDV > 0)
+ncAlifold <- ncAlifold %>% mutate(group = "Negative Control")
+
+dists <- pcAlifold %>% bind_rows(predAlifold, ncAlifold) %>% dplyr::rename(max_dist = z_max) 
+
+
+distsCumulativeCount <- cumulativeCounts(dists = dists, smooth = F)
+
+distsCumulativeCount <- distsCumulativeCount %>% dplyr::rename(alifold_z_score = max_dist)
+
+p <- ggplot() +
+  geom_line(data = distsCumulativeCount, aes(x= alifold_z_score, y = cumulative_prop, group = group, colour = group))
+p
+
+
+write_data <- F
+if(write_data){
+  
+  ggsave(filename = "~/phd/RNASeq/figures/z_score_alifold.svg", plot = p)
+}
+
+
 
 
 ```
 
 ####MFE
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
 ```{r MFE, eval = T, echo=T}
 pcMFE <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/positive_control.rnaalifold", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
 ncMFE <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/negative_control.rnaalifold", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
@@ -5304,6 +7912,22 @@ rocData <- pcMFE %>% bind_rows(ncMFE)
 roc.curve(response = rocData$response, predicted = rocData$V2,
           main="ROC curve for MFE")
 
+
+
+write_data <- T
+if(write_data){
+svg(filename="~/phd/RNASeq/figures/mfe.svg",
+     width=20,
+     height=20,
+     pointsize=12)
+roc.curve(response = rocData$response, predicted = rocData$V2,
+          main="ROC curve for MFE")
+
+dev.off()
+
+}
+
+
 save(pcMFE, file= "~/bin/r_git/R/r_files/pcMFE.Rda")
 save(ncMFE, file= "~/bin/r_git/R/r_files/ncMFE.Rda")
 save(predMFE, file= "~/bin/r_git/R/r_files/predMFE.Rda")
@@ -5314,7 +7938,15 @@ save(predMFE, file= "~/bin/r_git/R/r_files/predMFE.Rda")
 
 
 
-###ncRNA motifs
+###ncRNA motifs {#ncrna_motifs}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
 
 ```{r motifs, eval = T}
 
@@ -5322,41 +7954,42 @@ load("~/bin/r_git/R/pcMotif.Rda")
 load("~/bin/r_git/R/ncMotif.Rda")
 load("~/bin/r_git/R/predMotif.Rda")
 
-load("~/bin/r_git/R/pcDuplicates.Rda")
-load("~/bin/r_git/R/ncDuplicates.Rda")
-
-pcDuplicates <- pcDuplicates %>% mutate(keep.row = F)
-ncDuplicates <- ncDuplicates %>% mutate(keep.row = F)
-
-pcDuplicates <- pcDuplicates  %>% dplyr::rename(ID = V1)
-ncDuplicates <- ncDuplicates  %>% dplyr::rename(ID = V1)
-
-
-pcMotif <- pcMotif %>% left_join(pcDuplicates, by = "ID")
-ncMotif <- ncMotif %>% left_join(ncDuplicates, by = "ID")
-
-pcMotif <- pcMotif %>% mutate(keep.row = ifelse(is.na(keep.row), T, F)) 
-ncMotif <- ncMotif %>% mutate(keep.row = ifelse(is.na(keep.row), T, F)) 
-
-pcMotif <- pcMotif %>% filter(keep.row)
-ncMotif <- ncMotif %>% filter(keep.row)
-
-pcMotif <- pcMotif %>% select(-keep.row)
-ncMotif <- ncMotif %>% select(-keep.row)
-
 ncMotif <- ncMotif %>% mutate(response = 0)
 pcMotif <- pcMotif %>% mutate(response = 1)
 
 rocData <- pcMotif %>% bind_rows(ncMotif)
 
 roc.curve(response = rocData$response, predicted = rocData$max_score,
-          main="ROC curve for MFE")
+          main="ROC curve for motifs")
+
+write_data <- T
+if(write_data){
+svg(filename="~/phd/RNASeq/figures/motifs_max.svg",
+     width=20,
+     height=20,
+     pointsize=12)
+roc.curve(response = rocData$response, predicted = rocData$max_score,
+          main="ROC curve for motifs max")
+
+dev.off()
+
+svg(filename="~/phd/RNASeq/figures/motifs_mean.svg",
+     width=20,
+     height=20,
+     pointsize=12)
+roc.curve(response = rocData$response, predicted = rocData$mean_score,
+          main="ROC curve for motifs mean")
+
+dev.off()
+
+}
+
 
 ```
 
 ```{r motifs_setup, eval=F}
-pcMotif <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/positive_control.rmfam", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
-ncMotif <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/negative_control.rmfam", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
+pcMotif <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/positive_control.rmfam", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
+ncMotif <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/negative_control.rmfam", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
 
 predMotif <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/predicted.rmfam", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
 
@@ -5380,111 +8013,142 @@ predMotiffMax <- predMotif %>% group_by(ID) %>% summarise(max_score = max(score)
 predMotif <- predMotifMean %>% full_join(predMotiffMax, by = "ID")
 
 
-save(pcMotif, file = "~/bin/r_git/R/pcMotif.Rda")
-save(ncMotif, file = "~/bin/r_git/R/ncMotif.Rda")
-save(predMotif, file = "~/bin/r_git/R/predMotif.Rda")
+save(pcMotif, file = "~/bin/r_git/R/r_files/pcMotif.Rda")
+save(ncMotif, file = "~/bin/r_git/R/r_files/ncMotif.Rda")
+save(predMotif, file = "~/bin/r_git/R/r_files/predMotif.Rda")
 
 ```
 
 ###RandomForest
 
-```{r random_forest, eval=F}
-load("~/bin/r_git/R/r_files/pcMFE.Rda")
-load("~/bin/r_git/R/r_files/ncMFE.Rda")
+Go to:
 
-pcMFE <- pcMFE %>%  %>% mutate(ID = V1) %>% select(ID, V2) %>% dplyr::rename(mfe_score = V2)
-ncMFE <- ncMFE %>% separate(V1, into = c("t1", "ID_1", "ID_2", "ID_3"), remove = T, extra = "drop", sep = "_") %>% mutate(ID = paste(ID_1, ID_2, ID_3, sep = "_")) %>% select(ID, V2) %>% dplyr::rename(mfe_score = V2)
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
+```{r random_forest_data_setup, eval=T}
+load("~/bin/r_git/R/r_files/max_dists_pc.Rda")
+load("~/bin/r_git/R/r_files/max_dists_nc.Rda")
+
+max_dists_pc <- max_dists_pc %>% dplyr::rename(ID = id) %>% select(ID, distance)
+max_dists_nc <- max_dists_nc  %>% separate(col = id, into = c("t1", "ID"), sep = "_", extra = "merge")  %>% select(-t1)  %>% select(ID, distance)
+
+
+load("~/bin/r_git/R/r_files/ncRDepth.Rda")
+load("~/bin/r_git/R/r_files/pcRDepth.Rda")
+
+pcRDepthMaxs <- pcRDepth %>% dplyr::rename(ID = srna) %>% group_by(ID) %>% summarise(read.max.score  = sum(max.val))
+pcRDepthMeans <- pcRDepth %>% dplyr::rename(ID = srna) %>% group_by(ID) %>% summarise(reads.mean.score  = sum(mean.val))
+pcRDepth <- pcRDepthMaxs %>% full_join(pcRDepthMeans, by = "ID")
+
+ncRDepthMaxs <- ncRDepth %>% dplyr::rename(ID = srna) %>% group_by(ID) %>% summarise(read.max.score  = sum(max.val))
+ncRDepthMeans <- ncRDepth %>% dplyr::rename(ID = srna) %>% group_by(ID) %>% summarise(reads.mean.score  = sum(mean.val))
+ncRDepth <- ncRDepthMaxs %>% full_join(ncRDepthMeans, by = "ID")
+
+
+load("~/bin/r_git/R/r_files/pcCovariation.Rda") ##pcCov
+load("~/bin/r_git/R/r_files/ncCovariation.Rda") ##ncCovRNA
+
+ncCovRNA <- ncCovRNA %>% filter(!is.na(mean_score)) %>% mutate(combined_score = count * mean_score) %>% 
+  dplyr::rename(cov.mean.score = mean_score, cov.min.eval = min_eval, cov.count = count, cov.combined.score = combined_score)
+pcCov <- pcCov %>% filter(!is.na(mean_score)) %>% mutate(combined_score = count * mean_score) %>% 
+  dplyr::rename(cov.mean.score = mean_score, cov.min.eval = min_eval, cov.count = count, cov.combined.score = combined_score)
+
+
 
 load("~/bin/r_git/R/r_files/pcGC.Rda")
 load("~/bin/r_git/R/r_files/ncGC.Rda")
 
-pcGC <- pcGC %>% group_by(V1) %>% summarise(gc_score = mean(V2))%>% dplyr::rename(ID = V1)
-ncGC <- ncGC %>% group_by(V1) %>% summarise(gc_score = mean(V2)) %>% dplyr::rename(ID = V1)
+pcGC <- pcGC %>% dplyr::rename(gc.score = V2) %>% select(ID, gc.score)
+ncGC <- ncGC %>% group_by(ID) %>% summarise(gc.score = mean(V2)) 
 
-load("maxDistsPC.Rda") #variablename: distsPositive
-load("maxDistsNC.Rda") #variablename: distsNegative
+load("~/bin/r_git/R/r_files/pcAlifold.Rda")
+load("~/bin/r_git/R/r_files/ncAlifold.Rda")
 
-distsPositive <- distsPositive %>% dplyr::rename(ID = query.name)
-distsNegative <- distsNegative %>% dplyr::rename(ID = query.name)
+pcAlifold <- pcAlifold %>% separate(col = ID, into = c("t1", "t2"), sep = "_") %>% separate(t2, into = "ID", sep = "\\.", extra = "drop") %>% select(-t1, -STDV) 
 
-ncReadDepths <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_read_depths.txt", header = T, sep = "\t")
-pcReadDepths <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control_read_depths.txt", header = T, sep = "\t")
+ncAlifold <- ncAlifold %>% separate(col = ID, into = c("t1", "id"), sep = "_", extra = "merge")  %>% select(-t1) %>% dplyr::rename(ID = id)
 
-load("pcCovariation.Rda") #variablename: pcCov
-load("ncCovariation.Rda") #variablename: ncCov
 
-pcCov <- pcCov %>% dplyr::rename(mean_cov = mean_score, min_eval_cov = min_eval)
-ncCov <- ncCov %>% dplyr::rename(mean_cov = mean_score, min_eval_cov = min_eval)
+load("~/bin/r_git/R/r_files/pcMFE.Rda")
+load("~/bin/r_git/R/r_files/ncMFE.Rda")
 
-load("pcMotif.Rda") #variablename: pcMotif
-load("ncMotif.Rda") #variablename: ncMotif
+pcMFE <- pcMFE %>% dplyr::rename(ID = V1, mfe.score = V2) %>% select(ID, mfe.score)
 
-pcMotif <- pcMotif %>% dplyr::rename(mean_motif = mean_score, max_motif = max_score)
-ncMotif <- ncMotif %>% dplyr::rename(mean_motif = mean_score, max_motif = max_score)
+ncMFE <- ncMFE %>% separate(col = V1, into = c("t1", "ID"), sep = "_", extra = "merge")  %>% select(-t1) %>% dplyr::rename(mfe.score = V2) %>% select(ID, mfe.score)
 
-load("pcAlifold.Rda") #variablename: pcAlifold
-load("ncAlifold.Rda") #variablename: ncAlifold
+
+
+load("~/bin/r_git/R/r_files/pcMotif.Rda")
+load("~/bin/r_git/R/r_files/ncMotif.Rda")
+
+pcMotif <- pcMotif %>% separate(col = ID, into = c("t1", "t2"), sep = "_") %>% separate(t2, into = "ID", sep = "\\.", extra = "drop") %>% select(-t1) %>% 
+  dplyr::rename(motif.mean.score = mean_score, motif.max.score = max_score)
+
+ncMotif <- ncMotif %>% separate(col = ID, into = c("t1", "t2"), sep = "_", extra = "merge") %>% separate(t2, into = c("t3", "t4"), sep = "\\.", extra = "drop") %>% mutate(ID = paste(t3, t4, sep=".")) %>% select(ID, mean_score, max_score) %>% 
+  dplyr::rename(motif.mean.score = mean_score, motif.max.score = max_score)
+
+remaining_nc_srnas <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/negative_control_ids.txt", sep = "\t", fill =  T)
+remaining_nc_srnas <- remaining_nc_srnas %>% dplyr::rename(ID = V1) %>% mutate(keep =T)
+
 
 pcDat <- pcMFE %>% 
   full_join(pcGC, by = "ID") %>% 
-  full_join(distsPositive, by = "ID") %>% 
-  full_join(pcReadDepths, by = "ID") %>% 
+  full_join(max_dists_pc, by = "ID") %>% 
+  full_join(pcRDepth, by = "ID") %>% 
   full_join(pcCov, by = "ID") %>% 
   full_join(pcMotif, by = "ID")%>% 
   full_join(pcAlifold, by = "ID") %>% 
-  mutate(group = "Positive Control")
-
+  mutate(group = "Positive Control") %>% 
+  filter(!is.na(read.max.score)) %>% 
+  unique() 
 
 ncDat <- ncMFE %>% 
   full_join(ncGC, by = "ID") %>% 
-  full_join(distsNegative, by = "ID") %>% 
-  full_join(ncReadDepths, by = "ID") %>% 
-  full_join(ncCov, by = "ID") %>% 
+  full_join(max_dists_nc, by = "ID") %>% 
+  full_join(ncRDepth, by = "ID") %>% 
+  full_join(ncCovRNA, by = "ID") %>% 
   full_join(ncMotif, by = "ID")%>% 
   full_join(ncAlifold, by = "ID") %>% 
-  mutate(group = "Negative Control")
+  mutate(group = "Negative Control") 
 
 
-dat <- pcDat %>% bind_rows(ncDat)%>% 
-  select(-mean_median, -mean_max, -median_mean, -median_median, -median_max, -max_mean, -max_median, -ID_2)
+ncDat <- ncDat %>%  left_join(remaining_nc_srnas, by = "ID") %>% filter(!is.na(keep)) %>% select(-keep) %>%  unique()
 
-dat <- dat[,c(5, 1:4, 6:13)]
 
-dat$mfe_score[is.na(dat$mfe_score)] <- 0
-dat$gc_score[is.na(dat$gc_score)] <- 50
-dat$max_dist[is.na(dat$max_dist)] <- 0
-dat$mean_mean[is.na(dat$mean_mean)] <- 0
-dat$max_max[is.na(dat$max_max)] <- 0
-dat$mean_cov[is.na(dat$mean_cov)] <- 0
-dat$min_eval_cov[is.na(dat$min_eval_cov)] <- 10
-dat$mean_motif[is.na(dat$mean_motif)] <- 0
-dat$max_motif[is.na(dat$max_motif)] <- 0
+
+dat <- pcDat %>% bind_rows(ncDat)
+
+
+
+
+dat$mfe.score[is.na(dat$mfe.score)] <- 0
+dat$gc.score[is.na(dat$gc.score)] <- 50
+dat$distance[is.na(dat$distance)] <- 0
+dat$reads.mean.score[is.na(dat$reads.mean.score)] <- 0
+dat$read.max.score[is.na(dat$read.max.score)] <- 0
+dat$cov.mean.score[is.na(dat$cov.mean.score)] <- 0
+dat$cov.min.eval[is.na(dat$cov.min.eval)] <- 10
+dat$cov.combined.score[is.na(dat$cov.combined.score)] <- 0
+dat$cov.count[is.na(dat$cov.count)] <- 0
+dat$motif.mean.score[is.na(dat$motif.mean.score)] <- 0
+dat$motif.max.score[is.na(dat$motif.max.score)] <- 0
 dat$z_mean[is.na(dat$z_mean)] <- 10
 dat$z_max[is.na(dat$z_max)] <- 10
 
+randomForestDat <- dat
 
+save(randomForestDat, file = "~/bin/r_git/R/r_files/randomForestDat.Rda")
+```
 
+```{r random_forest_setup, eval = T}
 
-load("~/bin/r_git/R/pcDuplicates.Rda")
-load("~/bin/r_git/R/ncDuplicates.Rda")
+load("~/bin/r_git/R/r_files/randomForestDat.Rda")
 
-pcDuplicates <- pcDuplicates %>% mutate(keep.row = F)
-ncDuplicates <- ncDuplicates %>% mutate(keep.row = F)
-
-pcDuplicates <- pcDuplicates  %>% dplyr::rename(ID = V1)
-ncDuplicates <- ncDuplicates  %>% dplyr::rename(ID = V1)
-
-duplicates <- pcDuplicates %>% bind_rows(ncDuplicates)
-
-dat <- dat %>% left_join(duplicates, by = "ID")
-
-dat <- dat %>% mutate(keep.row = ifelse(is.na(keep.row), T, F)) 
-
-dat <- dat %>% filter(keep.row)
-
-dat <- dat %>% select(-keep.row)
-
-dat <- dat %>% select(-ID)
+dat <- randomForestDat %>% select(-ID) %>% unique
 set.seed(101)
 randomNum <- runif(n = nrow(dat), min = 0, max = 1)
 
@@ -5493,21 +8157,40 @@ dat2 <- dat %>% mutate(group = ifelse(group == "Positive Control", 1, 0)) #%>% s
 
 dat2$group <- as.factor(dat2$group) 
 
+dat2 <- dat2 %>% select(-cov.count, -cov.combined.score)
+
+colGroupNum <- match(x = "group", table = colnames(dat2))
+
 data_set_size <- floor(nrow(dat2)/2)
 indexes <- sample(1:nrow(dat2), size = data_set_size)
 
 training <- dat2[indexes,]
 validation1 <- dat2[-indexes,]
+save(training, file = "~/bin/r_git/R/r_files/training.Rda")
+save(validation1, file = "~/bin/r_git/R/r_files/validation1.Rda")
 
 rf_classifier = randomForest(group ~ ., data=training, ntree=100, importance=TRUE)
 rf_classifier
-varImpPlot(rf_classifier)
+save(rf_classifier, file = "~/bin/r_git/R/r_files/rf_classifier.Rda")
+```
 
+```{r random_forest, eval = T}
+load("~/bin/r_git/R/r_files/rf_classifier.Rda")
+load("~/bin/r_git/R/r_files/training.Rda")
+load("~/bin/r_git/R/r_files/validation1.Rda")
+load("~/bin/r_git/R/r_files/randomForestDat.Rda")
+
+dat <- randomForestDat %>% select(-ID) %>% unique
+set.seed(101)
+randomNum <- runif(n = nrow(dat), min = 0, max = 1)
+
+dat$random <- randomNum
+varImpPlot(rf_classifier)
+colGroupNum <- match(x = "group", table = colnames(validation1))
 # Make predictions
-prediction_for_table <- predict(rf_classifier,validation1[,-1])
-table(observed=validation1[,1],predicted=prediction_for_table)
-prediction_for_roc_curve <- predict(rf_classifier,validation1[,-1],type="prob")
-dat3 <- dat %>% select(-group) 
+prediction_for_table <- predict(rf_classifier,validation1[,-colGroupNum])
+table(observed=validation1[,colGroupNum],predicted=prediction_for_table)
+dat3 <- dat %>% select(-group)
 corMat <- cor(dat3, method = "spearman")
 round(corMat, 2)
   get_lower_tri<-function(cormat){
@@ -5521,13 +8204,16 @@ round(corMat, 2)
 upper_tri <- get_upper_tri(corMat)
 
 melted_cormat <- melt(upper_tri, na.rm = TRUE)
+
+# melted_cormat <- melted_cormat %>% filter(Var1 != "cov.combined.score", Var1 != "reads.mean.score", Var1 != "motif.mean.score", Var1 != "z_mean", Var1 != "cov.min.eval")%>% filter(Var2 != "cov.combined.score", Var2 != "reads.mean.score", Var2 != "motif.mean.score", Var2 != "z_mean", Var2 != "cov.min.eval")
+
 p <- ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
  geom_tile(color = "white")+
- scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
-   midpoint = 0, limit = c(-1,1), space = "Lab", 
-   name="Pearson\nCorrelation") +
-  theme_minimal()+ 
- theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+ scale_fill_gradient2(low = "blue", high = "red", mid = "white",
+   midpoint = 0, limit = c(-1,1), space = "Lab",
+   name="spearman\nCorrelation") +
+  theme_minimal()+
+ theme(axis.text.x = element_text(angle = 45, vjust = 1,
     size = 12, hjust = 1))+
  coord_fixed()
 p
@@ -5545,4 +8231,345 @@ varImpPlot(rf_classifier)
 
 dev.off()
 }
+
+```
+
+
+```{r correlation_heat_map, eval=F}
+load("~/bin/r_git/R/r_files/randomForestDat.Rda")
+dat <- randomForestDat %>% select(-ID) %>% unique
+set.seed(101)
+randomNum <- runif(n = nrow(dat), min = 0, max = 1)
+dat$random <- randomNum
+dat3 <- dat %>% select(-group)
+
+
+
+dNames <- colnames(dat3)
+pNames <- colnames(dat3)
+pvalMatrix<-matrix(1, length(dNames), length(dNames))
+rhoMatrix <-matrix(0, length(dNames), length(dNames))
+sigMatrix <-matrix("",length(dNames), length(dNames))
+
+colnames(pvalMatrix)    <-pNames
+rownames(pvalMatrix)    <-pNames
+colnames(rhoMatrix)     <-pNames
+rownames(rhoMatrix)     <-pNames
+colnames(sigMatrix)     <-pNames
+rownames(sigMatrix)     <-pNames
+sigCount     <- 0
+sigCount2015 <- 0
+for(i in 1:length(dNames)){
+      for(j in 1:length(dNames)){
+   spear<-cor.test(dat3[,dNames[i] == colnames(dat3)], dat3[,dNames[j] == colnames(dat3)], method = "spearman", exact = T)
+   pvalMatrix[i,j] <- spear$p.value
+   rhoMatrix[i,j]  <- spear$estimate
+   if(spear$p.value < 0.05){
+sigMatrix[i,j]  <- "X"
+                sigCount <- sigCount + 1
+   }
+
+      }
+}
+
+
+heatmap.2(rhoMatrix, cellnote=sigMatrix,notecex=1.5,notecol="black", col=rev(redblue(40)), density.info="none", trace="none", dendrogram=c("column"), symm=F,symkey=T,symbreaks=T, scale="none", key.title = "", srtRow=45, adjRow=c(0, 1), srtCol=45, adjCol=c(1,1), breaks=(-20:20)/20,
+margins = c(8, 8), cexRow=1.5, cexCol=1.5,font=2)
+
+
+```
+
+```{r random_forest_roc, eval=T}
+load("~/bin/r_git/R/r_files/rf_classifier.Rda")
+load("~/bin/r_git/R/r_files/training.Rda")
+load("~/bin/r_git/R/r_files/validation1.Rda")
+colGroupNum <- match(x = "group", table = colnames(validation1))
+
+prediction_for_roc_curve <- predict(rf_classifier,validation1[,-colGroupNum],type="prob")
+
+
+
+validation1$prob <- prediction_for_roc_curve[,2]
+validation_roc <- validation1 %>% select(group, prob) %>% mutate(pred = ifelse(prob > 0.06, 1, 0))
+table(observed=validation_roc$group,predicted=validation_roc$pred)
+roc.curve(response = validation_roc$group, predicted = validation_roc$prob,
+          main="ROC curve for MFE")
+library(ROCR)
+pred <- prediction( validation_roc$prob, validation_roc$group)
+perf <- performance(pred,"tpr","fpr")
+plot(perf)
+str(perf)
+
+cutoffs <- data.frame(cut=perf@alpha.values[[1]], fpr=perf@x.values[[1]], 
+                      tpr=perf@y.values[[1]])
+
+```
+
+
+```{r random_forsest_predicted_data, eval=T}
+load("~/bin/r_git/R/r_files/rf_classifier.Rda")
+load("~/bin/r_git/R/r_files/randomForestDat.Rda")
+load("~/bin/r_git/R/r_files/validation1.Rda")
+colGroupNum <- match(x = "group", table = colnames(validation1))
+prediction_for_roc_curve <- predict(rf_classifier,validation1[,-colGroupNum],type="prob")
+validation1$probability <- prediction_for_roc_curve[,2]
+
+
+dat <- randomForestDat %>% select(-ID) %>% unique()
+set.seed(101)
+randomNum <- runif(n = nrow(dat), min = 0, max = 1)
+
+dat$random <- randomNum
+
+colGroupNum <- match(x = "group", table = colnames(dat))
+prediction_randomForestDat <- predict(rf_classifier,dat[,-colGroupNum],type="prob")
+dat$probability <- prediction_randomForestDat[,2]
+
+load("~/bin/r_git/R/r_files/max_dists_pred.Rda")
+
+max_dists_pred <- max_dists_pred %>% dplyr::rename(ID = id) %>% select(ID, distance)
+
+
+
+load("~/bin/r_git/R/r_files/predRDepth.Rda")
+
+predRDepthMaxs <- predRDepth %>% dplyr::rename(ID = srna) %>% group_by(ID) %>% summarise(read.max.score  = sum(max.val))
+predDepthMeans <- predRDepth %>% dplyr::rename(ID = srna) %>% group_by(ID) %>% summarise(reads.mean.score  = sum(mean.val))
+predRDepth <- predRDepthMaxs %>% full_join(predDepthMeans, by = "ID") %>%  filter(read.max.score > 0)
+
+load("~/bin/r_git/R/r_files/predCovariation.Rda") ##pcCovRNA
+
+predCovRNA <- predCovRNA %>% filter(!is.na(mean_score)) %>% mutate(combined_score = count * mean_score) %>% 
+  dplyr::rename(cov.mean.score = mean_score, cov.min.eval = min_eval, cov.count = count, cov.combined.score = combined_score)
+
+
+
+
+load("~/bin/r_git/R/r_files/predGC.Rda")
+
+predGC <- predGC %>% dplyr::rename(gc.score = V2) %>% separate(V1, into = "ID", sep = "\\[", extra= 'drop') %>% select(ID, gc.score)
+
+load("~/bin/r_git/R/r_files/predAlifold.Rda")
+
+predAlifold <- predAlifold %>% separate(col = ID, into = c("t1", "id"), sep = "_", extra = "merge")  %>% select(-t1, -STDV) %>% dplyr::rename(ID = id) %>% filter(!is.na(ID))
+
+
+load("~/bin/r_git/R/r_files/predMFE.Rda")
+
+predMFE <- predMFE %>% dplyr::rename(ID = V1, mfe.score = V2) %>% select(ID, mfe.score)
+
+
+
+
+
+load("~/bin/r_git/R/r_files/predMotif.Rda")
+
+predMotif <- predMotif %>% filter(grepl(pattern = ".stk.gff", x = ID) == F)  %>% 
+  dplyr::rename(motif.mean.score = mean_score, motif.max.score = max_score)
+
+
+
+predDat <- predMFE %>% 
+  full_join(predGC, by = "ID") %>% 
+  full_join(max_dists_pred, by = "ID") %>% 
+  full_join(predRDepth, by = "ID") %>% 
+  full_join(predCovRNA, by = "ID") %>% 
+  full_join(predMotif, by = "ID")%>% 
+  full_join(predAlifold, by = "ID") %>% 
+  mutate(group = "Predicted")
+
+predDat <- predDat  %>% unique()
+
+set.seed(101)
+randomNum <- runif(n = nrow(predDat), min = 0, max = 1)
+
+predDat$random <- randomNum
+
+
+
+predDat$mfe.score[is.na(predDat$mfe.score)] <- 0
+predDat$gc.score[is.na(predDat$gc.score)] <- 50
+predDat$distance[is.na(predDat$distance)] <- 0
+predDat$reads.mean.score[is.na(predDat$reads.mean.score)] <- 0
+predDat$read.max.score[is.na(predDat$read.max.score)] <- 0
+predDat$cov.mean.score[is.na(predDat$cov.mean.score)] <- 0
+predDat$cov.min.eval[is.na(predDat$cov.min.eval)] <- 10
+predDat$cov.combined.score[is.na(predDat$cov.combined.score)] <- 0
+predDat$cov.count[is.na(predDat$cov.count)] <- 0
+predDat$motif.mean.score[is.na(predDat$motif.mean.score)] <- 0
+predDat$motif.max.score[is.na(predDat$motif.max.score)] <- 0
+predDat$z_mean[is.na(predDat$z_mean)] <- 10
+predDat$z_max[is.na(predDat$z_max)] <- 10
+
+colGroupNum <- match(x = "group", table = colnames(predDat))
+colIDNum <- match(x = "ID", table = colnames(predDat))
+
+
+prediction_for_predcited_data <- predict(rf_classifier,predDat[,-c(colIDNum, colGroupNum)], type = 'response')
+prob_for_predcited_data <- predict(rf_classifier,predDat[,-c(colIDNum, colGroupNum)], type = 'prob')
+
+predDat$probability <- prob_for_predcited_data[,2]
+
+
+##alifold < -4
+##distance > 0.071546
+
+predDat <- predDat %>% 
+  mutate(prediction = ifelse(probability > 0.09, 1, 0)) ##0.3
+
+table(predDat$prediction)
+
+predDat <- predDat %>% 
+  mutate(prediction = ifelse(z_mean < -4.2, 1, 0)) 
+
+table(predDat$prediction)
+
+predDat <- predDat %>% 
+  mutate(prediction = ifelse(distance > 0.05, 1, 0)) 
+
+table(predDat$prediction)
+
+predDat <- predDat %>% 
+  mutate(prediction = ifelse(read.max.score >= 2029, 1, 0))
+
+table(predDat$prediction)
+
+
+dat <- dat %>% 
+  mutate(prediction = ifelse(probability > 0.3, 1, 0)) 
+
+table(observed=dat$group,predicted=dat$prediction)
+
+dat <- dat %>% 
+  mutate(prediction = ifelse(z_mean < -4.2, 1, 0)) 
+
+table(observed=dat$group,predicted=dat$prediction)
+
+dat <- dat %>% 
+  mutate(prediction = ifelse(distance > 0.05, 1, 0)) 
+
+table(observed=dat$group,predicted=dat$prediction)
+
+dat <- dat %>% 
+  mutate(prediction = ifelse(read.max.score >= 2029, 1, 0))
+
+table(observed=dat$group,predicted=dat$prediction)
+
+dat <- dat %>% 
+  mutate(prediction = ifelse(mfe.score < -15, 1, 0))
+
+table(observed=dat$group,predicted=dat$prediction)
+
+
+table(randomForestDat$group)
+rocData <- randomForestDat  %>% mutate(response = ifelse(group == "Positive Control", 1, 0))
+roc.curve(response = rocData$response, predicted = rocData$distance,
+          main="ROC curve for Maximum Phylogenetic Distance")
+
+
+save(predDat, file="~/bin/r_git/R/r_files/predDat.Rda")
+
+
+
+tmp <- predDat %>% mutate(group = "Predicted") %>% select(group, probability)
+
+allDat <- dat %>% select(group, probability) %>% bind_rows(tmp) 
+
+
+p <- ggplot() +
+  geom_freqpoly(data = allDat, aes(x = probability, y = ..density.., group = group, color = group), binwidth = 0.05) +
+  xlim(min = 0, max = 1) 
+p
+
+ggsave(filename = "~/phd/RNASeq/figures/probabilites_rf.svg", plot = p)
+
+
+```
+
+
+###Examples
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
+
+####examples_setup
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
+```{r examples_setup, eval=T}
+load("~/bin/r_git/R/r_files/predDat.Rda")
+
+new_calls <- read.table("~/phd/RNASeq/genera/new_calls_simple.txt", sep = "\t", fill =  T)
+new_calls <- new_calls %>% filter(V5 != "", V5 != "id")
+colnames(new_calls) <- c("contig", "start", "stop", "new_feature", "ID")
+newCalls <- new_calls %>% select(ID, new_feature)
+
+predDat <- predDat %>% left_join(newCalls, by = "ID")
+
+predDat <- predDat %>% mutate(prediction = ifelse(new_feature == F, 1, prediction))
+
+predNew <- predDat %>% filter(prediction ==  1, new_feature == T)
+
+```
+
+
+
+
+####plots
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
+```{r example_plots, eval=T}
+ggplot() + 
+  geom_freqpoly(data = predDat %>% filter(read.max.score> 0), aes(x = read.max.score, y = ..density.., group = prediction, color = as.character(prediction)), binwidth = 20) +
+  xlim(c(0, 500))
+
+
+ggplot() + 
+  geom_freqpoly(data = predDat %>% filter(mfe.score < 0), aes(x = mfe.score, y = ..density.., group = prediction, color = as.character(prediction)), binwidth = 5) +
+  xlim(c(-100, 0))
+
+
+ggplot() + 
+  geom_freqpoly(data = predDat , aes(x = gc.score, y = ..density.., group = prediction, color = as.character(prediction)), binwidth = 2) +
+  xlim(c(10, 90))
+
+
+ggplot() + 
+  geom_freqpoly(data = predDat %>% filter(distance> 0), aes(x = distance, y = ..density.., group = prediction, color = as.character(prediction)), binwidth = 0.05) +
+  xlim(c(0, 1))
+
+
+ggplot() + 
+  geom_freqpoly(data = predDat %>% filter(cov.count> 0), aes(x = cov.count, y = ..density.., group = prediction, color = as.character(prediction)), binwidth = 1) +
+  xlim(c(0, 50))
+
+
+ggplot() + 
+  geom_freqpoly(data = predDat %>% filter(motif.max.score> 0), aes(x = motif.max.score, y = ..density.., group = prediction, color = as.character(prediction)), binwidth = 1) +
+  xlim(c(0, 50))
+
+
+ggplot() + 
+  geom_freqpoly(data = predDat %>% filter(motif.max.score> 0), aes(x = motif.max.score, y = ..density.., group = prediction, color = as.character(prediction)), binwidth = 1) +
+  xlim(c(0, 50))
+
 ```

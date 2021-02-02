@@ -43,7 +43,7 @@ if ( is.null(opt$gff) ) {
 
 
 suppressMessages(library(tidyverse))
-suppressMessages(library(tjnFunctions))
+suppressMessages(library(comparativeSRA))
 ###--- column 1 is reverse and column 2 is forward ---###
 
 if ( is.null(opt$file_path ) ) { opt$file_path = "." }

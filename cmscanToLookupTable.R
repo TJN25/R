@@ -1,6 +1,27 @@
 #!/usr/bin/env Rscript
 library('getopt')
 
+cmscanToLookup <- function(rfamRes){
+  colnames(rfamRes) <- c("idx", "target.name", "accession1", "query.name", "accession2", "clan.name", "mdl", "mdl.from",  "mdl.to", "seq.from",   "seq.to",
+                         "strand", "trunc", "pass",   "gc",  "bias",  "score",   "E.value", "inc", "olp", "anyidx", "afrct1", "afrct2", "winidx", "wfrct1", "wfrct2", "description.of.target")
+  
+  rfamRes <- rfamRes%>%
+    mutate(seq.from2 = seq.from)%>%
+    mutate(seq.from = ifelse(seq.from > seq.to, seq.to, seq.from))%>%
+    mutate(seq.to = ifelse(seq.from2 > seq.to, seq.from2, seq.to))
+  
+  gff <- data.frame(seqname = rfamRes$query.name,
+                    source = rep("rfam", nrow(rfamRes)),
+                    feature = rep("ncRNA", nrow(rfamRes)),
+                    start = rfamRes$seq.from,
+                    end = rfamRes$seq.to,
+                    score = rfamRes$score,
+                    strand = rfamRes$strand,
+                    frame = rep(".", nrow(rfamRes)),
+                    attribute = rfamRes$accession1)
+  return(gff)
+}
+
 
 spec = matrix(c(
   'cmscanOutput', 'f', 1, "character",
@@ -26,7 +47,7 @@ if ( !is.null(opt$help) ) {
   cat("  -g <gff file> The file that contains the gff data. Do not inclue the gff file extension\n")
   cat("  -f <file path> The location of the other files and the output file\n")
   cat("  -o <output file name> The name of the output file. Do not inclue the gff file extension. The default is the same as the gca input\n")
-   q(status=1)
+  q(status=1)
 }
 
 if ( is.null(opt$cmscanOutput) ) {
@@ -39,7 +60,7 @@ if ( is.null(opt$gcf) ) {
 }
 
 library(tidyverse)
-library(comparativeSRA)
+library(tjnFunctions)
 
 if ( is.null(opt$file_path ) ) { opt$file_path = "." }
 if ( is.null(opt$output ) ) { opt$output = opt$gcf }
@@ -47,27 +68,8 @@ if ( is.null(opt$output ) ) { opt$output = opt$gcf }
 rfamRes <- read.table(paste(opt$file_path, opt$cmscanOutput, sep = "/"), header = F, comment.char = "#",quote = "", fill = T)
 
 
-gff <- cmscanToGff(rfamRes = rfamRes)
+gff <- cmscanToLookup(rfamRes = rfamRes)
+gff <- gff %>% arrange(start)
 
 
-gffMain <- readLines(paste(opt$file_path, "/", opt$gcf, ".gff", sep = ""))
-gffMain <- data.frame(text = gffMain)
-genomeInfo <- as.character(gffMain[8,1])
-genomeBuild <- as.character(gffMain[4,1])
-genomeSpecies <- as.character(gffMain[9,1])
-accession <- strsplit(genomeInfo, " ")[[1]][2]
-
-fileConn<-file(paste(opt$file_path, "/",opt$output, "_ncRNA.gff", sep = ""))
-writeLines(c("##gff-version 3",
-             "#!gff-spec-version 1.21",
-             "#!processor R script (local)",
-             genomeBuild,
-             paste("#!genome-build-accession NCBI_Assembly:", opt$gcf, sep = ""),
-             paste("#!annotation-date ", Sys.Date(), sep = ""),
-             "#!annotation-source cmscan (rFam) (local version)",
-             genomeInfo,
-             genomeSpecies), fileConn)
-close(fileConn)
-
-
-write.table(x = gff, file = paste(opt$file_path, "/",opt$output, "_ncRNA.gff", sep = ""), row.names = F, col.names = F, quote = F, sep = "\t", append = T)
+write.table(x = gff, file = paste(opt$file_path, "/",opt$output, "_ncRNA.lookup", sep = ""), row.names = F, col.names = F, quote = F, sep = "\t")

@@ -1,6 +1,9 @@
 #!/usr/bin/env Rscript
 library(dplyr, quietly = T, warn.conflicts = F)
-dat <- read.table("~/phd/RNASeq/tmp/test.plot")
+
+args = commandArgs(trailingOnly=TRUE)
+print(args)
+dat <- read.table(args[1])
 
 valuesDat <- dat %>%
   summarise_all(list(max)) %>% as.matrix() %>% t()
