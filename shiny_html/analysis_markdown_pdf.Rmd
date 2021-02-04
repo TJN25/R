@@ -12,6 +12,7 @@ runtime: shiny
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+options(warn = -1) 
 # suppressMessages(library(comparativeSRA))
 library(tidyverse)
 library(VennDiagram)
@@ -1047,6 +1048,10 @@ Go to:
     
     -   [*run_rnaPeakCalling.R*](#section-run_rnapeakcalling.r)
     
+    -   [*sRNA Peak Calling (Current)*](#section-new_rnapeakcalling)
+
+    -   [*Combine GFF files (loop)*](#section-run_combine_gff_over_all_accessions)
+    
     -   [*rfamscan*](#section-rfamscan)
     
     -   [*cmscanToGFFWrapper.R*](#section-cmscantogffwrapper.r)
@@ -1054,10 +1059,6 @@ Go to:
     -   [*cmscanToLookupTable.R*](#section-cmscantolookuptable.r)
 
     -   [*combine_gff_files.R*](#section-combine_gff_files.r)
-
--   [*fix_peak_calling*](#section-fix_peak_calling)
-
--   [*Summary of Output Data*](#section-summary_of_output_data)
 
 -   [*Combining GFF file*](#section-combining_gff_files)
 
@@ -1071,6 +1072,18 @@ Go to:
     
     -   [*get_random_srna_sequence*](#section-get_random_srna_sequence)
     
+-   [*Run sRNA nhmmer*](#section-run_srna_nhmmer)
+
+    -   [*single_fasta_files.py*](#section-single_fasta_files.py)
+    
+    -   [*Make fasta file for each RUF*](#section-single_fasta_files_loop)
+    
+    -   [*run_srna_nhmmer.sh*](#section-run_srna_nhmmer.sh)
+    
+    -   [*Run nhmmer over fasta files*](#section-run_srna_nhmmer_loop_initial)
+    
+    -   [*Run nhmmer over representative genomes*](#section-run_srna_nhmmer_loop_large_alignments)        
+    
 ***
     
 ###Download data and map reads {#data_download}
@@ -1079,7 +1092,7 @@ Go to:
 
 -   [*Top*](#top)
 
--   [*Section*](#section-predicting_srnas)
+-   [*Predicting sRNAs*](#section-predicting_srnas)
 
 ***
 
@@ -1977,8 +1990,19 @@ write.table(x = gff, file = paste(filePath, "/", opt$out_name, "_sra_calls.gff",
 
 ```
 
+####new_rnapeakcalling
 
-```{r test_rnaPeakCalling, eval=F}
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
+
+-   These steps are not automated and are newer
+
+```{r new_rnaPeakCalling, eval=F}
 genera_list <- list.files("~/phd/RNASeq/genera/")
 
 genera <- "Acinetobacter"
@@ -2243,6 +2267,17 @@ write.table(x = gffFwd, file = paste("~/phd/RNASeq/genera/",  genera, "/", acces
 }
 ```
 
+####move_old_calls
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
+
+
 ```{bash move_old_calls, eval=F}
 ##done in ~/phd/RNASeq/genera/
 
@@ -2268,6 +2303,17 @@ mv *_sra_calls.gff old
 done
 done
 ```
+
+####run_combine_gff_over_all_accessions
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
+
 
 ```{bash run_combine_gff_over_all_accessions, eval=F}
 
@@ -2746,27 +2792,6 @@ write.table(x = mergedDat, file = paste(file_path, "/", opt$out_name, "_new_call
 
 
 
-###Summary of Output Data {#summary_of_output_data}
-
-Go to:
-
--   [*Top*](#top)
-
--   [*Predicting sRNAs*](#section-predicting_srnas)
-
-***
-
-Description:
-
--   From >21 strains and 11 genera, there were >292 RNA-Seq files.
-
-    -   *Escherichia* and *Shigella* are separated in the pyhlogenetic tree for this data
-
--   This resulted in ??? expressed regions being predicted.
-
--   There were ??? known ncRNAs included in the analysis.
-
-***
 
 ###Combining GFF file {#combining_gff_files}
 
@@ -2815,7 +2840,13 @@ Go to:
 
 ####get_sRNA_sequences.py {#get_sRNA_sequencespy}
 
-[*Back to top (section)*](#section-get_srnas)
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
 
 ```{python get_sRNA_sequences.py, eval=F, include=T}
 #!/usr/bin/python
@@ -2866,72 +2897,6 @@ def rungetopts():
         sys.exit(2)
     return(accession)
 
-
-
-
-#
-# def makeoutputdirectory(write_path):
-#     if os.path.isdir(write_path) == False:
-#         try:
-#             os.mkdir(write_path)
-#         except OSError:
-#             print ("Creation of the directory %s failed" % accession)
-#             sys.exit(2)
-#     directory = os.listdir(write_path)
-#     if len(directory) != 0:
-#         print "Examples of files in %s" % write_path
-#         print directory[0:4]
-#         query_user = raw_input("%s is not an empty directory. Continue anyway y/n (this may write over existing files): " % write_path)
-#         if query_user == "y":
-#             print "Using %s as directory" % write_path
-#         else:
-#             print "Exiting script"
-#             sys.exit(2)
-#
-# def concatenateSequence(fastaFile):
-#     my_seq = fastaFile[0].seq
-#     i = 0
-#     for seq in fastaFile:
-#         if i == 0:
-#             i += 1
-#             continue
-#         i += 1
-#         my_seq = my_seq + seq.seq
-#     return my_seq
-#
-# def writeSequences(inFile,my_seq,accession,write_path):
-#     i = 0
-#     for line in inFile:
-#         i += 1
-#         words = line.rstrip()
-#         words = words.split("\t")
-#         srna = words[-1]
-#         start = words[2]
-#         try:
-#             start = int(start)
-#         except ValueError:
-#             continue
-#         end = words[3]
-#         end = int(end)
-#         if end - start > 50:
-#             strand = words[4]
-#             new_feature = words[8]
-#             feature = words[1]
-#             overlap = words[7]
-#             if new_feature == "FALSE":
-#                 srna_type = "known"
-#             else:
-#                 srna_type = "novel"
-#             srnaSeq = my_seq[start:end]
-#             srnaSeqRev = srnaSeq.reverse_complement()
-#             if strand == "-":
-#                 srnaSeq = srnaSeqRev
-#             if srna_type == "known":
-#                 srnaPCFile = open("%s/positive_control/%s.fna" % (write_path, accession), "a")
-#                 srnaPCFile.write(">%s[%s-%s,%s,%s,%s,%s]\n%s\n" % (srna, start, end, strand, srna_type, feature, overlap, srnaSeq))
-#             else:
-#                 srnaPredictedFile = open("%s/predicted/%s.fna" % (write_path, accession), "a")
-#                 srnaPredictedFile.write(">%s[%s-%s,%s,%s,%s,%s]\n%s\n" % (srna, start, end, strand, srna_type, feature, overlap, srnaSeq))
 def main():
 
     accession = rungetopts()
@@ -2969,10 +2934,38 @@ if __name__ == "__main__":
 
 ####get_sRNA_sequences
 
-[*Back to top (section)*](#section-get_srnas)
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
+
+-   Once the new_calls.txt files have been made the predicted sequences are needed.
+
+      -   cd ~/phd/RNASeq/sequences
+      
+      -   cp ~/phd/RNASeq/genera/*/*/*.fna ./
+      
+      -   cd ~/phd/RNASeq/new_calls
+      
+      -   mkdir -p old
+      
+      -   mv *_new_calls.txt old/
+
+      -   cp ~/phd/RNASeq/genera/*/*/*_new_calls.txt ./
+      
+      
 
 ```{bash get_sRNA_sequences_loop, eval=F, include=T}
 ##done in ~/phd/RNASeq/new_calls/
+
+cd ~/phd/RNASeq/srna_seqs/version_1/
+mkdir -p seqs_predicted
+
+cd ~/phd/RNASeq/new_calls/
+
 for file in *.txt; 
 do 
   accession=`basename $file _new_calls.txt`; 
@@ -2983,8 +2976,13 @@ done
 
 ####get_random_srna_sequences_loop
 
-[*Back to top (section)*](#section-get_srnas)
+Go to:
 
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
 
 ```{bash get_random_srna_sequences_loop, eval = F}
 ##done in ~/phd/RNASeq/new_calls/
@@ -2993,8 +2991,13 @@ for file in *.txt; do accession=`basename $file _new_calls.txt`; echo $accession
 
 ####get_random_srna_sequence
 
-[*Back to top (section)*](#section-get_srnas)
+Go to:
 
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
 
 ```{python get_random_srna_sequences.py, eval = F, python.reticulate = FALSE, echo=T}
 #!/usr/bin/python
@@ -3096,17 +3099,477 @@ if __name__ == "__main__":
 
 For each genome there is now a single file containing all the SRA calls and whether they were previously found/predicted.
 
-## Search for known ncRNAs and get phylogenetic distance matrix {#known_srna}
+
+
+###run_srna_nhmmer
 
 Go to:
 
 -   [*Top*](#top)
 
--   [*Run over subset of genomes for all genera*](#section-subest_of_all_genomes)
+-   [*Predicting sRNAs*](#section-predicting_srnas)
 
--   [*run_csmscan_across_multiple_files*](#section-run_csmscan_across_multiple_files)
+***
 
--   [*genome_contig_pairs*](#section-genome_contig_pairs)
+####single_fasta_files.py
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
+
+```{python single_fasta_files.py, eval = F}
+#!/usr/bin/python
+import sys
+from Bio import SeqIO
+import getopt
+import os
+from BCBio import GFF
+from Bio.Seq import Seq
+from Bio.Alphabet import generic_dna
+import random
+import pandas as pd
+import comparativesrna as srna
+
+help = '''
+    {script_name} -c com_port [-o output_file] [--loglevel level]
+
+    Reads the temperature data from a radio.  The temperature data is output in csv form.
+
+    examples:
+        Read table from radio attached to com4 and write the table to the file
+        output.csv.
+
+            {script_name} -c com4 -o output.csv
+
+        Read table from radio attached to com3 and write the table to stdout. 
+        You can use IO redirection to send the contents where every you want.
+
+            # just print to the terminal 
+            {script_name} -c com3
+
+            # redirect to another file
+            {script_name} -c com3 > somefile.csv
+
+            # filter out temperatures that are -100
+            {script_name} -c com3 | grep -v '^-100' 
+
+
+    -c com_port
+    --com_port comport
+        Name of the COM port attached to the radio
+
+    -o output_file
+    --output output_file
+        If specified write the table data to the given file.  If not specified
+        the data will be written to stdout.
+
+    --loglevel critical | error | warning | info | debug | notset
+        Control the verbosity of the script by setting the log level.  Critical
+        is the least verbose and notset is the most verbose.
+
+        The default loglevel is {default_loglevel}.
+
+        These values correspond directly to the python logging module levels. 
+        (i.e. https://docs.python.org/3/howto/logging.html#logging-levels)
+
+
+    -h 
+    --help 
+        print this message
+
+'''
+
+def usage():
+    print help
+
+def rungetopts():
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "i:f:qh", ["infile", "folder", "quiet", "help"])
+    except getopt.GetoptError as err:
+        # print help information and exit:
+        print(err) # will print something like "option -a not recognized"
+        usage()
+        sys.exit(2)
+    file = ""
+    for o, a in opts:
+            if o in ("-h", "--help"):
+                usage()
+                sys.exit()
+            elif o in ("-i", "--infile"):
+                file = a
+            elif o in ("-f", "--folder"):
+                folder = a
+            else:
+                assert False, "unhandled option"
+    if file == "":
+        print "-f <file> missing. For more help use -h"
+        sys.exit(2)
+    return(file, folder)
+
+# def single_fasta(fastaFile, folder):
+#     for seq in fastaFile:
+#         id = seq.id
+#         outname = id.split("[")
+#         outname = outname[0]
+#         my_seq = seq.seq
+#         outFile = open("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/%s/%s.fna" % (folder, outname), "w")
+#         outFile.write(">%s\n%s\n" % (id, my_seq))
+
+
+
+def main():
+
+    filename, folder = rungetopts()
+    print filename, folder
+    print "Reading files"
+    try:
+        fastaFile = list(SeqIO.parse("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/%s" % filename, "fasta"))
+    except IOError:
+        print "/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/%s not found" % filename
+        sys.exit(2)
+
+    srna.single_fasta(fastaFile, folder)
+
+
+if __name__ == "__main__":
+    main()
+
+
+```
+
+####single_fasta_files_loop
+
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
+
+
+-   Get individual sequences
+
+```{bash single_fasta_files_loop, eval = F}
+##done in ~/phd/RNASeq/srna_seqs/version_1/seqs_predicted/${group}
+group="predicted"
+cd ~/phd/RNASeq/srna_seqs/version_1/seqs_predicted/${group}
+
+mkdir -p single_seqs
+
+if [[ $group == "predicted" ]]; then
+
+fasta_file="predicted.fna"
+
+elif [[ $group == "positive_control" ]]; then
+fasta_file="predicted_known.fna"
+
+else;
+echo "${group} not a valid option for group variable"
+fasta_file=""
+
+
+fi
+single_fasta_files.py -i seqs_predicted/${group}/${fasta_file} -f seqs_predicted/${group}/single_seqs/
+
+
+```
+
+####run_srna_nhmmer.sh
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
+
+```{bash run_srna_nhmmer.sh, eval=F}
+#!/bin/bash
+
+# Setup Variables #
+
+usage(){
+    echo "run_sRNA_nhmmer.sh is a script for running nhmmer and sorting the results.  
+Usage:
+ run_sRNA_nhmmer.sh [opts] [input]
+
+Required:	       
+	-d	<database> The nucleotide database to be searched against as the nhmmer target
+	-f	<folder> The folder containing the query file for nhmmer
+	-e	<extension> The file extension of the query file in <folder>
+
+Options:
+	-h	Display this help
+	-c	Check if the sequences are >50 nt (only works on fasta files)
+"
+}
+
+check_seq_lengths=""
+database=""
+folder=""
+extension=""
+outfolder="."
+missing=""
+exitTrue="F"
+evalue="1e-5"
+
+# User Input Options #
+
+while getopts "d:o:f:E:e:ch" arg; do
+case $arg in
+	d) 
+	database=${OPTARG};;
+	f)
+	folder=${OPTARG};;
+	o)
+	outfolder=${OPTARG};;
+	E)
+	evalue=${OPTARG};;
+	e)
+	extension=${OPTARG};;	
+	c)
+	check_seq_lengths="T";;
+    h)
+		usage
+		exit
+      ;;    
+	\?) 
+	echo "Unknown option: -${OPTARG}" >&2; exit 1;;
+    esac
+done
+
+# Tests for inputs #
+
+if [[ $database == "" ]]; then
+	missing="$missing -d <database> "
+	exitTrue="T"
+fi
+
+if [[ $folder == "" ]]; then
+	missing="$missing -f <folder> "
+	exitTrue="T"	
+fi
+
+if [[ $extension == "" ]]; then
+	missing="$missing -e <extension> "
+	exitTrue="T"
+fi
+
+if [[ $exitTrue == "T" ]];then
+	echo "$missing not found. Use -h for more help."
+	exit
+fi
+
+if [[ $extension == "stk" ]]; then
+	check_seq_lengths=""
+fi
+
+echo "extension value: $extension"
+
+if [[ $check_seq_lengths == "T" ]]; then
+
+	echo "checking for short seqs"
+	mkdir -p $folder/short_seqs
+	
+	let "fileNum = 0"
+	for file in $folder/*.$extension
+	do
+	
+	seqlength=`grep -v ^">" $file | wc -c`
+	if (( $seqlength < 50 )); then
+	mv $file  single_seqs/short_seqs/
+	fi
+	
+	done
+
+fi
+
+# Set up folders/files #
+
+echo "making directories in `pwd`"
+mkdir -p $outfolder/alignments
+mkdir -p $outfolder/hmm
+mkdir -p $outfolder/output
+
+# Run nhmmer #
+
+echo "running nhmmer"
+let "fileNum = 0"
+for file in $folder/*.$extension
+
+do
+
+echo $file
+outname=`basename $file`
+
+
+if [ -f "$outfolder/output/$outname.res" ]; then
+	echo "Already exists: $file"
+	continue
+fi
+
+
+nseqs=`esl-alistat $file | grep "Number of sequences" | cut -d ":" -f2`
+length=`esl-alistat $file | grep "Alignment length:" | cut -d ":" -f2`
+echo "Running nhmmer on $file (length: $length, nseqs: $nseqs)"
+
+
+nhmmer -E $evalue --tblout $outfolder/output/$outname.tbl -A $outfolder/alignments/tmp.stk --tformat FASTA  $file $database > $outfolder/output/$outname.res
+
+lines=`wc -l < $outfolder/alignments/tmp.stk`
+
+
+if (( $lines > 0 )); then
+
+
+##esl-weight!!!
+esl-alimanip   --lnfract 0.8 --lxfract 1.2 --lmin 50 --lmax 500 --detrunc 30  $outfolder/alignments/tmp.stk | esl-alimask -g --gapthresh 0.8 -p --pfract 0.5 --pthresh 0.5 --keepins - > $outfolder/alignments/$outname
+
+
+
+hmmbuild $outfolder/hmm/$outname.hmm $outfolder/alignments/$outname
+
+else
+
+echo "No hits found for $outname"
+
+fi
+
+done
+
+
+
+
+
+```
+
+####run_srna_nhmmer_loop_initial
+
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
+
+-   loop over the single sequences and build models from the predicted sRNAs
+
+    -   done for the known and novel predicted sRNAs
+
+```{bash run_srna_nhmmer_loop_initial, eval=F}
+##done in ~/phd/RNASeq/srna_seqs/version_1/seqs_predicted/${group}
+group="predicted"
+cd ~/phd/RNASeq/srna_seqs/version_1/seqs_predicted/${group}
+run_sRNA_nhmmer.sh -d ~/phd/RNASeq/srna_seqs/version_1/seqs_predicted/${group}/predicted*.fna -f single_seqs/ -e fna
+
+```
+
+####change_fna_stk
+
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
+
+-   output is with .fna instead of .stk
+
+```{bash change_fna_stk, eval=F}
+##done in ~/phd/RNASeq/srna_seqs/version_1/seqs_predicted/${group}/alignments
+group="predicted"
+
+cd ~/phd/RNASeq/srna_seqs/version_1/seqs_predicted/${group}/alignments
+
+for file in *.fna;
+do
+outname=`basename $file .fna`
+
+mv $file $outname.stk
+
+done
+
+```
+
+####server_transfer_setup
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
+
+
+-   move alignments to server 
+
+    -   on server 
+    
+```{bash server_transfer_setup, eval=F}
+##done in ~/phd/RNASeq/srnas/${group}
+
+group="predicted"
+cd ~/phd/RNASeq/srnas/${group}
+mkdir -p initial_alignments
+```
+
+####run_srna_nhmmer_loop_large_alignments
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Predicting sRNAs*](#section-predicting_srnas)
+
+***
+
+-   from ~/phd/RNASeq/srna_seqs/version_1/seqs_predicted/predicted/alignments
+    
+    -   scp *.stk bioc:./phd/RNASeq/srnas/predicted/initial_alignments
+
+
+-   on server
+
+```{bash run_srna_nhmmer_loop_large_alignments, eval=F}
+##done in ~/phd/RNASeq/srnas/${group}
+group="predicted"
+cd ~/phd/RNASeq/srnas/${group}
+run_sRNA_nhmmer.sh -d ~/phd/RNASeq/representative_genomes.fna -f initial_alignments/ -o large_alignments/ -e stk -E 1e-5
+
+##currently on screen 57692 (predicted) and 134352 (known_predicted)
+##screen -list to see all
+##screen -r 57692 to reattach
+```
+
+
+
+-   transfer files to server
+
+    -   scp *.stk bioc:./phd/RNASeq/srnas/predicted/initial_alignments
+
+## Known sRNAs and phylogenetic distance {#known_srna}
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Run over representative genomes*](#section-subest_of_all_genomes)
+
+-   [*Run csmscan (loop)*](#section-run_csmscan_across_multiple_files)
+
+-   [*Get genome contig pairs*](#section-genome_contig_pairs)
 
 -   [*cmsearch_res_pc*](#section-cmsearch_res_pc)
 
@@ -3144,6 +3607,7 @@ Go to:
 
 ***
 
+-   2 genomes from each genera (from REFSEQ95) were selected as a representative set of genomes
 
 ```{r get_genomes_for_analysis, eval=F}
 assembly_summary <- read.table("/Volumes/scratch/brownlab/chrisbr/DB/REFSEQ_REPREF/bacteria/assembly_summary_repref.txt", sep = "\t", fill = T, quote = "", comment.char = "")
@@ -3197,11 +3661,7 @@ write.table(x = complete_genomes$species, file = "~/phd/RNASeq/all_taxa_names.tx
   p
 ```
 
--   cmscan run with commands in a file containing the nucleotide files which need to be searched
-    
-    - mkdir checkfiles
-    - *rfamscan()* is the command called.
-    - cmscan -Z $counts --cut_ga --rfam --nohmmonly --tblout $1.tblout --fmt 2 --clanin ~/phd/RNASeq/Rfam.clanin.txt ~/phd/RNASeq/Rfam.cm $1
+
   
 ###run_csmscan_across_multiple_files
 
@@ -3213,6 +3673,11 @@ Go to:
 
 ***
 
+-   cmscan run with commands in a file containing the nucleotide files which need to be searched
+    
+    - mkdir checkfiles
+    - *rfamscan()* is the command called.
+    - cmscan -Z $counts --cut_ga --rfam --nohmmonly --tblout $1.tblout --fmt 2 --clanin ~/phd/RNASeq/Rfam.clanin.txt ~/phd/RNASeq/Rfam.cm $1
 
 ```{bash run_csmscan_across_multiple_files, eval=F, include=T}
 #in ~/phd/RNASeq/representative_genomes
@@ -3269,6 +3734,7 @@ Go to:
 
 ***
 
+-  This is needed for lookup steps later as there are genome accessions and contig accessions used by different scripts
 
 ```{bash genome_contig_pairs, eval=F}
 #done from ~/phd/RNASeq/representative_genomes/
@@ -3295,6 +3761,11 @@ Go to:
 
 ***
 
+-   convert the output of the cmsearch for rFam models into the same format that is used for the predicted and negative control datasets
+
+    -   output a file for each rFam model that has the strand, contig and position of sequence
+    
+    -   done on server
 
 ```{r cmsearch_res_pc, eval=F}
 
@@ -3362,6 +3833,7 @@ Go to:
 
 ***
 
+-   appears to repeat the above script
 
 ```{r cmsearch_res_analysed_genomes, eval=F}
 
@@ -3423,7 +3895,6 @@ write.table(x = modelDat, file = paste("~/phd/RNASeq/analysed_genomes_rfam_files
 
 -   Other models also saved
 
--   'esl-sfetch --index ${group}.fna' used to index the fasta file
 
 
 ###get_nucelotide_sequences
@@ -3437,6 +3908,14 @@ Go to:
 
 ***
 
+
+-   'esl-sfetch --index ${group}.fna' used to index the fasta file
+
+-   once indexed the location files created earlier can be used to extract sequences from the representative genomes that match to each rFam family
+
+    -   a later step (cmalign) uses a lot of memory. To keep it managable the sequences are limited to 20 per file.
+    
+    -   This is later combined with esl-alimerge
 
 ```{bash get_nucelotide_sequences, eval = F}   
 
@@ -3536,6 +4015,7 @@ Go to:
 
 ***
 
+-   The files with sequences for each rFam model need to be in stockholm alignment format which is done by running cmalign against the rFam model
 
 ```{bash make_cm_files, eval=F}
 ##from ~/phd/RNASeq/rfam_files/
@@ -3614,6 +4094,8 @@ Go to:
 
 ***
 
+-   Mask to reference and combine the alignments
+
 
 ```{bash combine_alignments, eval=F}
 for folder in *_files;
@@ -3643,6 +4125,7 @@ Go to:
 
 ***
 
+-   phylip formatted files have limited name lengths (10 characters I think) so it is necessary to rename IDs and save a lookup table.
 
 ```{r rename_alignment_ids, eval=F}
 dat <- read.table("~/phd/RNASeq/RF00177.stk", sep = "\t", fill = T, comment.char = "", quote = "", header = F)
@@ -3663,9 +4146,7 @@ save(current_ids, file = "~/bin/r_git/R/r_files/current_ids.Rda")
 
 -   RF00177.stk was the name of the file containing the RF00177 alignments for the ~1500 genomes
     
--   esl-reformat phylip RF00177.stk > RF00177_rep_seqs_all.phylip
 
--   the .phylip file is used with dnadist to create the RF00177_rep_seqs_all.dists file
 
 
 
@@ -3679,6 +4160,9 @@ Go to:
 
 ***
 
+-   esl-reformat phylip RF00177.stk > RF00177_rep_seqs_all.phylip
+
+-   the .phylip file is used with dnadist to create the RF00177_rep_seqs_all.dists file
 
 Summary:
 
@@ -3698,6 +4182,7 @@ Go to:
 
 ***
 
+-   This outputs a file with the query genome, target contig and srna ID
 
 ```{bash query_target_pairs, eval=F}
 #done in the alignments file (such as ~/phd/RNASeq/srnas/predicted/combined_alignments_ids/alignments)
@@ -3714,7 +4199,9 @@ do
 done
 ```
 
-###dna_dists
+UP TO HERE!!!
+
+###dna_dists 
 
 Go to:
 
@@ -5450,6 +5937,8 @@ Go to:
     
     -   [*negative_control_alignments*](#section-negative_control_alignments)
 
+    -   [*rnaalifold_outputs*](#section-rnaalifold_outputs)
+
 -   [*run_rscape.sh*](#section-run_rscape.sh)
 
     -   [*rscape_summary*](#section-rscape_summary)
@@ -5476,7 +5965,16 @@ Go to:
 
     -   [*sRNA_read_depths_script*](#section-srna_read_depths_script)
     
+    -   [*sRNA_read_depths_predicted*](#section-srna_read_depths_predicted)  
+
+    -   [*combine_predicted_read_depths*](#section-combine_predicted_read_depths)  
+
+    -   [*srna_read_depths_new_calls_pc*](#section-srna_read_depths_new_calls_pc)  
+
+    -   [*match_pc_pred_ids*](#section-match_pc_pred_ids)  
+
     -   [*summarise_sRNA_read_depths.R*](#section-summarise_srna_read_depths.r)  
+
 
 ***
 
@@ -5709,7 +6207,15 @@ tmpname=`echo $file | cut -d '_' -f2,3,4,5`
 done
 ```
 
+####rnaalifold_outputs
 
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
 
 ```{bash rnaalifold_outputs, eval=F}
 group="predicted"
@@ -6557,6 +7063,15 @@ for file in *.stk;
 done
 ```
 
+####sRNA_read_depths_predicted
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
 
 -   Get read depths for the originally predicted sRNAs
 
@@ -6660,6 +7175,15 @@ done
 
 ```
 
+####combine_predicted_read_depths
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
 
 ```{bash combine_predicted_read_depths, eval=F}
 ##done in ~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments
@@ -6708,6 +7232,16 @@ do
 done
 
 ```
+
+####match_pc_pred_ids
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Score RNAs*](#section-score_rnas)
+
+***
 
 ```{bash match_pc_pred_ids, eval=F}
 ##done in ~/phd/RNASeq/genera
@@ -6767,9 +7301,13 @@ Go to:
 
 -   [*Top*](#top)
 
+-   [*Summary*](#section-summary_results)
+
 -   [*conservation_distance*](#section-conservation_distance)
 
     -   [*conservation_distance_roc_curve*](#section-conservation_distance_roc_curve)
+    
+    -   [*distance_check*](#section-distance_check)
     
     -   [*predicted_data_upsetr*](#section-predicted_data_upsetr)
     
@@ -6777,17 +7315,29 @@ Go to:
 
 -   [*read_depths*](#section-read_depths)
 
+    -   [*read_depths_setup*](#section-read_depths_setup)
+
+    -   [*read_depths*](#section-read_depths)
+
+    -   [*read_depths_check*](#section-read_depths_check)
+
 -   [*Covariation*](#section-covariation)
 
     -   [*rscape_setup*](#section-rscape_setup)
 
+    -   [*rscape_check*](#section-rscape_check)
+
     -   [*rscape*](#section-rscape)
+
+    -   [*Alifold Covariation*](#section-alifold_cov)
 
 -   [*GC Content*](#section-gc_content_results)
 
 -   [*Secondary Structure*](#section-secondary_structure_results)
 
     -   [*alifold_setup*](#section-alifold_setup)
+
+    -   [*alifold_check*](#section-alifold_check)
     
     -   [*alifold_results*](#section-alifold_results)
     
@@ -6797,19 +7347,37 @@ Go to:
 
 -   [*RandomForest*](#section-randomforest)
 
+    -   [*random_forest_data_setup*](#section-random_forest_data_setup)
+
+    -   [*random_forest_setup*](#section-random_forest_setup)
+    
+    -   [*random_forest*](#section-random_forest)
+    
+    -   [*correlation_heat_map*](#section-correlation_heat_map)
+
+    -   [*random_forest_roc*](#section-random_forest_roc)
+
+    -   [*random_forsest_predicted_data*](#section-random_forsest_predicted_data)
+
 -   [*Examples*](#section-examples)
 
+    -   [*examples_setup*](#section-examples_setup)
+
+    -   [*plots*](#section-plots)
 
 
 
 ***
 
+###summary_results 
 
--   Analysis of the evolutionary distance of all the sequences in a given sRNA
+Go to:
 
-    -   the maximum distance between sequences in an sRNA was selected 
-    
-    -   this is then plotted below in a cumulative proportion plot for each of PC, NC and Predicted datasets.
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
 
 ```{bash number_of_sRNAs_predicted, eval=F}
 ##done in ~/phd/RNASeq/genera
@@ -6871,6 +7439,13 @@ Go to:
 -   [*Results*](#section-results)
 
 ***
+
+-   Analysis of the evolutionary distance of all the sequences in a given sRNA
+
+    -   the maximum distance between sequences in an sRNA was selected 
+    
+    -   this is then plotted below in a cumulative proportion plot for each of PC, NC and Predicted datasets.
+
 
 ```{r conservation_distance, eval=T}
 load("~/bin/r_git/R/r_files/max_dists_pred.Rda")
@@ -6958,6 +7533,17 @@ dev.off()
 }
 
 ```
+
+####distance_check
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
 
 ```{r distance_check, eval = T}
 load( file = "~/bin/r_git/R/r_files/max_dists_pred.Rda")
@@ -7135,6 +7721,17 @@ Go to:
 
 ***
 
+####read_depths_setup
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
+
 ```{r read_depths_setup, eval=F, include=T}
 ncRDepth <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/negative_control_read_depths_summary_reads.txt")
 pcRDepth <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/positive_control_read_depths_summary.txt")
@@ -7190,6 +7787,16 @@ save(predRDepth, file = "~/bin/r_git/R/r_files/predRDepth.Rda")
 
 
 ```
+
+####read_depths
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
 
 
 ```{r read_depths}
@@ -7260,6 +7867,17 @@ dev.off()
 
 }
 ```
+
+####read_depths_check
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
 
 ```{r read_depths_check, eval=T}
 load("~/bin/r_git/R/r_files/ncRDepth.Rda")
@@ -7426,6 +8044,17 @@ save(predCovRNA, file = "~/bin/r_git/R/r_files/predCovariation.Rda")
 
 
 ```
+
+####rscape_check
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
 
 ```{r rscape_check, eval=F, include=T}
 load("~/bin/r_git/R/r_files/pcCovariation.Rda")
@@ -7758,6 +8387,17 @@ save(ncAlifold, file = "~/bin/r_git/R/r_files/ncAlifold.Rda")
 save(predAlifold, file = "~/bin/r_git/R/r_files/predAlifold.Rda")
 ```
 
+####alifold_check
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
+
 -   The original ROC plot was showing a flat spot near the start. 
 
     -   The code below was used to check what this was. 
@@ -7987,6 +8627,17 @@ dev.off()
 
 ```
 
+####motifs_setup
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
+
 ```{r motifs_setup, eval=F}
 pcMotif <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/positive_control.rmfam", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
 ncMotif <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/negative_control.rmfam", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
@@ -8028,6 +8679,17 @@ Go to:
 -   [*Results*](#section-results)
 
 ***
+
+####random_forest_data_setup
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
 
 ```{r random_forest_data_setup, eval=T}
 load("~/bin/r_git/R/r_files/max_dists_pc.Rda")
@@ -8144,6 +8806,17 @@ randomForestDat <- dat
 save(randomForestDat, file = "~/bin/r_git/R/r_files/randomForestDat.Rda")
 ```
 
+####random_forest_setup
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
+
 ```{r random_forest_setup, eval = T}
 
 load("~/bin/r_git/R/r_files/randomForestDat.Rda")
@@ -8173,6 +8846,17 @@ rf_classifier = randomForest(group ~ ., data=training, ntree=100, importance=TRU
 rf_classifier
 save(rf_classifier, file = "~/bin/r_git/R/r_files/rf_classifier.Rda")
 ```
+
+####random_forest
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
 
 ```{r random_forest, eval = T}
 load("~/bin/r_git/R/r_files/rf_classifier.Rda")
@@ -8235,7 +8919,18 @@ dev.off()
 ```
 
 
-```{r correlation_heat_map, eval=F}
+####correlation_heat_map
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
+
+```{r correlation_heat_map, eval=T}
 load("~/bin/r_git/R/r_files/randomForestDat.Rda")
 dat <- randomForestDat %>% select(-ID) %>% unique
 set.seed(101)
@@ -8264,7 +8959,7 @@ for(i in 1:length(dNames)){
    spear<-cor.test(dat3[,dNames[i] == colnames(dat3)], dat3[,dNames[j] == colnames(dat3)], method = "spearman", exact = T)
    pvalMatrix[i,j] <- spear$p.value
    rhoMatrix[i,j]  <- spear$estimate
-   if(spear$p.value < 0.05){
+   if(spear$p.value < 0.05/(15*15)){
 sigMatrix[i,j]  <- "X"
                 sigCount <- sigCount + 1
    }
@@ -8278,6 +8973,17 @@ margins = c(8, 8), cexRow=1.5, cexCol=1.5,font=2)
 
 
 ```
+
+####random_forest_roc
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
+
 
 ```{r random_forest_roc, eval=T}
 load("~/bin/r_git/R/r_files/rf_classifier.Rda")
@@ -8304,6 +9010,17 @@ cutoffs <- data.frame(cut=perf@alpha.values[[1]], fpr=perf@x.values[[1]],
                       tpr=perf@y.values[[1]])
 
 ```
+
+
+####random_forsest_predicted_data
+
+Go to:
+
+-   [*Top*](#top)
+
+-   [*Results*](#section-results)
+
+***
 
 
 ```{r random_forsest_predicted_data, eval=T}
