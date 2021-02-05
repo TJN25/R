@@ -853,7 +853,7 @@ sraDatAll[rand.selection,]%>%
 
 ```
 
-#Data Selection
+#Data Selection {#data_selection}
 
 ##Strains and experiments
 How to get the summary table for the genera for the RNA-seq data:
@@ -864,7 +864,7 @@ How to get the summary table for the genera for the RNA-seq data:
 
 -   Select the "Metadata" button of the "Total" row and "Download" Column.
 
--   cat SraRunTable* >> ~/phd/RNASeq/sra_run_tables.csv
+-   `cat SraRunTable* >> ~/phd/RNASeq/sra_run_tables.csv`
 
     -   This appears to have columns out of order so it is important to consider that there might be more data available and to search sraDatAll for genus names to check.
 
@@ -964,7 +964,7 @@ The genome accession for each added genome was looked up on [NCBI](https://www.n
 
 -   Create a folder for the genus
 
--   Create a folder using the GenBank assembly accession e.g. mkdir GCA_002504285.1.data/
+-   Create a folder using the GenBank assembly accession e.g. `mkdir GCA_002504285.1.data/`
 
 -   Create an experiments_list.txt file listing all of the SRA experiments for the given genome and save the file in the genus folder.
     
@@ -972,7 +972,7 @@ The genome accession for each added genome was looked up on [NCBI](https://www.n
 
 A taxonomy table was generated with the code below. This had to be supplemented by going through manually to correct mistakes, or fill in missing data.
 
--   genera_list.txt was made by hand by searching for RNASeq files for each genus as above and if found, the genus was added to the file. 
+-   *genera_list.txt* was made by hand by searching for RNASeq files for each genus as above and if found, the genus was added to the file. 
 
     -   this would not be practical for a bigger clade.
 
@@ -1027,6 +1027,8 @@ for item in genera.iloc[:,0]:
 ##Subset of genomes {#subest_of_all_genomes}
 
 Two genomes from each genera (from REFSEQ95) were selected as a representative set of genomes
+
+-   This is done on the server (biochemcompute.uod.otago.ac.nz) using [Rstudio](http://biochemcompute.uod.otago.ac.nz:8787/) from the browser
 
 ```{r get_genomes_for_analysis, eval=F}
 assembly_summary <- read.table("/Volumes/scratch/brownlab/chrisbr/DB/REFSEQ_REPREF/bacteria/assembly_summary_repref.txt", sep = "\t", fill = T, quote = "", comment.char = "")
@@ -1120,6 +1122,7 @@ write.table(x = complete_genomes$species, file = "~/phd/RNASeq/all_taxa_names.tx
 
     -   [*combine_gff_files.R*](#section-combine_gff_files.r) -f *./gff_files/* *-o* *\<GCA Accession\>*
 
+
 ***
 
 
@@ -1130,289 +1133,27 @@ Description:
 
 -   A plot file is produced. This contains a number for each nucleotide that indicates read depth.
 
--   The read depth gets set to 0 for all coding regions of the file
-
-    -   This is done as identifying ncRNAs inside coding regions is a much more challenging problem than simply peak calling
-
--   For the remaining positions, the read depth is normalised and any region where the read depth is above a threshold for \>50 nt is called a peak.
+-   The read depth is normalised and any region where the read depth is above a threshold for \>50 nt is called a peak.
 
     -   Threshold is set to the equivalent of \~15 nt read depth before normalisation
 
+-   The protein coding regions are ignored
 
 
-###new_rnapeakcalling
 
+###RUF peak calling
 
--   These steps are not automated and are newer
+The peak calling steps appeared to have something wrong so it was rewritten:
 
-```{r new_rnaPeakCalling, eval=F}
-genera_list <- list.files("~/phd/RNASeq/genera/")
+-   [*run_rnaPeakCalling.2.0.R*](#section-run_rnapeakcalling.2.0.r)
 
-genera <- "Acinetobacter"
+    -   This runs over all current plot files in the subfolders of *~/phd/RNASeq/genera/* and uses a slightly different approach to before
 
-for(genera in genera_list){
-  print(genera)
-  if(genera == "Escherichia"){
-    next
-  }
+    -   It has everything hardcoded including file locations and no checks for overwriting existing files so before running this code
+    
+###Move old calls {#move_old_calls}
 
-
-accession_list <- list.files(paste("~/phd/RNASeq/genera/",  genera, "/", sep = ""), pattern = ".data$")
-accessionsDat <- data.frame(accession_list = accession_list)
-
-accessionsDat <- accessionsDat %>% mutate_all(as.character)
-accession_folder <-  accessionsDat$accession_list[1]
-
-
-for(accession_folder in accessionsDat$accession_list){
-  accession <- unlist(strsplit(accession_folder, "\\."))[c(1,2)]
-  accession <- paste(accession, collapse = ".")
-  files <- list.files(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/plot_files/", sep = ""), pattern = ".plot$")
-
-filesDat <- data.frame(files = files)
-
-filesDat <- filesDat %>% filter(grepl(pattern = "ncRNA", x = files)==F,
-                                grepl(pattern = "fwd", x = files)==F,
-                                grepl(pattern = "rev", x = files)==F,
-                                grepl(pattern = accession, x = files)==F) %>% mutate_all(as.character)
-
-
-if(nrow(filesDat) == 0){
-  next
-}
-print(accession)
-
-gffDat <- read.table(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", accession, ".gff", sep = ""), sep = "\t", fill = T, comment.char = "#", quote = "")
-colnames(gffDat) <- c("sequence", "source", "feature", "start", "end", "score", "strand", "phase", "Atrribute")
-
-regions <- gffDat %>% filter(feature == "region", start == "1") %>% select(sequence, start, end)
-
-current_pos <- 0
-for(i in 1:nrow(regions)){
-  # print(regions$start[i])
-  regions$end[i] <- regions$end[i] + current_pos
-  regions$start[i] <- regions$start[i] + current_pos
-  current_pos <- regions$end[i]
-
-}
-
-file_name <-  filesDat$files[1]
-
-for(file_name in filesDat$files){
-  print(file_name)
-  sra_id <- unlist(strsplit(file_name, "\\."))[1]
-  
-    plotFile <- read.table(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/plot_files/", file_name, sep = ""))
-
-
-
-
-
-
-cdsDat <- gffDat %>% filter(feature == "CDS")
-
-for(i in 1:nrow(regions)){
-  contig <- regions$sequence[i]
-  increase_val <- regions$start[i]
-  cdsDat <- cdsDat %>% mutate(start = ifelse(sequence == contig, start + increase_val, start),
-  end = ifelse(sequence == contig, end + increase_val, end))
-  
-}
-
-
-
-positions <- cdsDat %>% select(sequence,start, end) %>% mutate(start = start - 149) %>% mutate(start = ifelse(start < 1, 1, start))  %>% mutate(end = end + 149) %>% mutate(end = ifelse(end > max(regions$end), max(regions$end), end))
-
-
-
-
-
-
-positions$new <- do.call(paste, c(positions, sep=":")) 
-positions$new <- Map(":", positions$start, positions$end)
-
-
-values <- unlist(positions$new[1:1000])
-
-
-positions <- data.frame(rowNum = values, type="CDS")
-
-starts <- data.frame(rowNum = cdsDat$start, type2 ="start")
-stops <- data.frame(rowNum = cdsDat$end, type2 ="stop")
-starts <- starts %>% mutate(rowNum = rowNum - 149) %>% mutate(rowNum = ifelse(rowNum < 1, 1, rowNum))
-stops <- stops %>% mutate(rowNum = rowNum + 149) %>% mutate(rowNum = ifelse(rowNum > max(regions$end), max(regions$end), rowNum))
-
-starts_and_stops <- starts %>% bind_rows(stops)
-
-positions <- positions %>% 
-  left_join(starts_and_stops, by = "rowNum") %>% 
-  mutate(type2 = ifelse(is.na(type2), "remove", type2))
-
-plotDat <- plotFile %>% mutate(value = ifelse(V1 > V2, V1, V2)) %>% select(value) %>% mutate(rowNum = row_number())
-
-plotDat <- plotDat %>% left_join(positions, by = "rowNum") %>% mutate(type2 = ifelse(is.na(type2), "intergenic", type2)) %>% 
-  filter(type2 != "remove")
-
-
-plotDat <- plotDat %>% unique()
-
-
-
-plotDat <- plotDat %>% mutate(type = ifelse(is.na(type), "intergenic", "CDS"))
-
-total <- sum(plotDat$value)/1000000
-
-plotDat$value <- plotDat$value/total
-
-# save(plotDat, file = "~/phd/RNASeq/tmp/plotDat.Rda")
-# 
-# load("~/phd/RNASeq/tmp/plotDat.Rda")
-
-checkDat <- plotDat %>% filter(value > 15/total & type == "intergenic" )
-
-
-# checkDat <- data.frame(value = "0.04", rowNum = c(1,2,3,4,5,15,16,17,18,21,22,23,50,51,52,56,61,62,63,64,100,101,102,103),
-#                        type = "intergenic")
-# checkDat <- checkDat %>% mutate(type = ifelse(rowNum > 15 & rowNum < 30, "CDS", "intergenic"))
-
-plotDat <- checkDat
-
-callsDat <- data.frame(start = rep(as.character("0"), 20000), stop = rep(as.character("0"), 20000), stringsAsFactors = F)
-start <- 0
-stop <- 0
-current_feature <- F
-cds <- F
-id_pos <- 0
-
-
-i <- 1
-for(i in 1:nrow(plotDat)){
-  printRemaining(i = i, length = nrow(plotDat))
-  if(i == nrow(plotDat)){
-    if(current_feature){
-    if((plotDat$rowNum[i] - 25) < stop){
-    stop <- plotDat$rowNum[i]
-    if(plotDat$type[i] == "CDS"){
-        cds <- T
-    }
-    }
-      if(cds){
-        current_feature <- F
-        cds <- F
-        next
-      }
-    id_pos <- id_pos + 1
-    # print(paste(start,stop, id_pos))
-    callsDat$start[id_pos] <- start
-    callsDat$stop[id_pos] <- stop
-    current_feature <- F
-    cds <- F
-    }
-  }
-  
-  if(current_feature == F){
-      start <- plotDat$rowNum[i]
-      stop <- plotDat$rowNum[i]
-      if(plotDat$type[i] == "CDS"){
-          cds <- T
-      }
-      current_feature <- T
-      next
-  }
-  
-  if(plotDat$type2[i] == "stop"){
-    stop <- plotDat$rowNum[i]
-    cds <- T
-    next
-  }
-  
-  if((plotDat$rowNum[i] - 25) < stop){
-    stop <- plotDat$rowNum[i]
-    if(plotDat$type[i] == "CDS"){
-        cds <- T
-    }
-    next
-  }else{
-     if(cds){
-      current_feature <- F
-      cds <- F
-      start <- plotDat$rowNum[i]
-      stop <- plotDat$rowNum[i]
-      next
-     }
-    id_pos <- id_pos + 1
-    # print(paste(start,stop, id_pos))
-    callsDat$start[id_pos] <- start
-    callsDat$stop[id_pos] <- stop
-    current_feature <- F
-    cds <- F 
-  }
-}  
-  
-  
-
-
-
-
-combinedCalls <- callsDat %>% filter(start != 0) %>% mutate_all(as.numeric) %>% filter((stop - start) > 50)
-
-
-
-
-gffMain <- readLines(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", accession, ".gff", sep = ""))
-gffMain <- data.frame(text = gffMain)
-genomeInfo <- as.character(gffMain[8,1])
-genomeBuild <- as.character(gffMain[4,1])
-genomeSpecies <- as.character(gffMain[9,1])
-accession_contig <- strsplit(genomeInfo, " ")[[1]][2]
-
-
-
-gffFwd <- combinedCalls%>%mutate(strand = "+",
-                                                 source = "sraAlignedncRNAExpression",
-                                                 seqname = accession_contig,
-                                                 median.val = 0,
-                                                 feature = "ncRNA",
-                                                 frame = ".",
-                                                 attribute = paste("ID=rna_fwd_", row_number(), sep = ""))%>%
-  select(seqname, source, feature, start, stop, median.val, strand, frame, attribute)
-
-
-
-
-fileConn<-file(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", sra_id, "_snra_calls.gff", sep = ""))
-writeLines(c("##gff-version 3",
-             "#!gff-spec-version 1.21",
-             "#!processor R script (local) with manual add of top section",
-             genomeBuild,
-             paste("#!genome-build-accession NCBI_Assembly:", "GCA_000017745.1", sep = ""),
-             paste("#!annotation-date ", Sys.Date(), sep = ""),
-             "#!annotation-source snraCalls (local version)",
-             genomeInfo,
-             genomeSpecies), fileConn)
-close(fileConn)
-
- print(paste("Writing to ~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", sra_id, "_snra_calls.gff", sep = ""))
-write.table(x = gffFwd, file = paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", sra_id, "_snra_calls.gff", sep = ""), row.names = F, col.names = F, quote = F, sep = "\t", append = T)
-
-
-# plotDat <- plotDat %>% mutate(value = ifelse(is.na(type), value, 0))
-# 
-# 
-# outDat <- plotDat %>% select(value)
-# 
-# 
-# write.table(outDat, paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/plot_files/", file_name, "_ncRNA_no_buffer.plot", sep = ""), quote = F, row.names = F, col.names = F)
-}
-
-
-}
-}
-```
-
-###move_old_calls
-
-
+Moves existing `${experiment}_sra_calls.gff` files to an *old/* folder. This will prevent them from being included in the `${accession}_new_calls.txt` file from the [*combine_gff_files.R*](#section-combine_gff_files.r) script.
 
 ```{bash move_old_calls, eval=F}
 ##done in ~/phd/RNASeq/genera/
@@ -1440,40 +1181,13 @@ done
 done
 ```
 
-###run_combine_gff_over_all_accessions
-
-
-
-```{bash run_combine_gff_over_all_accessions, eval=F}
-
-cd ~/phd/RNASeq/genera/
-for genus in *;
-do
-#genus="Escherichia"
-
-
-cd ~/phd/RNASeq/genera/${genus}
-
-
-for folder in *.data;
-do
-accession=`basename $folder .data`
-echo $genus $accession
-cd ~/phd/RNASeq/genera/${genus}/${folder}/
-
-combine_gff_files.R -f ./gff_files/ -o $accession
-
-done
-done
-
-```
 
 ##Combining GFF file {#combining_gff_files}
 
 
-At this stage each individual RNA-Seq file has a corresponding gff file of SRA calls. There is also the original GFF file containing ncRNAs (along with CDS). Predictions of ncRNAs are made using rfam models and the output is made into a GFF file. There are 2 GFF files containing *known* ncRNAs and a number of GFF files containing predicted SRAs.
+At this stage each individual RNA-Seq file has a corresponding gff file of RUFs. There is also the original GFF file containing ncRNAs (along with CDS). Predictions of ncRNAs are made using rfam models and the output is made into a GFF file. There are 2 GFF files containing *known* sRNAs and a number of GFF files containing predicted RUFs.
 
--   feature files (.gff) files were all combined into a single *ACCESSION*_new_calls.txt file.
+-   feature files (.gff) files were all combined into a single `${accession}_new_calls.txt` file.
 
     -   [*combine_gff_files.r*](#section-combine_gff_files.r) *(done in gff_files folder)*
 
@@ -1481,146 +1195,83 @@ At this stage each individual RNA-Seq file has a corresponding gff file of SRA c
 
 -   For each sRNA that was predicted, a random intergenic region was selected.
 
-    -   [*get_random_srna_sequences.py*](#section-get_random_srna_sequences.py) *-a GCA_002208745.1*
+    -   [*get_random_srna_sequences.py*](#section-get_random_srna_sequences.py) *-a* *\<GCA Accession\>*
     -   the file containing new calls for a given genome was used.
     -   this was done by randomly selecting a start site and taking the sequence from that location (for the same length as the orignial predicted sRNA).
     -   coding regions were removed
 
--   There were 15,072 random regions chosen
+```{r, include=F}
+files <- list.files("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/alignments/", pattern = ".stk")
+file_count <- length(files)
+```
+
+-   There were `r file_count` random regions chosen
 
 
-A set of 'RNAs' were predicted based on selecting random regions of genomes of the equavilent size to the predicted set in order to give a baseline of what is expected from different sRNA prediction approaches. 
+To simluate noise a set of regions were predicted based on selecting random regions of genomes of the equivalent size to the predicted RUFs in order to give a baseline of what is expected from different sRNA prediction approaches. 
 
--   All ${accession}_new_calls.txt files are moved to ~/phd/RNASeq/new_calls/
+-   All `${accession}_new_calls.txt` files are moved to *~/phd/RNASeq/new_calls/*
 
+
+It is necessary to rerun the [*combine_gff_files.R*](#section-combine_gff_files.r) script for each strain due to the RUFs being predicted again after the intial run of the combine_gff_files.R
+
+```{bash run_combine_gff_over_all_accessions, eval=F}
+cd ~/phd/RNASeq/genera/
+for genus in *;
+do
+  cd ~/phd/RNASeq/genera/${genus}
+  for folder in *.data;
+  do
+    accession=`basename $folder .data`
+    echo $genus $accession
+    cd ~/phd/RNASeq/genera/${genus}/${folder}/
+    combine_gff_files.R -f ./gff_files/ -o $accession
+  done
+done
+```
 
 ##Get sRNA Sequences {#get_srnas}
 
+Once the`${accessiion}_new_calls.txt` files have been made the predicted sequences are needed.
 
 
-###get_sRNA_sequences.py {#get_sRNA_sequencespy}
+###Predicted RUFs
 
+The fasta files and calls files for each individual strain are all moved to common folders.
 
-```{python get_sRNA_sequences.py, eval=F, include=T}
-#!/usr/bin/python
-import sys
-from Bio import SeqIO
-from Bio.Alphabet import generic_dna
-import getopt
-import os
-
-
-
-help = '''
-    get_sRNA_sequences.py v 0.1 (August 2020) is a script for taking predicted sRNA regions and extracting the DNA sequence from 
-    fasta files.
-    Usage:
-     get_sRNA_sequences.py <accession>
-    
-    Options:
-        -h	Display this help
-        -q  Supress messages
-    Input
-        -a	<accession> the genome accession to use for the input and output files
-
-    
-'''
-
-def usage():
-    print help
-
-def rungetopts():
-    try:
-        opts, args = getopt.getopt(sys.argv[1:], "a:qh", ["accession", "quiet", "help"])
-    except getopt.GetoptError as err:
-        print(err)
-        usage()
-        sys.exit(2)
-    accession = ""
-    for o, a in opts:
-            if o in ("-h", "--help"):
-                usage()
-                sys.exit()
-            elif o in ("-a", "--accession"):
-                accession = a
-            else:
-                assert False, "unhandled option"
-    if accession == "":
-        print "-a <accession> missing. For more help use -h"
-        sys.exit(2)
-    return(accession)
-
-def main():
-
-    accession = rungetopts()
-
-    try:
-        inFile = open("/Users/thomasnicholson/phd/RNASeq/new_calls/%s_new_calls.txt" % accession, 'r')
-    except IOError:
-        print "/Users/thomasnicholson/phd/RNASeq/new_calls/%s_new_calls.txt not found" % accession
-        sys.exit(2)
-    try:
-        fastaFile = list(SeqIO.parse("/Users/thomasnicholson/phd/RNASeq/sequences/%s.fna" % accession, "fasta"))
-    except IOError:
-        print "/Users/thomasnicholson/phd/RNASeq/sequences/%s.fna not found" % accession
-        sys.exit(2)
-
-
-    write_path = "/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1"
-
-    print "Combining contigs"
-    my_seq = srna.concatenateSequence(fastaFile)
-
-    print "Writing sequences"
-    srna.writeSequences(inFile,my_seq,accession,write_path)
-
-
-if __name__ == "__main__":
-    main()
-
-
-
-
-
-
-```
-
-###get_sRNA_sequences
-
-
--   Once the new_calls.txt files have been made the predicted sequences are needed.
-
-      -   cd ~/phd/RNASeq/sequences
+```{bash move_files_to_common_folders, eval=F}
+cd ~/phd/RNASeq/sequences
+cp ~/phd/RNASeq/genera/*/*/*.fna ./
+cd ~/phd/RNASeq/new_calls
+mkdir -p old
+mv *_new_calls.txt old/
+cp ~/phd/RNASeq/genera/*/*/*_new_calls.txt ./
+```      
       
-      -   cp ~/phd/RNASeq/genera/*/*/*.fna ./
-      
-      -   cd ~/phd/RNASeq/new_calls
-      
-      -   mkdir -p old
-      
-      -   mv *_new_calls.txt old/
+Each of the calls files are then used to obtain the coordinates (contig, start and end locations) for each RUF. These are then extracted from the genome fasta files and written to a common fasta file. Writing to a common file is useful, although a later step of writing each RUF to a unique file is necessary as a result. Combining these steps would have been sensible.
 
-      -   cp ~/phd/RNASeq/genera/*/*/*_new_calls.txt ./
-      
-      
+-   [*get_sRNA_sequences.py*](#section-get_srna_sequences.py) is currently used
 
+-   `esl-sfetch` with a while loop for each file would be better if this is ever redone
+
+      
 ```{bash get_sRNA_sequences_loop, eval=F, include=T}
 ##done in ~/phd/RNASeq/new_calls/
-
 cd ~/phd/RNASeq/srna_seqs/version_1/
 mkdir -p seqs_predicted
-
 cd ~/phd/RNASeq/new_calls/
-
 for file in *.txt; 
 do 
   accession=`basename $file _new_calls.txt`; 
   echo $accession; get_sRNA_sequences.py -a $accession; 
 done
-
 ```
 
-###get_random_srna_sequences_loop
+###Random regions
+
+The random sequences are obtained in a similar way using [*get_random_srna_sequences.py*](#section-get_random_srna_sequences.py). 
+
+-   `esl-sfetch` with a while loop for each file would be better if this is ever redone
 
 
 ```{bash get_random_srna_sequences_loop, eval = F}
@@ -1628,241 +1279,11 @@ done
 for file in *.txt; do accession=`basename $file _new_calls.txt`; echo $accession; get_random_srna_sequences.py -a $accession; done
 ```
 
-###get_random_srna_sequence
 
-```{python get_random_srna_sequences.py, eval = F, python.reticulate = FALSE, echo=T}
-#!/usr/bin/python
 
-'''
-file paths are hard coded
-'''
+###Fasta files for each RUF
 
-
-import sys
-from Bio import SeqIO
-import getopt
-import os
-from BCBio import GFF
-from Bio.Seq import Seq
-from Bio.Alphabet import generic_dna
-import random
-import comparativeSRNA as srna
-
-
-help = '''
-
-'''
-
-def usage():
-    print help
-
-def rungetopts():
-    try:
-        opts, args = getopt.getopt(sys.argv[1:], "a:sqh", ["accession", "shuffle", "quiet", "help"])
-    except getopt.GetoptError as err:
-        # print help information and exit:
-        print(err) # will print something like "option -a not recognized"
-        usage()
-        sys.exit(2)
-    accession = ""
-    shuffled = False
-    for o, a in opts:
-            if o in ("-h", "--help"):
-                usage()
-                sys.exit()
-            elif o in ("-a", "--accession"):
-                accession = a
-            elif o in ("-s", "--shuffle"):
-                shuffled = True
-            else:
-                assert False, "unhandled option"
-    if accession == "":
-        print "-a <accession> missing. For more help use -h"
-        sys.exit(2)
-    return(accession, shuffled)
-
-
-def main():
-
-    accession, shuffled = rungetopts()
-    print "Reading files"
-    try:
-        inFile = open("/Users/thomasnicholson/phd/RNASeq/new_calls/%s_new_calls.txt" % accession, 'r')
-
-        fileLength = file_len("/Users/thomasnicholson/phd/RNASeq/new_calls/%s_new_calls.txt" % accession)
-    except IOError:
-        print "/Users/thomasnicholson/phd/RNASeq/new_calls/%s_new_calls.txt not found" % accession
-        sys.exit(2)
-    try:
-        fastaFile = list(SeqIO.parse("/Users/thomasnicholson/phd/RNASeq/sequences/%s.fna" % accession, "fasta"))
-    except IOError:
-        print "/Users/thomasnicholson/phd/RNASeq/sequences/%s.fna not found" % accession
-        sys.exit(2)
-
-    print "Combining contigs"
-    my_seq = srna.concatenateSequence(fastaFile)
-
-
-
-    print "Getting intergenic sequence"
-    random_seq = srna.intergenicSequence(accession, my_seq, shuffled)
-
-
-    print "Getting intergenic positions"
-    positions = srna.intergenicPositions(accession)
-
-    print "Selecting random sRNAs"
-    srna.selectRandomLocation(inFile, positions,fileLength, random_seq, accession)
-
-
-
-
-
-if __name__ == "__main__":
-    main()
-
-
-
-
-
-
-```
-
-For each genome there is now a single file containing all the SRA calls and whether they were previously found/predicted.
-
-
-
-##run_srna_nhmmer
-
-
-###single_fasta_files.py
-
-```{python single_fasta_files.py, eval = F}
-#!/usr/bin/python
-import sys
-from Bio import SeqIO
-import getopt
-import os
-from BCBio import GFF
-from Bio.Seq import Seq
-from Bio.Alphabet import generic_dna
-import random
-import pandas as pd
-import comparativesrna as srna
-
-help = '''
-    {script_name} -c com_port [-o output_file] [--loglevel level]
-
-    Reads the temperature data from a radio.  The temperature data is output in csv form.
-
-    examples:
-        Read table from radio attached to com4 and write the table to the file
-        output.csv.
-
-            {script_name} -c com4 -o output.csv
-
-        Read table from radio attached to com3 and write the table to stdout. 
-        You can use IO redirection to send the contents where every you want.
-
-            # just print to the terminal 
-            {script_name} -c com3
-
-            # redirect to another file
-            {script_name} -c com3 > somefile.csv
-
-            # filter out temperatures that are -100
-            {script_name} -c com3 | grep -v '^-100' 
-
-
-    -c com_port
-    --com_port comport
-        Name of the COM port attached to the radio
-
-    -o output_file
-    --output output_file
-        If specified write the table data to the given file.  If not specified
-        the data will be written to stdout.
-
-    --loglevel critical | error | warning | info | debug | notset
-        Control the verbosity of the script by setting the log level.  Critical
-        is the least verbose and notset is the most verbose.
-
-        The default loglevel is {default_loglevel}.
-
-        These values correspond directly to the python logging module levels. 
-        (i.e. https://docs.python.org/3/howto/logging.html#logging-levels)
-
-
-    -h 
-    --help 
-        print this message
-
-'''
-
-def usage():
-    print help
-
-def rungetopts():
-    try:
-        opts, args = getopt.getopt(sys.argv[1:], "i:f:qh", ["infile", "folder", "quiet", "help"])
-    except getopt.GetoptError as err:
-        # print help information and exit:
-        print(err) # will print something like "option -a not recognized"
-        usage()
-        sys.exit(2)
-    file = ""
-    for o, a in opts:
-            if o in ("-h", "--help"):
-                usage()
-                sys.exit()
-            elif o in ("-i", "--infile"):
-                file = a
-            elif o in ("-f", "--folder"):
-                folder = a
-            else:
-                assert False, "unhandled option"
-    if file == "":
-        print "-f <file> missing. For more help use -h"
-        sys.exit(2)
-    return(file, folder)
-
-# def single_fasta(fastaFile, folder):
-#     for seq in fastaFile:
-#         id = seq.id
-#         outname = id.split("[")
-#         outname = outname[0]
-#         my_seq = seq.seq
-#         outFile = open("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/%s/%s.fna" % (folder, outname), "w")
-#         outFile.write(">%s\n%s\n" % (id, my_seq))
-
-
-
-def main():
-
-    filename, folder = rungetopts()
-    print filename, folder
-    print "Reading files"
-    try:
-        fastaFile = list(SeqIO.parse("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/%s" % filename, "fasta"))
-    except IOError:
-        print "/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/%s not found" % filename
-        sys.exit(2)
-
-    srna.single_fasta(fastaFile, folder)
-
-
-if __name__ == "__main__":
-    main()
-
-
-```
-
-###single_fasta_files_loop
-
-
-
-
--   Get individual sequences
+This step creates a fasta file for each RUF. This is needed so that nhmmer can be used as the input for the query can only be a single sequence or alignment (from what I could figure out). The script [*single_fasta_files.py*](#section-single_fasta_files.py) is used although this could have been built into [*get_sRNA_sequences.py*](#section-get_srna_sequences.py).
 
 ```{bash single_fasta_files_loop, eval = F}
 ##done in ~/phd/RNASeq/srna_seqs/version_1/seqs_predicted/${group}
@@ -1889,175 +1310,31 @@ single_fasta_files.py -i seqs_predicted/${group}/${fasta_file} -f seqs_predicted
 
 ```
 
-###run_srna_nhmmer.sh
 
-```{bash run_srna_nhmmer.sh, eval=F}
-#!/bin/bash
+##Build models {#run_nhmmer}
 
-# Setup Variables #
+Each of the measures used for evaluating RUFs are improved by alignments with more unique sequences. In order to build models for each RUF (and control group) a number of steps were done.
 
-usage(){
-    echo "run_sRNA_nhmmer.sh is a script for running nhmmer and sorting the results.  
-Usage:
- run_sRNA_nhmmer.sh [opts] [input]
+-  The following steps are described for the *predicted* data set but this also applys to the *negative* *control* dataset
 
-Required:	       
-	-d	<database> The nucleotide database to be searched against as the nhmmer target
-	-f	<folder> The folder containing the query file for nhmmer
-	-e	<extension> The file extension of the query file in <folder>
+-   The *positive* *control* dataset steps are described [later](#section-cmscan_rfam)
 
-Options:
-	-h	Display this help
-	-c	Check if the sequences are >50 nt (only works on fasta files)
-"
-}
+###Predicted nhmmer (first iteration)
 
-check_seq_lengths=""
-database=""
-folder=""
-extension=""
-outfolder="."
-missing=""
-exitTrue="F"
-evalue="1e-5"
+```{r, include=F}
+known_files <- list.files("~/phd/RNASeq/srna_seqs/version_1/seqs_predicted/positive_control/single_seqs/", pattern = ".fna")
+known_count <- length(known_files)
 
-# User Input Options #
-
-while getopts "d:o:f:E:e:ch" arg; do
-case $arg in
-	d) 
-	database=${OPTARG};;
-	f)
-	folder=${OPTARG};;
-	o)
-	outfolder=${OPTARG};;
-	E)
-	evalue=${OPTARG};;
-	e)
-	extension=${OPTARG};;	
-	c)
-	check_seq_lengths="T";;
-    h)
-		usage
-		exit
-      ;;    
-	\?) 
-	echo "Unknown option: -${OPTARG}" >&2; exit 1;;
-    esac
-done
-
-# Tests for inputs #
-
-if [[ $database == "" ]]; then
-	missing="$missing -d <database> "
-	exitTrue="T"
-fi
-
-if [[ $folder == "" ]]; then
-	missing="$missing -f <folder> "
-	exitTrue="T"	
-fi
-
-if [[ $extension == "" ]]; then
-	missing="$missing -e <extension> "
-	exitTrue="T"
-fi
-
-if [[ $exitTrue == "T" ]];then
-	echo "$missing not found. Use -h for more help."
-	exit
-fi
-
-if [[ $extension == "stk" ]]; then
-	check_seq_lengths=""
-fi
-
-echo "extension value: $extension"
-
-if [[ $check_seq_lengths == "T" ]]; then
-
-	echo "checking for short seqs"
-	mkdir -p $folder/short_seqs
-	
-	let "fileNum = 0"
-	for file in $folder/*.$extension
-	do
-	
-	seqlength=`grep -v ^">" $file | wc -c`
-	if (( $seqlength < 50 )); then
-	mv $file  single_seqs/short_seqs/
-	fi
-	
-	done
-
-fi
-
-# Set up folders/files #
-
-echo "making directories in `pwd`"
-mkdir -p $outfolder/alignments
-mkdir -p $outfolder/hmm
-mkdir -p $outfolder/output
-
-# Run nhmmer #
-
-echo "running nhmmer"
-let "fileNum = 0"
-for file in $folder/*.$extension
-
-do
-
-echo $file
-outname=`basename $file`
-
-
-if [ -f "$outfolder/output/$outname.res" ]; then
-	echo "Already exists: $file"
-	continue
-fi
-
-
-nseqs=`esl-alistat $file | grep "Number of sequences" | cut -d ":" -f2`
-length=`esl-alistat $file | grep "Alignment length:" | cut -d ":" -f2`
-echo "Running nhmmer on $file (length: $length, nseqs: $nseqs)"
-
-
-nhmmer -E $evalue --tblout $outfolder/output/$outname.tbl -A $outfolder/alignments/tmp.stk --tformat FASTA  $file $database > $outfolder/output/$outname.res
-
-lines=`wc -l < $outfolder/alignments/tmp.stk`
-
-
-if (( $lines > 0 )); then
-
-
-##esl-weight!!!
-esl-alimanip   --lnfract 0.8 --lxfract 1.2 --lmin 50 --lmax 500 --detrunc 30  $outfolder/alignments/tmp.stk | esl-alimask -g --gapthresh 0.8 -p --pfract 0.5 --pthresh 0.5 --keepins - > $outfolder/alignments/$outname
-
-
-
-hmmbuild $outfolder/hmm/$outname.hmm $outfolder/alignments/$outname
-
-else
-
-echo "No hits found for $outname"
-
-fi
-
-done
-
-
-
-
+novel_files <- list.files("~/phd/RNASeq/srna_seqs/version_1/seqs_predicted/predicted/single_seqs/", pattern = ".fna")
+novel_count <- length(novel_files)
 
 ```
 
-###run_srna_nhmmer_loop_initial
+The predicted RUFs are built into model by searching the set of predicted RUFs in an all by all search. This first step is done in order to make later steps reducing redundanc easier.
 
+-   The RUFs have been split into those that overlap with a known sRNA (`r known_count`) and those that are novel (`r novel_count`)
 
-
--   loop over the single sequences and build models from the predicted sRNAs
-
-    -   done for the known and novel predicted sRNAs
+-   nhmmer needs to be run on both datasets.
 
 ```{bash run_srna_nhmmer_loop_initial, eval=F}
 ##done in ~/phd/RNASeq/srna_seqs/version_1/seqs_predicted/${group}
@@ -2067,11 +1344,7 @@ run_sRNA_nhmmer.sh -d ~/phd/RNASeq/srna_seqs/version_1/seqs_predicted/${group}/p
 
 ```
 
-###change_fna_stk
-
-
-
--   output is with .fna instead of .stk
+-   the output extension uses *.fna* instead of *.stk* which needs to be changed
 
 ```{bash change_fna_stk, eval=F}
 ##done in ~/phd/RNASeq/srna_seqs/version_1/seqs_predicted/${group}/alignments
@@ -2089,66 +1362,76 @@ done
 
 ```
 
-###server_transfer_setup
+The next step involves using the server and in order to do this all the files need to be copied into a folder.
 
+Run on server (*biochemcompute.uod.otago.ac.nz*):
 
--   move alignments to server 
-
-    -   on server 
-    
 ```{bash server_transfer_setup, eval=F}
 ##done in ~/phd/RNASeq/srnas/${group}
-
 group="predicted"
 cd ~/phd/RNASeq/srnas/${group}
 mkdir -p initial_alignments
 ```
 
-###run_srna_nhmmer_loop_large_alignments
+Run locally:
 
+```{bash transfer_to_server,eval=F}
+cd ~/phd/RNASeq/srna_seqs/version_1/seqs_predicted/predicted/alignments
+scp *.stk bioc:./phd/RNASeq/srnas/predicted/initial_alignments
+```
 
--   from ~/phd/RNASeq/srna_seqs/version_1/seqs_predicted/predicted/alignments
-    
-    -   scp *.stk bioc:./phd/RNASeq/srnas/predicted/initial_alignments
+###Predicted nhmmer (second iteration)
 
+Each of the alignments for predicted RUFs are used as queries to search against the set of representative genomes in order to expand the number of sequences used and to determine the evolutionary conservation of each RUF.
 
--   on server
+Run on server (*biochemcompute.uod.otago.ac.nz*):
+
+-   `screen -list` to see screens
+
+-   `screen -r $ID ` to reattach screen
 
 ```{bash run_srna_nhmmer_loop_large_alignments, eval=F}
 ##done in ~/phd/RNASeq/srnas/${group}
 group="predicted"
 cd ~/phd/RNASeq/srnas/${group}
 run_sRNA_nhmmer.sh -d ~/phd/RNASeq/representative_genomes.fna -f initial_alignments/ -o large_alignments/ -e stk -E 1e-5
-
-##currently on screen 57692 (predicted) and 134352 (known_predicted)
-##screen -list to see all
-##screen -r 57692 to reattach
 ```
 
 
+# Known sRNAs{#known_srna}
 
--   transfer files to server
+The known sRNAs are used for two purposes:
 
-    -   scp *.stk bioc:./phd/RNASeq/srnas/predicted/initial_alignments
+-   The ribosomal small subunit is used to calculate phylogenetic distances for each of the genomes used
 
-# Known sRNAs and phylogenetic distance {#known_srna}
+-   All rFam models with sRNAs < 500 nt are used as a *positive* *control* dataset
 
-***
+##Find known sRNAs
 
-  
-##run_csmscan_across_multiple_files
+###cmscan with RFam families {#cmscan_rfam}
 
+The RFam families were downloaded from [Rfam](https://rfam.xfam.org/):
 
--   cmscan run with commands in a file containing the nucleotide files which need to be searched
+-   Click *FTP*
+
+    -   Select Guest as user and connect
     
-    - mkdir checkfiles
-    - *rfamscan()* is the command called.
-    - cmscan -Z $counts --cut_ga --rfam --nohmmonly --tblout $1.tblout --fmt 2 --clanin ~/phd/RNASeq/Rfam.clanin.txt ~/phd/RNASeq/Rfam.cm $1
+    -   open Current (14.4)
+    
+Two files were downloaded:
+
+-   *Rfam.cm* contains all the models for the families
+
+    -   The *RFam.cm* file needed to be unzipped `gunzip Rfam.cm.gz`.
+
+-   *Rfam.clanin.txt* contains clan information
+
+
+These files were used to search against the set of representative genomes and analysed genomes.
 
 ```{bash run_csmscan_across_multiple_files, eval=F, include=T}
 #in ~/phd/RNASeq/representative_genomes
 #in ~/phd/RNASeq/analysed_genomes
-
 mkdir check_files
 for file in *.fna; 
 do 
@@ -2169,31 +1452,28 @@ done
 
 ```
 
--   group="representative_genomes"
+This seach gave an output for each genome containing coordinates (contig, start, end, strand) for the location of sequences matching Rfam families. These files needed to be combined and reformatted so that the nucelotide sequences of the matches could be obtained. This was done for each group:
 
--   group="analysed_genomes"
+`group="representative_genomes"`
 
--   output combined with 'cat *.tblout >> ../${group}.tblout'
+`group="analysed_genomes"`
 
-    -   a second version is now being run across all of the analysed genomes with plot files. This will enable a better analysis of the read depths.
-
--   reformatted for R with 'cat ${group}.tblout | sed 's/  /\t/g' | tr -s '\t' | sed 's/\t /\t/g' | sed 's/ \t/\t/g' | sed 's/ /\t/3' | sed 's/ /\t/' | sed 's/ /\t/' | sed 's/ /_/g' | sed 's/_!/\t!/g' | tr -s '\t' | sed 's/Pseudomonas\t/Pseudomonas_/g' > ${group}.tab'
-
--   cat *.fna >> ../${group}.fna
-
--   mkdir done
-
--   mv *.fna done/
-
--   mv *.tblout done/
-
--   get a list of contigs and the corresponding genomes
+The outputs combined with `cat *.tblout >> ../${group}.tblout`. This output was reformatted so that it could be easily read into R `cat ${group}.tblout | sed 's/  /\t/g' | tr -s '\t' | sed 's/\t /\t/g' | sed 's/ \t/\t/g' | sed 's/ /\t/3' | sed 's/ /\t/' | sed 's/ /\t/' | sed 's/ /_/g' | sed 's/_!/\t!/g' | tr -s '\t' | sed 's/Pseudomonas\t/Pseudomonas_/g' > ${group}.tab`
 
 
-##genome_contig_pairs
+All of the genomes for each group were combined into one file for easier coding of the step involving getting the sequences `cat *.fna >> ../${group}.fna`
 
+The files were then marked as completed:
 
--  This is needed for lookup steps later as there are genome accessions and contig accessions used by different scripts
+`mkdir done`
+
+`mv *.fna done/`
+
+`mv *.tblout done/`
+
+###Lookup table (genomes and contigs)
+
+The results from cmscan and nhmmer use contig accessions for the target accessions, while the genomes that were used have genome accessions. It was therefore necessary to create a lookup table of genome and contig accessions.
 
 ```{bash genome_contig_pairs, eval=F}
 #done from ~/phd/RNASeq/representative_genomes/
@@ -2209,13 +1489,13 @@ done
 
 
 
-##cmsearch_res_pc
+###Coordinates from cmsearch
 
--   convert the output of the cmsearch for rFam models into the same format that is used for the predicted and negative control datasets
-
-    -   output a file for each rFam model that has the strand, contig and position of sequence
+The reformatted cmscan output is used to create files `${family}_locations.txt` for each of the Rfam families of  the coordinates of all the matching regions from the representative and analysed genomes.
     
-    -   done on server
+-   This was done on the server (biochemcompute.uod.otago.ac.nz) using [Rstudio](http://biochemcompute.uod.otago.ac.nz:8787/) from the browser
+
+-   representative genomes
 
 ```{r cmsearch_res_pc, eval=F}
 
@@ -2273,10 +1553,7 @@ write.table(x = modelDat, file = paste("~/phd/RNASeq/rfam_files/locations/", ite
 
 ```
 
-##cmsearch_res_analysed_genomes
-
-
--   appears to repeat the above script
+-   analysed genomes
 
 ```{r cmsearch_res_analysed_genomes, eval=F}
 
@@ -2334,23 +1611,15 @@ write.table(x = modelDat, file = paste("~/phd/RNASeq/analysed_genomes_rfam_files
 
 ```
 
--   RF00177 (Ribosome SSU) saved as above.
+###Get sequences
 
--   Other models also saved
+The `${family}_locations.txt` were then used to extract the nucelotide sequence of all matching regions from each of the corresponding fasta files. 
 
+-   The fasta files needed to be indexed with `esl-sfetch --index ${group}.fna` 
 
+A later step ([cmalign](#section-make_cm_files)) uses a lot of memory. To keep this step managable the files were limited to 20 sequences per file, with multiple files being created for each Rfam family if needed.
 
-##get_nucelotide_sequences
-
-
-
--   'esl-sfetch --index ${group}.fna' used to index the fasta file
-
--   once indexed the location files created earlier can be used to extract sequences from the representative genomes that match to each rFam family
-
-    -   a later step (cmalign) uses a lot of memory. To keep it managable the sequences are limited to 20 per file.
-    
-    -   This is later combined with esl-alimerge
+-   This is [later](#section-combine_alignments) combined with `esl-alimerge`
 
 ```{bash get_nucelotide_sequences, eval = F}   
 
@@ -2436,13 +1705,9 @@ done
 
 ```
 
+###Make cm files {#make_cm_files}
 
--   Build covariance models (on server)
-
-##make_cm_files
-
-
--   The files with sequences for each rFam model need to be in stockholm alignment format which is done by running cmalign against the rFam model
+The files with sequences for each rFam model need to be in stockholm alignment format which is done by running cmalign against the Rfam model.
 
 ```{bash make_cm_files, eval=F}
 ##from ~/phd/RNASeq/rfam_files/
@@ -2474,8 +1739,11 @@ done
 ```
 
 
-##remove_empty_files
+###Remove empty files
 
+Some of the files do not contain sequences and cause problems for the [merging](#section-combine_alignments) step. 
+
+-   I think this is due to some earlier mistakes creating extra empty files that were not removed
 
 
 ```{bash remove_empty_files, eval=F}
@@ -2501,13 +1769,10 @@ do
 done
 ```
 
--   Mask to reference and combine the alignments
 
-##combine_alignments
+###Combine alignments {#combine_alignments}
 
-
-
--   Mask to reference and combine the alignments
+Once the alignments have been built, it is possible to combine these alignments with `esl-alimerge` while also masking these alignments to the original model so that the alignments are kept very similar to the rfam family, while providing coordinates of the locations of sequences for the *representative* and *analysed* genomes.
 
 
 ```{bash combine_alignments, eval=F}
@@ -2523,15 +1788,20 @@ done
 ```
 
 
--   These files are downloaded from the server
+These files are downloaded from the server:
+
+-   `cd ~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/alignments`
+
+-   `scp bioc:./phd/RNASeq/rfam_files/alignments/* ./`
 
 
--   phylip files shorten IDs to 10 characters. This means there needs to be a lookup table to reverse this in later steps.
+##Phylogenetic Distance
 
-##rename_alignment_ids
+The bacterial ribosomal small subunit (RF00177) was used to get the phylogeneitc distances between all the genomes. This was done using [Phylip](https://evolution.genetics.washington.edu/phylip.html).
 
+###Rename IDs
 
--   phylip formatted files have limited name lengths (10 characters I think) so it is necessary to rename IDs and save a lookup table.
+The phylip format for files uses shortened ID, limited to 10 characters. This means there needs to be a lookup table to reverse this in later steps.
 
 ```{r rename_alignment_ids, eval=F}
 dat <- read.table("~/phd/RNASeq/RF00177.stk", sep = "\t", fill = T, comment.char = "", quote = "", header = F)
@@ -2550,30 +1820,20 @@ save(current_ids, file = "~/bin/r_git/R/r_files/current_ids.Rda")
 
 ```
 
--   RF00177.stk was the name of the file containing the RF00177 alignments for the ~1500 genomes
-    
+###reformat_matrix
+
+The phylip tool dnadist was used to create a distance matrix based on the SSU alignment.
+
+The stockholm file was reformatted `esl-reformat phylip RF00177.stk > RF00177_rep_seqs_all.phylip` and this was used in dnadist as an input, with *RF00177_rep_seqs_all.dists* as the output. All settings used were defaults.
+
+The matrix that is made is not in an easily useable format:
+
+-   `cat  RF00177_rep_seqs_all.dists | tr '\n' ' ' | sed 's/ N/\nN/g' > RF00177_rep_MATRIX_all.dists`
 
 
+###Lookup table (query and target)
 
-
-##reformat_matrix
-
-
--   esl-reformat phylip RF00177.stk > RF00177_rep_seqs_all.phylip
-
--   the .phylip file is used with dnadist to create the RF00177_rep_seqs_all.dists file
-
-Summary:
-
--   output from dnadist changed into useable matrix
-
-    -   cat  RF00177_rep_seqs_all.dists | tr '\n' ' ' | sed 's/ N/\nN/g' > RF00177_rep_MATRIX_all.dists
-
--   get the complete list of all query-target so that all contigs in each sRNA are listed.
-
-##query_target_pairs
-
--   This outputs a file with the query genome, target contig and srna ID
+A lookup table of  query genomes, target contigs and srna IDs was needed in later steps.
 
 ```{bash query_target_pairs, eval=F}
 #done in the alignments file (such as ~/phd/RNASeq/srnas/predicted/combined_alignments_ids/alignments)
@@ -2590,11 +1850,10 @@ do
 done
 ```
 
-UP TO HERE!!!
 
-##dna_dists 
+###Maximum phylogenetic distance 
 
-
+The file containing the queries, targets and sRNA IDs (along with the same files for the *predicted* and *negative* *control* datasets) and the distance matrix were used to get the maximum phylogenetic distance between species for each sRNA.
 
 ```{r dna_dists_setup, eval=F, include=F}
 run_all <- F
@@ -2934,7 +2193,7 @@ save(max_dists_pred_nr, file = "~/bin/r_git/R/r_files/max_dists_pred_nr.Rda")
 }
 ```
 
-```{r dna_dists, eval=T}
+```{r dna_dists, eval=F, include=F}
 run_all <- F
 load("~/bin/r_git/R/r_files/max_dists_pred.Rda")
 # load("~/bin/r_git/R/r_files/max_dists_pred_nr.Rda")
@@ -2962,10 +2221,6 @@ ggsave(filename = "~/phd/RNASeq/figures/max_conservation_distance_4.svg", plot =
 }
 ```
 
-
-##large_tree
-
-
 ```{r large_tree, eval=F, include=F}
   # tree <- read.tree("~/bin/r_git/R/r_files/large_labelled_tree.tree")
   tree <- read.tree("~/bin/r_git/R/r_files/all_taxa.tree")
@@ -2989,7 +2244,7 @@ Each individual sRNA was searched against the complete list of sRNAs in order to
 ![Figure a. show the clade]()
 
 
-###Check negative control for matches to known elements {#check_negaitves}
+##Check negative control for matches to known elements {#check_negaitves}
 
 Go to:
 
@@ -7723,292 +6978,6 @@ write.table(x = gff, file = paste(filePath, "/", opt$out_name, "_sra_calls.gff",
 
 ```
 
-###run_rnaPeakCalling.R
-
-
-Regions of expression are called on each individual RNA-Seq experiment by looking for regions where read depths are > 15 for atleast 50nt.
-
-```{r run_rnaPeakCalling2.0.R, eval = F, echo=T}
-#!/usr/bin/env Rscript
-
-##no idea which packages are needed
-library(tidyverse)
-library(devtools)
-library(lubridate)
-library(genoPlotR)
-library(drake)
-library(ape)
-library(Biostrings)
-library(ROSE)
-library(reshape2)
-
-suppressMessages(library(tidyverse))
-suppressMessages(library(comparativeSRA))
-genera_list <- list.files("~/phd/RNASeq/genera/")
-
-genera <- "Acinetobacter"
-
-for(genera in genera_list){
-  print(genera)
-  if(genera == "Escherichia"){
-    next
-  }
-  
-  
-  accession_list <- list.files(paste("~/phd/RNASeq/genera/",  genera, "/", sep = ""), pattern = ".data$")
-  accessionsDat <- data.frame(accession_list = accession_list)
-  
-  accessionsDat <- accessionsDat %>% mutate_all(as.character)
-  accession_folder <-  accessionsDat$accession_list[1]
-  
-  
-  for(accession_folder in accessionsDat$accession_list){
-    accession <- unlist(strsplit(accession_folder, "\\."))[c(1,2)]
-    accession <- paste(accession, collapse = ".")
-    files <- list.files(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/plot_files/", sep = ""), pattern = ".plot$")
-    
-    filesDat <- data.frame(files = files)
-    
-    filesDat <- filesDat %>% filter(grepl(pattern = "ncRNA", x = files)==F,
-                                    grepl(pattern = "fwd", x = files)==F,
-                                    grepl(pattern = "rev", x = files)==F,
-                                    grepl(pattern = accession, x = files)==F) %>% mutate_all(as.character)
-    
-    
-    if(nrow(filesDat) == 0){
-      next
-    }
-    print(accession)
-    
-    gffDat <- read.table(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", accession, ".gff", sep = ""), sep = "\t", fill = T, comment.char = "#", quote = "")
-    colnames(gffDat) <- c("sequence", "source", "feature", "start", "end", "score", "strand", "phase", "Atrribute")
-    
-    regions <- gffDat %>% filter(feature == "region", start == "1") %>% select(sequence, start, end)
-    
-    current_pos <- 0
-    for(i in 1:nrow(regions)){
-      # print(regions$start[i])
-      regions$end[i] <- regions$end[i] + current_pos
-      regions$start[i] <- regions$start[i] + current_pos
-      current_pos <- regions$end[i]
-      
-    }
-    
-    file_name <-  filesDat$files[1]
-    
-    for(file_name in filesDat$files){
-      print(file_name)
-      sra_id <- unlist(strsplit(file_name, "\\."))[1]
-      
-      plotFile <- read.table(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/plot_files/", file_name, sep = ""))
-      
-      
-      
-      
-      
-      
-      cdsDat <- gffDat %>% filter(feature == "CDS")
-      
-      for(i in 1:nrow(regions)){
-        contig <- regions$sequence[i]
-        increase_val <- regions$start[i]
-        cdsDat <- cdsDat %>% mutate(start = ifelse(sequence == contig, start + increase_val, start),
-                                    end = ifelse(sequence == contig, end + increase_val, end))
-        
-      }
-      
-      
-      
-      positions <- cdsDat %>% select(sequence,start, end) %>% mutate(start = start - 149) %>% mutate(start = ifelse(start < 1, 1, start))  %>% mutate(end = end + 149) %>% mutate(end = ifelse(end > max(regions$end), max(regions$end), end))
-      
-      
-      
-      
-      
-      
-      positions$new <- do.call(paste, c(positions, sep=":")) 
-      positions$new <- Map(":", positions$start, positions$end)
-      
-      
-      values <- unlist(positions$new[1:1000])
-      
-      
-      positions <- data.frame(rowNum = values, type="CDS")
-      
-      starts <- data.frame(rowNum = cdsDat$start, type2 ="start")
-      stops <- data.frame(rowNum = cdsDat$end, type2 ="stop")
-      starts <- starts %>% mutate(rowNum = rowNum - 149) %>% mutate(rowNum = ifelse(rowNum < 1, 1, rowNum))
-      stops <- stops %>% mutate(rowNum = rowNum + 149) %>% mutate(rowNum = ifelse(rowNum > max(regions$end), max(regions$end), rowNum))
-      
-      starts_and_stops <- starts %>% bind_rows(stops)
-      
-      positions <- positions %>% 
-        left_join(starts_and_stops, by = "rowNum") %>% 
-        mutate(type2 = ifelse(is.na(type2), "remove", type2))
-      
-      plotDat <- plotFile %>% mutate(value = ifelse(V1 > V2, V1, V2)) %>% select(value) %>% mutate(rowNum = row_number())
-      
-      plotDat <- plotDat %>% left_join(positions, by = "rowNum") %>% mutate(type2 = ifelse(is.na(type2), "intergenic", type2)) %>% 
-        filter(type2 != "remove")
-      
-      
-      plotDat <- plotDat %>% unique()
-      
-      
-      
-      plotDat <- plotDat %>% mutate(type = ifelse(is.na(type), "intergenic", "CDS"))
-      
-      total <- sum(plotDat$value)/1000000
-      
-      plotDat$value <- plotDat$value/total
-      
-      # save(plotDat, file = "~/phd/RNASeq/tmp/plotDat.Rda")
-      # 
-      # load("~/phd/RNASeq/tmp/plotDat.Rda")
-      
-      checkDat <- plotDat %>% filter(value > 15/total & type == "intergenic" )
-      
-      
-      # checkDat <- data.frame(value = "0.04", rowNum = c(1,2,3,4,5,15,16,17,18,21,22,23,50,51,52,56,61,62,63,64,100,101,102,103),
-      #                        type = "intergenic")
-      # checkDat <- checkDat %>% mutate(type = ifelse(rowNum > 15 & rowNum < 30, "CDS", "intergenic"))
-      
-      plotDat <- checkDat
-      
-      callsDat <- data.frame(start = rep(as.character("0"), 20000), stop = rep(as.character("0"), 20000), stringsAsFactors = F)
-      start <- 0
-      stop <- 0
-      current_feature <- F
-      cds <- F
-      id_pos <- 0
-      
-      
-      i <- 1
-      for(i in 1:nrow(plotDat)){
-        printRemaining(i = i, length = nrow(plotDat))
-        if(i == nrow(plotDat)){
-          if(current_feature){
-            if((plotDat$rowNum[i] - 25) < stop){
-              stop <- plotDat$rowNum[i]
-              if(plotDat$type[i] == "CDS"){
-                cds <- T
-              }
-            }
-            if(cds){
-              current_feature <- F
-              cds <- F
-              next
-            }
-            id_pos <- id_pos + 1
-            # print(paste(start,stop, id_pos))
-            callsDat$start[id_pos] <- start
-            callsDat$stop[id_pos] <- stop
-            current_feature <- F
-            cds <- F
-          }
-        }
-        
-        if(current_feature == F){
-          start <- plotDat$rowNum[i]
-          stop <- plotDat$rowNum[i]
-          if(plotDat$type[i] == "CDS"){
-            cds <- T
-          }
-          current_feature <- T
-          next
-        }
-        
-        if(plotDat$type2[i] == "stop"){
-          stop <- plotDat$rowNum[i]
-          cds <- T
-          next
-        }
-        
-        if((plotDat$rowNum[i] - 25) < stop){
-          stop <- plotDat$rowNum[i]
-          if(plotDat$type[i] == "CDS"){
-            cds <- T
-          }
-          next
-        }else{
-          if(cds){
-            current_feature <- F
-            cds <- F
-            start <- plotDat$rowNum[i]
-            stop <- plotDat$rowNum[i]
-            next
-          }
-          id_pos <- id_pos + 1
-          # print(paste(start,stop, id_pos))
-          callsDat$start[id_pos] <- start
-          callsDat$stop[id_pos] <- stop
-          current_feature <- F
-          cds <- F 
-        }
-      }  
-      
-      
-      
-      
-      
-      
-      combinedCalls <- callsDat %>% filter(start != 0) %>% mutate_all(as.numeric) %>% filter((stop - start) > 50)
-      
-      
-      
-      
-      gffMain <- readLines(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", accession, ".gff", sep = ""))
-      gffMain <- data.frame(text = gffMain)
-      genomeInfo <- as.character(gffMain[8,1])
-      genomeBuild <- as.character(gffMain[4,1])
-      genomeSpecies <- as.character(gffMain[9,1])
-      accession_contig <- strsplit(genomeInfo, " ")[[1]][2]
-      
-      
-      
-      gffFwd <- combinedCalls%>%mutate(strand = "+",
-                                       source = "sraAlignedncRNAExpression",
-                                       seqname = accession_contig,
-                                       median.val = 0,
-                                       feature = "ncRNA",
-                                       frame = ".",
-                                       attribute = paste("ID=rna_fwd_", row_number(), sep = ""))%>%
-        select(seqname, source, feature, start, stop, median.val, strand, frame, attribute)
-      
-      
-      
-      
-      fileConn<-file(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", sra_id, "_snra_calls.gff", sep = ""))
-      writeLines(c("##gff-version 3",
-                   "#!gff-spec-version 1.21",
-                   "#!processor R script (local) with manual add of top section",
-                   genomeBuild,
-                   paste("#!genome-build-accession NCBI_Assembly:", "GCA_000017745.1", sep = ""),
-                   paste("#!annotation-date ", Sys.Date(), sep = ""),
-                   "#!annotation-source snraCalls (local version)",
-                   genomeInfo,
-                   genomeSpecies), fileConn)
-      close(fileConn)
-      
-      print(paste("Writing to ~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", sra_id, "_snra_calls.gff", sep = ""))
-      write.table(x = gffFwd, file = paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", sra_id, "_snra_calls.gff", sep = ""), row.names = F, col.names = F, quote = F, sep = "\t", append = T)
-      
-      
-      # plotDat <- plotDat %>% mutate(value = ifelse(is.na(type), value, 0))
-      # 
-      # 
-      # outDat <- plotDat %>% select(value)
-      # 
-      # 
-      # write.table(outDat, paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/plot_files/", file_name, "_ncRNA_no_buffer.plot", sep = ""), quote = F, row.names = F, col.names = F)
-    }
-    
-    
-  }
-}
-```
-
-
 ###rfamscan
 
 
@@ -8434,4 +7403,764 @@ write.table(x = mergedDat, file = paste(file_path, "/", opt$out_name, "_new_call
 
 
 
+
+##run_rnapeakcalling.2.0.r
+
+
+Regions of expression are called on each individual RNA-Seq experiment by looking for regions where read depths are > 15 for atleast 50nt.
+
+```{r run_rnaPeakCalling2.0.R, eval = F, echo=T}
+#!/usr/bin/env Rscript
+
+##no idea which packages are needed
+library(tidyverse)
+library(devtools)
+library(lubridate)
+library(genoPlotR)
+library(drake)
+library(ape)
+library(Biostrings)
+library(ROSE)
+library(reshape2)
+
+suppressMessages(library(tidyverse))
+suppressMessages(library(comparativeSRA))
+genera_list <- list.files("~/phd/RNASeq/genera/")
+
+genera <- "Acinetobacter"
+
+for(genera in genera_list){
+  print(genera)
+  if(genera == "Escherichia"){
+    next
+  }
+  
+  
+  accession_list <- list.files(paste("~/phd/RNASeq/genera/",  genera, "/", sep = ""), pattern = ".data$")
+  accessionsDat <- data.frame(accession_list = accession_list)
+  
+  accessionsDat <- accessionsDat %>% mutate_all(as.character)
+  accession_folder <-  accessionsDat$accession_list[1]
+  
+  
+  for(accession_folder in accessionsDat$accession_list){
+    accession <- unlist(strsplit(accession_folder, "\\."))[c(1,2)]
+    accession <- paste(accession, collapse = ".")
+    files <- list.files(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/plot_files/", sep = ""), pattern = ".plot$")
+    
+    filesDat <- data.frame(files = files)
+    
+    filesDat <- filesDat %>% filter(grepl(pattern = "ncRNA", x = files)==F,
+                                    grepl(pattern = "fwd", x = files)==F,
+                                    grepl(pattern = "rev", x = files)==F,
+                                    grepl(pattern = accession, x = files)==F) %>% mutate_all(as.character)
+    
+    
+    if(nrow(filesDat) == 0){
+      next
+    }
+    print(accession)
+    
+    gffDat <- read.table(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", accession, ".gff", sep = ""), sep = "\t", fill = T, comment.char = "#", quote = "")
+    colnames(gffDat) <- c("sequence", "source", "feature", "start", "end", "score", "strand", "phase", "Atrribute")
+    
+    regions <- gffDat %>% filter(feature == "region", start == "1") %>% select(sequence, start, end)
+    
+    current_pos <- 0
+    for(i in 1:nrow(regions)){
+      # print(regions$start[i])
+      regions$end[i] <- regions$end[i] + current_pos
+      regions$start[i] <- regions$start[i] + current_pos
+      current_pos <- regions$end[i]
+      
+    }
+    
+    file_name <-  filesDat$files[1]
+    
+    for(file_name in filesDat$files){
+      print(file_name)
+      sra_id <- unlist(strsplit(file_name, "\\."))[1]
+      
+      plotFile <- read.table(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/plot_files/", file_name, sep = ""))
+      
+      
+      
+      
+      
+      
+      cdsDat <- gffDat %>% filter(feature == "CDS")
+      
+      for(i in 1:nrow(regions)){
+        contig <- regions$sequence[i]
+        increase_val <- regions$start[i]
+        cdsDat <- cdsDat %>% mutate(start = ifelse(sequence == contig, start + increase_val, start),
+                                    end = ifelse(sequence == contig, end + increase_val, end))
+        
+      }
+      
+      
+      
+      positions <- cdsDat %>% select(sequence,start, end) %>% mutate(start = start - 149) %>% mutate(start = ifelse(start < 1, 1, start))  %>% mutate(end = end + 149) %>% mutate(end = ifelse(end > max(regions$end), max(regions$end), end))
+      
+      
+      
+      
+      
+      
+      positions$new <- do.call(paste, c(positions, sep=":")) 
+      positions$new <- Map(":", positions$start, positions$end)
+      
+      
+      values <- unlist(positions$new[1:1000])
+      
+      
+      positions <- data.frame(rowNum = values, type="CDS")
+      
+      starts <- data.frame(rowNum = cdsDat$start, type2 ="start")
+      stops <- data.frame(rowNum = cdsDat$end, type2 ="stop")
+      starts <- starts %>% mutate(rowNum = rowNum - 149) %>% mutate(rowNum = ifelse(rowNum < 1, 1, rowNum))
+      stops <- stops %>% mutate(rowNum = rowNum + 149) %>% mutate(rowNum = ifelse(rowNum > max(regions$end), max(regions$end), rowNum))
+      
+      starts_and_stops <- starts %>% bind_rows(stops)
+      
+      positions <- positions %>% 
+        left_join(starts_and_stops, by = "rowNum") %>% 
+        mutate(type2 = ifelse(is.na(type2), "remove", type2))
+      
+      plotDat <- plotFile %>% mutate(value = ifelse(V1 > V2, V1, V2)) %>% select(value) %>% mutate(rowNum = row_number())
+      
+      plotDat <- plotDat %>% left_join(positions, by = "rowNum") %>% mutate(type2 = ifelse(is.na(type2), "intergenic", type2)) %>% 
+        filter(type2 != "remove")
+      
+      
+      plotDat <- plotDat %>% unique()
+      
+      
+      
+      plotDat <- plotDat %>% mutate(type = ifelse(is.na(type), "intergenic", "CDS"))
+      
+      total <- sum(plotDat$value)/1000000
+      
+      plotDat$value <- plotDat$value/total
+      
+      # save(plotDat, file = "~/phd/RNASeq/tmp/plotDat.Rda")
+      # 
+      # load("~/phd/RNASeq/tmp/plotDat.Rda")
+      
+      checkDat <- plotDat %>% filter(value > 15/total & type == "intergenic" )
+      
+      
+      # checkDat <- data.frame(value = "0.04", rowNum = c(1,2,3,4,5,15,16,17,18,21,22,23,50,51,52,56,61,62,63,64,100,101,102,103),
+      #                        type = "intergenic")
+      # checkDat <- checkDat %>% mutate(type = ifelse(rowNum > 15 & rowNum < 30, "CDS", "intergenic"))
+      
+      plotDat <- checkDat
+      
+      callsDat <- data.frame(start = rep(as.character("0"), 20000), stop = rep(as.character("0"), 20000), stringsAsFactors = F)
+      start <- 0
+      stop <- 0
+      current_feature <- F
+      cds <- F
+      id_pos <- 0
+      
+      
+      i <- 1
+      for(i in 1:nrow(plotDat)){
+        printRemaining(i = i, length = nrow(plotDat))
+        if(i == nrow(plotDat)){
+          if(current_feature){
+            if((plotDat$rowNum[i] - 25) < stop){
+              stop <- plotDat$rowNum[i]
+              if(plotDat$type[i] == "CDS"){
+                cds <- T
+              }
+            }
+            if(cds){
+              current_feature <- F
+              cds <- F
+              next
+            }
+            id_pos <- id_pos + 1
+            # print(paste(start,stop, id_pos))
+            callsDat$start[id_pos] <- start
+            callsDat$stop[id_pos] <- stop
+            current_feature <- F
+            cds <- F
+          }
+        }
+        
+        if(current_feature == F){
+          start <- plotDat$rowNum[i]
+          stop <- plotDat$rowNum[i]
+          if(plotDat$type[i] == "CDS"){
+            cds <- T
+          }
+          current_feature <- T
+          next
+        }
+        
+        if(plotDat$type2[i] == "stop"){
+          stop <- plotDat$rowNum[i]
+          cds <- T
+          next
+        }
+        
+        if((plotDat$rowNum[i] - 25) < stop){
+          stop <- plotDat$rowNum[i]
+          if(plotDat$type[i] == "CDS"){
+            cds <- T
+          }
+          next
+        }else{
+          if(cds){
+            current_feature <- F
+            cds <- F
+            start <- plotDat$rowNum[i]
+            stop <- plotDat$rowNum[i]
+            next
+          }
+          id_pos <- id_pos + 1
+          # print(paste(start,stop, id_pos))
+          callsDat$start[id_pos] <- start
+          callsDat$stop[id_pos] <- stop
+          current_feature <- F
+          cds <- F 
+        }
+      }  
+      
+      
+      
+      
+      
+      
+      combinedCalls <- callsDat %>% filter(start != 0) %>% mutate_all(as.numeric) %>% filter((stop - start) > 50)
+      
+      
+      
+      
+      gffMain <- readLines(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", accession, ".gff", sep = ""))
+      gffMain <- data.frame(text = gffMain)
+      genomeInfo <- as.character(gffMain[8,1])
+      genomeBuild <- as.character(gffMain[4,1])
+      genomeSpecies <- as.character(gffMain[9,1])
+      accession_contig <- strsplit(genomeInfo, " ")[[1]][2]
+      
+      
+      
+      gffFwd <- combinedCalls%>%mutate(strand = "+",
+                                       source = "sraAlignedncRNAExpression",
+                                       seqname = accession_contig,
+                                       median.val = 0,
+                                       feature = "ncRNA",
+                                       frame = ".",
+                                       attribute = paste("ID=rna_fwd_", row_number(), sep = ""))%>%
+        select(seqname, source, feature, start, stop, median.val, strand, frame, attribute)
+      
+      
+      
+      
+      fileConn<-file(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", sra_id, "_snra_calls.gff", sep = ""))
+      writeLines(c("##gff-version 3",
+                   "#!gff-spec-version 1.21",
+                   "#!processor R script (local) with manual add of top section",
+                   genomeBuild,
+                   paste("#!genome-build-accession NCBI_Assembly:", "GCA_000017745.1", sep = ""),
+                   paste("#!annotation-date ", Sys.Date(), sep = ""),
+                   "#!annotation-source snraCalls (local version)",
+                   genomeInfo,
+                   genomeSpecies), fileConn)
+      close(fileConn)
+      
+      print(paste("Writing to ~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", sra_id, "_snra_calls.gff", sep = ""))
+      write.table(x = gffFwd, file = paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", sra_id, "_snra_calls.gff", sep = ""), row.names = F, col.names = F, quote = F, sep = "\t", append = T)
+      
+      
+      # plotDat <- plotDat %>% mutate(value = ifelse(is.na(type), value, 0))
+      # 
+      # 
+      # outDat <- plotDat %>% select(value)
+      # 
+      # 
+      # write.table(outDat, paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/plot_files/", file_name, "_ncRNA_no_buffer.plot", sep = ""), quote = F, row.names = F, col.names = F)
+    }
+    
+    
+  }
+}
+```
+
+
+
+##get_sRNA_sequences.py
+
+
+```{python get_sRNA_sequences.py, eval=F, include=T}
+#!/usr/bin/python
+import sys
+from Bio import SeqIO
+from Bio.Alphabet import generic_dna
+import getopt
+import os
+
+
+
+help = '''
+    get_sRNA_sequences.py v 0.1 (August 2020) is a script for taking predicted sRNA regions and extracting the DNA sequence from 
+    fasta files.
+    Usage:
+     get_sRNA_sequences.py <accession>
+    
+    Options:
+        -h	Display this help
+        -q  Supress messages
+    Input
+        -a	<accession> the genome accession to use for the input and output files
+
+    
+'''
+
+def usage():
+    print help
+
+def rungetopts():
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "a:qh", ["accession", "quiet", "help"])
+    except getopt.GetoptError as err:
+        print(err)
+        usage()
+        sys.exit(2)
+    accession = ""
+    for o, a in opts:
+            if o in ("-h", "--help"):
+                usage()
+                sys.exit()
+            elif o in ("-a", "--accession"):
+                accession = a
+            else:
+                assert False, "unhandled option"
+    if accession == "":
+        print "-a <accession> missing. For more help use -h"
+        sys.exit(2)
+    return(accession)
+
+def main():
+
+    accession = rungetopts()
+
+    try:
+        inFile = open("/Users/thomasnicholson/phd/RNASeq/new_calls/%s_new_calls.txt" % accession, 'r')
+    except IOError:
+        print "/Users/thomasnicholson/phd/RNASeq/new_calls/%s_new_calls.txt not found" % accession
+        sys.exit(2)
+    try:
+        fastaFile = list(SeqIO.parse("/Users/thomasnicholson/phd/RNASeq/sequences/%s.fna" % accession, "fasta"))
+    except IOError:
+        print "/Users/thomasnicholson/phd/RNASeq/sequences/%s.fna not found" % accession
+        sys.exit(2)
+
+
+    write_path = "/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1"
+
+    print "Combining contigs"
+    my_seq = srna.concatenateSequence(fastaFile)
+
+    print "Writing sequences"
+    srna.writeSequences(inFile,my_seq,accession,write_path)
+
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+
+
+```
+
+##get_random_srna_sequence.py
+
+```{python get_random_srna_sequences.py, eval = F, python.reticulate = FALSE, echo=T}
+#!/usr/bin/python
+
+'''
+file paths are hard coded
+'''
+
+
+import sys
+from Bio import SeqIO
+import getopt
+import os
+from BCBio import GFF
+from Bio.Seq import Seq
+from Bio.Alphabet import generic_dna
+import random
+import comparativeSRNA as srna
+
+
+help = '''
+
+'''
+
+def usage():
+    print help
+
+def rungetopts():
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "a:sqh", ["accession", "shuffle", "quiet", "help"])
+    except getopt.GetoptError as err:
+        # print help information and exit:
+        print(err) # will print something like "option -a not recognized"
+        usage()
+        sys.exit(2)
+    accession = ""
+    shuffled = False
+    for o, a in opts:
+            if o in ("-h", "--help"):
+                usage()
+                sys.exit()
+            elif o in ("-a", "--accession"):
+                accession = a
+            elif o in ("-s", "--shuffle"):
+                shuffled = True
+            else:
+                assert False, "unhandled option"
+    if accession == "":
+        print "-a <accession> missing. For more help use -h"
+        sys.exit(2)
+    return(accession, shuffled)
+
+
+def main():
+
+    accession, shuffled = rungetopts()
+    print "Reading files"
+    try:
+        inFile = open("/Users/thomasnicholson/phd/RNASeq/new_calls/%s_new_calls.txt" % accession, 'r')
+
+        fileLength = file_len("/Users/thomasnicholson/phd/RNASeq/new_calls/%s_new_calls.txt" % accession)
+    except IOError:
+        print "/Users/thomasnicholson/phd/RNASeq/new_calls/%s_new_calls.txt not found" % accession
+        sys.exit(2)
+    try:
+        fastaFile = list(SeqIO.parse("/Users/thomasnicholson/phd/RNASeq/sequences/%s.fna" % accession, "fasta"))
+    except IOError:
+        print "/Users/thomasnicholson/phd/RNASeq/sequences/%s.fna not found" % accession
+        sys.exit(2)
+
+    print "Combining contigs"
+    my_seq = srna.concatenateSequence(fastaFile)
+
+
+
+    print "Getting intergenic sequence"
+    random_seq = srna.intergenicSequence(accession, my_seq, shuffled)
+
+
+    print "Getting intergenic positions"
+    positions = srna.intergenicPositions(accession)
+
+    print "Selecting random sRNAs"
+    srna.selectRandomLocation(inFile, positions,fileLength, random_seq, accession)
+
+
+
+
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+
+
+```
+
+
+
+##single_fasta_files.py
+
+```{python single_fasta_files.py, eval = F}
+#!/usr/bin/python
+import sys
+from Bio import SeqIO
+import getopt
+import os
+from BCBio import GFF
+from Bio.Seq import Seq
+from Bio.Alphabet import generic_dna
+import random
+import pandas as pd
+import comparativesrna as srna
+
+help = '''
+    {script_name} -c com_port [-o output_file] [--loglevel level]
+
+    Reads the temperature data from a radio.  The temperature data is output in csv form.
+
+    examples:
+        Read table from radio attached to com4 and write the table to the file
+        output.csv.
+
+            {script_name} -c com4 -o output.csv
+
+        Read table from radio attached to com3 and write the table to stdout. 
+        You can use IO redirection to send the contents where every you want.
+
+            # just print to the terminal 
+            {script_name} -c com3
+
+            # redirect to another file
+            {script_name} -c com3 > somefile.csv
+
+            # filter out temperatures that are -100
+            {script_name} -c com3 | grep -v '^-100' 
+
+
+    -c com_port
+    --com_port comport
+        Name of the COM port attached to the radio
+
+    -o output_file
+    --output output_file
+        If specified write the table data to the given file.  If not specified
+        the data will be written to stdout.
+
+    --loglevel critical | error | warning | info | debug | notset
+        Control the verbosity of the script by setting the log level.  Critical
+        is the least verbose and notset is the most verbose.
+
+        The default loglevel is {default_loglevel}.
+
+        These values correspond directly to the python logging module levels. 
+        (i.e. https://docs.python.org/3/howto/logging.html#logging-levels)
+
+
+    -h 
+    --help 
+        print this message
+
+'''
+
+def usage():
+    print help
+
+def rungetopts():
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "i:f:qh", ["infile", "folder", "quiet", "help"])
+    except getopt.GetoptError as err:
+        # print help information and exit:
+        print(err) # will print something like "option -a not recognized"
+        usage()
+        sys.exit(2)
+    file = ""
+    for o, a in opts:
+            if o in ("-h", "--help"):
+                usage()
+                sys.exit()
+            elif o in ("-i", "--infile"):
+                file = a
+            elif o in ("-f", "--folder"):
+                folder = a
+            else:
+                assert False, "unhandled option"
+    if file == "":
+        print "-f <file> missing. For more help use -h"
+        sys.exit(2)
+    return(file, folder)
+
+# def single_fasta(fastaFile, folder):
+#     for seq in fastaFile:
+#         id = seq.id
+#         outname = id.split("[")
+#         outname = outname[0]
+#         my_seq = seq.seq
+#         outFile = open("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/%s/%s.fna" % (folder, outname), "w")
+#         outFile.write(">%s\n%s\n" % (id, my_seq))
+
+
+
+def main():
+
+    filename, folder = rungetopts()
+    print filename, folder
+    print "Reading files"
+    try:
+        fastaFile = list(SeqIO.parse("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/%s" % filename, "fasta"))
+    except IOError:
+        print "/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/%s not found" % filename
+        sys.exit(2)
+
+    srna.single_fasta(fastaFile, folder)
+
+
+if __name__ == "__main__":
+    main()
+
+
+```
+
+##run_srna_nhmmer.sh
+
+```{bash run_srna_nhmmer.sh, eval=F}
+#!/bin/bash
+
+# Setup Variables #
+
+usage(){
+    echo "run_sRNA_nhmmer.sh is a script for running nhmmer and sorting the results.  
+Usage:
+ run_sRNA_nhmmer.sh [opts] [input]
+
+Required:	       
+	-d	<database> The nucleotide database to be searched against as the nhmmer target
+	-f	<folder> The folder containing the query file for nhmmer
+	-e	<extension> The file extension of the query file in <folder>
+
+Options:
+	-h	Display this help
+	-c	Check if the sequences are >50 nt (only works on fasta files)
+"
+}
+
+check_seq_lengths=""
+database=""
+folder=""
+extension=""
+outfolder="."
+missing=""
+exitTrue="F"
+evalue="1e-5"
+
+# User Input Options #
+
+while getopts "d:o:f:E:e:ch" arg; do
+case $arg in
+	d) 
+	database=${OPTARG};;
+	f)
+	folder=${OPTARG};;
+	o)
+	outfolder=${OPTARG};;
+	E)
+	evalue=${OPTARG};;
+	e)
+	extension=${OPTARG};;	
+	c)
+	check_seq_lengths="T";;
+    h)
+		usage
+		exit
+      ;;    
+	\?) 
+	echo "Unknown option: -${OPTARG}" >&2; exit 1;;
+    esac
+done
+
+# Tests for inputs #
+
+if [[ $database == "" ]]; then
+	missing="$missing -d <database> "
+	exitTrue="T"
+fi
+
+if [[ $folder == "" ]]; then
+	missing="$missing -f <folder> "
+	exitTrue="T"	
+fi
+
+if [[ $extension == "" ]]; then
+	missing="$missing -e <extension> "
+	exitTrue="T"
+fi
+
+if [[ $exitTrue == "T" ]];then
+	echo "$missing not found. Use -h for more help."
+	exit
+fi
+
+if [[ $extension == "stk" ]]; then
+	check_seq_lengths=""
+fi
+
+echo "extension value: $extension"
+
+if [[ $check_seq_lengths == "T" ]]; then
+
+	echo "checking for short seqs"
+	mkdir -p $folder/short_seqs
+	
+	let "fileNum = 0"
+	for file in $folder/*.$extension
+	do
+	
+	seqlength=`grep -v ^">" $file | wc -c`
+	if (( $seqlength < 50 )); then
+	mv $file  single_seqs/short_seqs/
+	fi
+	
+	done
+
+fi
+
+# Set up folders/files #
+
+echo "making directories in `pwd`"
+mkdir -p $outfolder/alignments
+mkdir -p $outfolder/hmm
+mkdir -p $outfolder/output
+
+# Run nhmmer #
+
+echo "running nhmmer"
+let "fileNum = 0"
+for file in $folder/*.$extension
+
+do
+
+echo $file
+outname=`basename $file`
+
+
+if [ -f "$outfolder/output/$outname.res" ]; then
+	echo "Already exists: $file"
+	continue
+fi
+
+
+nseqs=`esl-alistat $file | grep "Number of sequences" | cut -d ":" -f2`
+length=`esl-alistat $file | grep "Alignment length:" | cut -d ":" -f2`
+echo "Running nhmmer on $file (length: $length, nseqs: $nseqs)"
+
+
+nhmmer -E $evalue --tblout $outfolder/output/$outname.tbl -A $outfolder/alignments/tmp.stk --tformat FASTA  $file $database > $outfolder/output/$outname.res
+
+lines=`wc -l < $outfolder/alignments/tmp.stk`
+
+
+if (( $lines > 0 )); then
+
+
+##esl-weight!!!
+esl-alimanip   --lnfract 0.8 --lxfract 1.2 --lmin 50 --lmax 500 --detrunc 30  $outfolder/alignments/tmp.stk | esl-alimask -g --gapthresh 0.8 -p --pfract 0.5 --pthresh 0.5 --keepins - > $outfolder/alignments/$outname
+
+
+
+hmmbuild $outfolder/hmm/$outname.hmm $outfolder/alignments/$outname
+
+else
+
+echo "No hits found for $outname"
+
+fi
+
+done
+
+
+
+
+
+```
 
