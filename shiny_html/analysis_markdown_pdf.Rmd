@@ -1452,7 +1452,7 @@ done
 
 ```
 
-This seach gave an output for each genome containing coordinates (contig, start, end, strand) for the location of sequences matching Rfam families. These files needed to be combined and reformatted so that the nucelotide sequences of the matches could be obtained. This was done for each group:
+This search gave an output for each genome containing coordinates (contig, start, end, strand) for the location of sequences matching Rfam families. These files needed to be combined and reformatted so that the nucelotide sequences of the matches could be obtained. This was done for each group:
 
 `group="representative_genomes"`
 
@@ -2421,64 +2421,14 @@ done < predicted_matches_positive_control_ids.txt
 ***
 
 
-As there are many sRNAs each comntributing to each model, it is important to enusre that each sequence only shows up in one model rather than several. This means combining the duplicated models to remove redundancy. 
+Each of the predicted sRNAs have been used in a search of ~1500 genomes. As there are many sRNAs each comntributing to each model, it is important to enusre that each sequence only shows up in one model rather than several. This means combining the duplicated models to remove redundancy. This will be done by getting the coordinates of each match for each contig and checking for overlapping regions and the overlapping regions will be merged.
 
-##redundancy_check
+- done on the server (biochemcompute.uod.otago.ac.nz)
+    
 
-
-```{r redundancy_check, eval = F, include=T}
-
-
-load("~/bin/r_git/R/r_files/overlapping_models_ids.Rda") #made from ~/phd/RNASeq/srna_seqs/version_1/positive_control/overlapping_models/overlapping_models_ids.txt
-
-colnames(overlapping_models_ids) <- c("target.id", "query.id")
-
-tbl <- table(overlapping_models_ids[,c('target.id','query.id')])
-idsDat <- as.data.frame(as.matrix(tbl))
-
-
-idsDat$target.id <- as.character(idsDat$target.id)
-idsDat$query.id <- as.character(idsDat$query.id)
-idsDat <- idsDat %>% filter(Freq > 0)
-
-queryCounts <- idsDat %>% group_by(query.id) %>% summarise(query.count = n()) %>% dplyr::rename(target = query.id)
-
-df <- data.frame(query.name = targets)
-
-df <- df %>% mutate(group = 1)
-
-
-mat <- reshape2::acast(idsDat, formula = target.id ~ query.id)
-mat[is.na(mat)] <- 0
-g <- graph.incidence(mat, weighted = T)
-g
-
-# svg(filename="~/phd/RNASeq/figures/pc_models.svg", 
-#      width=100, 
-#      height=100, 
-#      pointsize=20)
-V(g)$color <- V(g)$type
-V(g)$color=gsub("FALSE","red",V(g)$color)
-V(g)$color=gsub("TRUE","blue",V(g)$color)
-plot(g, edge.color="gray30", vertex.size = 5)
-# dev.off()
-# 
-# p <- ggplot(data = df, aes(target.id, query.id, fill = Freq))+
-#  geom_tile(color = "white")+
-#  scale_fill_gradient2(low = "white", high = "red", mid = "white", space = "Lab") +
-#   theme_minimal()+ 
-#  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
-#     size = 12, hjust = 1))
-# p
-# 
-
-```
-
-Checking that the overlapping sRNAs will be combined correctly.
 
 
 ##redundancy_test_example
-
 
 
 ```{python redundacy_test_example}
@@ -2503,25 +2453,14 @@ for contig in test_contigs:
 test_d
 ```
 
-Checking the distribution of overlap %.
 
--   each of the predicted sRNAs have been used in a searh of ~1500 genomes.
-    
-    - this was done on the server
-    
-    - files will need to be transfered to the MacBook for python analysis
-    
--   A check for redundancy of sRNAs is needed
-    
-    -   this will be done by getting the coordinates of each match for each contig and checking for overlapping regions
-    
-    -   overlapping regions will be merged.
+##Coordinates of matches{#contigs_and_cordinates_of_matches}
 
-##contigs_and_cordinates_of_matches
-
-
+From the output (stoockholm format) for each RUF, a file containing coordinates (target contig, query ID, start, end) id generated for the predicted and negative control dataset (should be done for the positive control as well).
 
 ```{bash contigs_and_cordinates_of_matches, eval=F}
+##done in ~/phd/RNASeq/srnas/predicted/large_alignments/alignments
+cd ~/phd/RNASeq/srnas/predicted/large_alignments/alignments
 > ../../predicted_genomic_sequence_matches.txt
 for file in *.stk;
 do 
@@ -2533,30 +2472,13 @@ done
  
 ```
 
--   get the number of sequences in each model for analysis of the distributions in later steps
+##redundancy_1_R 
 
-##get_stats_on_alignments
-
-
-```{bash get_stats_on_alignments, eval=F}
-> ../../original_stats_all.txt
-
-for file in *;
-do 
-
-echo $file
-esl-alistat $file | sed 's/%//g' | sed 's/Alignment /Alignment_/g' | sed 's/Average /Average_/g' | sed 's/Format: /Format:_/g' | sed 's/Number of sequences/Number_of_sequences/g' | sed -e "s/$/ $file/" >> ../../original_stats_all.txt
-
-done
-
-
-```
 
 -   there is a faster way of doing these steps with GRanges, however there are thresholds and variables that cannot be controlled so it is nopt being used. It might be possible, however the current method is good enough. 
     
     - I have used this for the negative control group as it is so much faster. Any repeats will use this method
 
-##redundancy_1_R 
 
 ```{r redundancy_1_R, eval=F}
 
