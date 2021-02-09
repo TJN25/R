@@ -39,7 +39,7 @@ if ( is.null(opt$gcf) ) {
 }
 
 library(tidyverse)
-library(tjnFunctions)
+library(comparativeSRA)
 
 if ( is.null(opt$file_path ) ) { opt$file_path = "." }
 if ( is.null(opt$output ) ) { opt$output = opt$gcf }

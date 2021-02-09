@@ -1,5 +1,6 @@
 #!/usr/bin/env Rscript
 suppressMessages(library('getopt'))
+suppressMessages(library('dplyr'))
 
 
 # getopts -----------------------------------------------------------------
@@ -86,14 +87,14 @@ files <- list.files(paste(file_path, opt$sra, sep = "/"), pattern = ".gff$")
 # import data -------------------------------------------------------------
 
 
-#print(files)
+print(files)
 dat <- data.frame(sequence = as.character("0"), source = as.character("0"), feature = as.character("0"),
                   start = as.integer("0"), end = as.integer("0"), score = as.character("0"),
                   strand = as.character("0"), phase = as.character("0"), Atrribute = as.character("0"), file_name = as.character("start_row"), stringsAsFactors = F)
 i <- 2
 for(i in 1:length(files)){
   tmp  <- tryCatch({
-    suppressWarnings(tmp <- read.table(paste(file_path, opt$sra, files[i], sep = "/"), comment.char = "#", quote = "", sep = "\t", as.is = T))
+    suppressWarnings(tmp <- read.table(paste(file_path, opt$sra, files[i], sep = "/"), comment.char = "#", quote = "", sep = "\t", as.is = T, fill = T))
   }, error =  function(e) {
     cat(paste("Error: ", "row ", i, ", ", file_path, "/", opt$sra, "/", files[i], " cannot be opened.\n", sep = ""))
     cat(paste(e, "\n"))
@@ -103,11 +104,16 @@ for(i in 1:length(files)){
     next
   }
 
-  if(ncol(tmp) != 9){
+  if(ncol(tmp) < 9){
     cat(paste("Error: ", "row ", i, ", ", file_path, "/", opt$sra, "/", files[i], " contains ", ncol(tmp), " columns.\n", sep = ""))
     next
   }
 
+  if(ncol(tmp) > 9){
+    cat(paste("Warning: ", file_path, "/", opt$sra, "/", files[i], " contains ", ncol(tmp), " columns.\n", sep = ""))
+    tmp <- tmp[,c(1:9)]
+  }
+  
   colnames(tmp) <- c("sequence", "source", "feature", "start", "end", "score", "strand", "phase", "Atrribute")
 
   tmp <- tmp%>%mutate(file_name = files[i])%>%mutate(score = as.character(score))
@@ -137,7 +143,7 @@ mergedDat <- data.frame(sequence = as.character("0"), feature = as.character("0"
                         strand = as.character("0"), file_names = as.character("start_row"),
                         row_numbers = as.character("0"), prop_overlap = as.numeric(0), new_feature = F,
                         number_of_rnaseq_files = as.integer("0"),
-                        score = as.character("0"),
+                        score = as.character("0"), atrribute = as.character("0"),
                         stringsAsFactors = F)
 
 ##loop through the combined gff files and combine features that overlap
@@ -184,6 +190,7 @@ for(i in 1:(nrow(ncRNAgff))){
                       new_feature = new_feature,
                       number_of_rnaseq_files = length(start_i:i),
                       score = as.character(ncRNAgff$score[i]),
+                      atrribute = paste(ncRNAgff$Atrribute[start_i:i], collapse = ","),
                       stringsAsFactors = F)
     mergedDat <- mergedDat%>%bind_rows(tmp)
     current_feature <- F
@@ -214,6 +221,7 @@ for(i in 1:(nrow(ncRNAgff))){
                       new_feature = new_feature,
                       number_of_rnaseq_files = length(start_i:i),
                       score = as.character(ncRNAgff$score[i]),
+                      atrribute = paste(ncRNAgff$Atrribute[start_i:i], collapse = ","),
                       stringsAsFactors = F)
     mergedDat <- mergedDat%>%bind_rows(tmp)
     current_feature <- F
