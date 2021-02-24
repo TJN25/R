@@ -15,14 +15,14 @@ suppressMessages(library(tidyverse))
 suppressMessages(library(comparativeSRA))
 genera_list <- list.files("~/phd/RNASeq/genera/")
 
-genera <- "Acinetobacter"
+genera <- "Pseudomonas"
 
 for(genera in genera_list){
   print(genera)
   if(genera == "Escherichia"){
     next
   }
-  
+
   
   accession_list <- list.files(paste("~/phd/RNASeq/genera/",  genera, "/", sep = ""), pattern = ".data$")
   accessionsDat <- data.frame(accession_list = accession_list)
@@ -31,10 +31,21 @@ for(genera in genera_list){
   accession_folder <-  accessionsDat$accession_list[1]
   
   
+  
   for(accession_folder in accessionsDat$accession_list){
     accession <- unlist(strsplit(accession_folder, "\\."))[c(1,2)]
     accession <- paste(accession, collapse = ".")
     files <- list.files(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/plot_files/", sep = ""), pattern = ".plot$")
+    files_done <- list.files(paste("~/phd/RNASeq/tmp/done/", sep = ""), pattern = ".plot$")
+    
+    list_ignored <- files_done[files_done %in% files]
+    
+    if(length(list_ignored) > 0){
+      print("Skipping files already done:")
+      print(list_ignored)
+    }
+    
+    files <- files[files %in% files_done == F]
     
     filesDat <- data.frame(files = files)
     
@@ -42,6 +53,8 @@ for(genera in genera_list){
                                     grepl(pattern = "fwd", x = files)==F,
                                     grepl(pattern = "rev", x = files)==F,
                                     grepl(pattern = accession, x = files)==F) %>% mutate_all(as.character)
+    
+    
     
     
     if(nrow(filesDat) == 0){
@@ -64,57 +77,66 @@ for(genera in genera_list){
     }
     
     file_name <-  filesDat$files[1]
+    cdsDat <- gffDat %>% filter(feature == "CDS")
+    for(i in 1:nrow(regions)){
+      contig <- regions$sequence[i]
+      increase_val <- regions$start[i]
+      cdsDat <- cdsDat %>% mutate(start = ifelse(sequence == contig, start + increase_val, start),
+                                  end = ifelse(sequence == contig, end + increase_val, end))
+      
+    }
     
+    positions <- cdsDat %>% select(sequence,start, end) %>% mutate(start = start - 149) %>% mutate(start = ifelse(start < 1, 1, start))  %>% mutate(end = end + 149) %>% mutate(end = ifelse(end > max(regions$end), max(regions$end), end))
+    
+    
+    
+    
+    
+    
+    positions$new <- do.call(paste, c(positions, sep=":")) 
+    positions$new <- Map(":", positions$start, positions$end)
+    
+    if(nrow(positions) <= 1000){
+      next
+    }
+    
+    values <- unlist(positions$new)
+    
+    
+    positions <- data.frame(rowNum = values, type="CDS")
+    
+    starts <- data.frame(rowNum = cdsDat$start, type2 ="start")
+    stops <- data.frame(rowNum = cdsDat$end, type2 ="stop")
+    starts <- starts %>% mutate(rowNum = rowNum - 149) %>% mutate(rowNum = ifelse(rowNum < 1, 1, rowNum))
+    stops <- stops %>% mutate(rowNum = rowNum + 149) %>% mutate(rowNum = ifelse(rowNum > max(regions$end), max(regions$end), rowNum))
+    
+    starts_and_stops <- starts %>% bind_rows(stops)
+    
+    positions <- positions %>% 
+      left_join(starts_and_stops, by = "rowNum") %>% 
+      mutate(type2 = ifelse(is.na(type2), "remove", type2))
+    file_name <- "SRR519062.plot"
     for(file_name in filesDat$files){
       print(file_name)
+      next_val <- F
       sra_id <- unlist(strsplit(file_name, "\\."))[1]
       
+
+      
+      next_val  <- tryCatch({
+        plotFile <- read.table(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/plot_files/", file_name, sep = ""))
+        next_val <- F
+      }, error =  function(e) {
+        cat(paste("Error: ","~/phd/RNASeq/genera/",  genera, "/", accession ,".data/plot_files/", file_name, " failed.\n", sep = ""))
+        fileConn <- file(paste("~/phd/RNASeq/tmp/done/", sra_id, ".plot", sep = ""))
+        writeLines("done", fileConn)
+        close(fileConn)
+        next_val <- T
+      })
+      
+      
+     if(next_val == F){
       plotFile <- read.table(paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/plot_files/", file_name, sep = ""))
-      
-      
-      
-      
-      
-      
-      cdsDat <- gffDat %>% filter(feature == "CDS")
-      
-      for(i in 1:nrow(regions)){
-        contig <- regions$sequence[i]
-        increase_val <- regions$start[i]
-        cdsDat <- cdsDat %>% mutate(start = ifelse(sequence == contig, start + increase_val, start),
-                                    end = ifelse(sequence == contig, end + increase_val, end))
-        
-      }
-      
-      
-      
-      positions <- cdsDat %>% select(sequence,start, end) %>% mutate(start = start - 149) %>% mutate(start = ifelse(start < 1, 1, start))  %>% mutate(end = end + 149) %>% mutate(end = ifelse(end > max(regions$end), max(regions$end), end))
-      
-      
-      
-      
-      
-      
-      positions$new <- do.call(paste, c(positions, sep=":")) 
-      positions$new <- Map(":", positions$start, positions$end)
-      
-      
-      values <- unlist(positions$new[1:1000])
-      
-      
-      positions <- data.frame(rowNum = values, type="CDS")
-      
-      starts <- data.frame(rowNum = cdsDat$start, type2 ="start")
-      stops <- data.frame(rowNum = cdsDat$end, type2 ="stop")
-      starts <- starts %>% mutate(rowNum = rowNum - 149) %>% mutate(rowNum = ifelse(rowNum < 1, 1, rowNum))
-      stops <- stops %>% mutate(rowNum = rowNum + 149) %>% mutate(rowNum = ifelse(rowNum > max(regions$end), max(regions$end), rowNum))
-      
-      starts_and_stops <- starts %>% bind_rows(stops)
-      
-      positions <- positions %>% 
-        left_join(starts_and_stops, by = "rowNum") %>% 
-        mutate(type2 = ifelse(is.na(type2), "remove", type2))
-      
       plotDat <- plotFile %>% mutate(value = ifelse(V1 > V2, V1, V2)) %>% select(value) %>% mutate(rowNum = row_number())
       
       plotDat <- plotDat %>% left_join(positions, by = "rowNum") %>% mutate(type2 = ifelse(is.na(type2), "intergenic", type2)) %>% 
@@ -151,6 +173,7 @@ for(genera in genera_list){
       cds <- F
       id_pos <- 0
       
+      if(nrow(plotDat) > 50){
       
       i <- 1
       for(i in 1:nrow(plotDat)){
@@ -261,7 +284,10 @@ for(genera in genera_list){
       
       print(paste("Writing to ~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", sra_id, "_snra_calls.gff", sep = ""))
       write.table(x = gffFwd, file = paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/gff_files/", sra_id, "_snra_calls.gff", sep = ""), row.names = F, col.names = F, quote = F, sep = "\t", append = T)
-      
+      }
+      fileConn<-file(paste("~/phd/RNASeq/tmp/done/", sra_id, ".plot", sep = ""))
+      writeLines("done", fileConn)
+      close(fileConn)
       
       # plotDat <- plotDat %>% mutate(value = ifelse(is.na(type), value, 0))
       # 
@@ -271,7 +297,7 @@ for(genera in genera_list){
       # 
       # write.table(outDat, paste("~/phd/RNASeq/genera/",  genera, "/", accession ,".data/plot_files/", file_name, "_ncRNA_no_buffer.plot", sep = ""), quote = F, row.names = F, col.names = F)
     }
-    
+  }
     
   }
 }
