@@ -36,7 +36,7 @@ library(genoPlotR)
 library(drake)
 library(ape)
 library(Biostrings)
-library(ggtree)
+# library(ggtree)
 # library(treeio)
 library(geiger)
 library(ROSE)
@@ -46,9 +46,10 @@ library("viridis")
 library(randomForest)
 library(ROCR)
 library(corrplot)
-library(kableExtra)
+# library(kableExtra)
 library(reticulate)
 library(rjson)
+library(GenomicRanges)
 filePath <- "~/phd/RNASeq/r_files/"
 # use_python("/Users/thomasnicholson/anaconda3/bin/python")
 # use_condaenv("comparativesrna")
@@ -145,6 +146,31 @@ cumulativeCounts <- function(dists, smooth = T){
   return(combinedDat)  
 
 }
+
+groupOverlapItems <- function(smallDat, item, current_ids){
+  # print(length(current_ids))
+  # print(item)
+  if(length(current_ids) == 0){
+    current_ids <- item
+  }
+  df <- smallDat %>% filter(id1 == item)
+
+  if(nrow(df) == 0){
+    return(current_ids)
+  }
+  df$seen <- df$id2 %in% current_ids
+  df <- df %>% filter(seen == F)
+
+  if(nrow(df) == 0){
+    return(current_ids)
+  }
+  for(item2 in df$id2){
+    current_ids <- unique(c(current_ids, item2))
+    current_ids <- groupOverlapItems(smallDat, item2, current_ids)
+  }
+  return(current_ids)
+}
+
 
 ```
 ```{python pysetup, include=F}
@@ -2466,10 +2492,9 @@ for file in *.stk;
 do 
 
   ID=`echo $file | cut -d '.' -f1,2`
-  grep ^"#=GS" $file | sort | uniq | cut -d "[" -f1 | sed -e "s/$/   $ID/" | cut -d ' ' -f2- | cut -d '|' -f2 >> ../../predicted_genomic_sequence_matches.txt
+  grep ^"#=GS" $file | sort | uniq | cut -d "[" -f1 | cut -d ' ' -f2  | cut -d '|' -f2- |  sed -e "s/$/   $ID/" >> ../../predicted_genomic_sequence_matches.txt
 
 done
- 
 ```
 
 ##redundancy_1_R 
@@ -2482,26 +2507,18 @@ done
 
 ```{r redundancy_1_R, eval=F}
 
-dat <- read.table("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/negative_control_contig_pos.txt", sep = " ", fill = T, as.is = T)
-colnames(dat) <- c("contig", "start", "stop", "srna")
-dat <- dat  %>% select(contig, srna, start, stop) %>% mutate(strand = "+")
+dat <- read.table("~/phd/RNASeq/srnas/predicted/predicted_genomic_sequence_matches.txt", sep = " ", fill = T, as.is = T)
+
+dat <- dat %>% select(V1, V4)
+dat <- dat %>% separate(col = V1, into = c("contig", "coordinates"), sep = "\\/", remove = F)
+dat <- dat %>% separate(col = coordinates, into = c("start", "stop"), sep = "-", remove = F)
+dat <- dat %>% dplyr::rename(srna = V4) %>% select(contig, srna, start, stop) %>% mutate(strand = "+")
+colnames(dat) <- c("contig","srna", "start", "stop", "strand") 
 
 dat <- dat %>% mutate(start = as.numeric(start), stop = as.numeric(stop))
 
 dat <- dat %>% mutate(tmpstart = ifelse(start < stop, start, stop),
                       tmpend = ifelse(start > stop, start, stop))
-dat <- dat %>% filter(!is.na(tmpstart))
-
-# dat <- dat %>% separate(col = V1, into = c("contig", "coordinates"), sep = "\\/", remove = F)
-# 
-# dat <- dat %>% separate(col = coordinates, into = c("start", "stop"), sep = "-", remove = F)
-# 
-# dat <- dat %>% dplyr::rename(srna = V3) %>% select(contig, srna, start, stop) %>% mutate(strand = "+")
-# 
-# dat <- dat %>% mutate(start = as.numeric(start), stop = as.numeric(stop))
-# 
-# dat <- dat %>% mutate(tmpstart = ifelse(start < stop, start, stop),
-#                       tmpend = ifelse(start > stop, start, stop))
 
 query <- GRanges(seqnames = dat$contig,
                  ranges = IRanges(start = dat$tmpstart, end = dat$tmpend),
@@ -2511,16 +2528,25 @@ query <- GRanges(seqnames = dat$contig,
 lookup1 <- data.frame(id1 = dat$srna, queryHits = c(1:length(dat$srna)))
 lookup2 <- data.frame(id2 = dat$srna, subjectHits = c(1:length(dat$srna)))
 
+save(query, file="~/phd/RNASeq/r_files/query.Rda")
+save(lookup1, file="~/phd/RNASeq/r_files/lookup1.Rda")
+save(lookup2, file="~/phd/RNASeq/r_files/lookup1.Rda")
 
-tmp <- GenomicRanges::findOverlaps(query, query, type = 'any')
+range_out <- GenomicRanges::findOverlaps(query, query, type = 'any')
+save(range_out, file="~/phd/RNASeq/r_files/range_out.Rda")
 
-tmp <- as.data.frame(tmp)
+tmpDat <- as.data.frame(range_out)
 
-tmp <- tmp %>% left_join(lookup1) %>% left_join(lookup2)
+rangesDat <- tmpDat %>% left_join(lookup1) %>% left_join(lookup2)
 
-tmp <- tmp %>% filter(id1 != id2)
+rangesDat <- rangesDat %>% filter(id1 != id2)
 
-smallDat <- tmp %>% select(id1, id2) %>% unique()
+smallDat <- rangesDat %>% select(id1, id2) %>% unique()
+
+save(smallDat, file="~/phd/RNASeq/r_files/smallDat.Rda")
+save(rangesDat, file="~/phd/RNASeq/r_files/rangesDat.Rda")
+
+
 smallDat <- smallDat %>% mutate_all(as.character)
 
 s2 <- smallDat
@@ -2529,35 +2555,16 @@ s2$id2 <- smallDat$id1
 
 smallDat <- smallDat %>% bind_rows(s2) %>% unique()
 
+lookup1$id1[lookup1$id1 == "GCA_000015425.1_1002"]
+
 ids <- as.character(unique(dat$srna))
 item <- ids[68]
 item2 <- "alignments_GCA_000017765.1_689"
 
-groupOverlapItems <- function(smallDat, item, current_ids){
-  # print(length(current_ids))
-  # print(item)
-  if(length(current_ids) == 0){
-    current_ids <- item
-  }
-  df <- smallDat %>% filter(id1 == item)
+ids[1:10]
+idsDat <- data.frame(ids = ids)
 
-  if(nrow(df) == 0){
-    return(current_ids)
-  }
-  df$seen <- df$id2 %in% current_ids
-  df <- df %>% filter(seen == F)
-
-  if(nrow(df) == 0){
-    return(current_ids)
-  }
-  for(item2 in df$id2){
-    current_ids <- unique(c(current_ids, item2))
-    current_ids <- groupOverlapItems(smallDat, item2, current_ids)
-  }
-  return(current_ids)
-}
-
-item <- ids[ids == "alignments_GCA_000006945.2_2627"]
+item <- ids[ids == "GCA_000015425.1_1002"]
 tmp <- groupOverlapItems(smallDat, item, current_ids = c())
 
 checked_ids <- c()
@@ -2570,7 +2577,7 @@ for(item in ids){
  
   checked_ids <- c(checked_ids, current_ids)
   
-    write.table(x = current_ids, file = paste("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/combined_alignments_ids/", current_ids[1], "_combined_list.txt", sep = ""), append = T, quote = F, row.names = F, col.names = F)
+    write.table(x = current_ids, file = paste("~/phd/RNASeq/srnas/predicted/combined_alignments_ids/", current_ids[1], "_combined_list.txt", sep = ""), append = T, quote = F, row.names = F, col.names = F)
 
   # mat <- as.data.frame(t(as.matrix(current_ids)))
   # write.table(mat, file = "~/phd/RNASeq/tmp/nc_overlaps", append = T, quote = F, col.names = F, row.names = F, sep = "\t")
@@ -2836,6 +2843,8 @@ for(key in json_data){
 
 ```{bash combine_sRNAs_bash, eval=F}
 ##done in ~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/combined_alignments_ids
+
+cd ~/phd/RNASeq/srnas/predicted/combined_alignments_ids/
 mkdir -p fasta
 mkdir -p hmm
 mkdir -p alignments
@@ -2849,9 +2858,9 @@ echo $outname
 while read line; 
 do 
 
-esl-reformat fasta ../alignments_rnaalifold/$line.stk >> fasta/$outname.fa
+esl-reformat fasta ../large_alignments/alignments/$line.stk >> fasta/$outname.fa
 
-current_num=`esl-alistat ../alignments_rnaalifold/$line.stk | grep "Number of sequences" | cut -d ' ' -f 4`
+current_num=`esl-alistat ../large_alignments/alignments/$line.stk | grep "Number of sequences" | cut -d ' ' -f 4`
 
 if(( $current_num > $max_num ));
 then
@@ -2862,7 +2871,7 @@ fi
 
 done < $file
 
-hmmbuild hmm/$outname.hmm ../alignments_rnaalifold/$max_seq
+hmmbuild hmm/$outname.hmm ../large_alignments/alignments/$max_seq
 
 hmmalign --informat fasta hmm/$outname.hmm fasta/$outname.fa | esl-alimask -g --gapthresh 0.8 -p --pfract 0.5 --pthresh 0.5 - | esl-alimanip   --lnfract 0.6 --lxfract 1.4 --lmin 50 --lmax 500 --detrunc 50 - > alignments/$outname.stk
 
