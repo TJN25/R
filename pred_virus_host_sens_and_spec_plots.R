@@ -11,9 +11,147 @@ mround <- function(x,base){
 
 ## Base scoring script on this section #####
 getwd()
-setwd("~/phd/pred_virus_host/Server_files/")
+setwd("~/phd/PredVirusHost/Server_files//")
 
+simulateSmallContigs <- function(arVOGres, baPOGres, euVOGres, lookup,
+                                 arVOGModels = archaealModels,
+                                 baPOGModels = phageModels,
+                                 euVOGModels = eukaryoticModels,
+                                 discriminant_models_only = F){
+  
+  ptm1 <- proc.time()
+  aa <- arVOGres#%>%full_join(lookup, by = "target.name")
+  pa <- baPOGres#%>%full_join(lookup, by = "target.name")
+  ea <- euVOGres#%>%full_join(lookup, by = "target.name")
+  
+  # aa <- aa%>%full_join(arVOGModels, by = "query.name")
+  # pa <- pa%>%full_join(baPOGModels, by = "query.name")
+  # ea <- ea%>%full_join(euVOGModels, by = "query.name")
+  
+  
+  ##adjust the model scores
+  aa <- aa%>%mutate(score = score*score.percentage)%>%mutate(score = ifelse(is.na(score), 0, score))%>%mutate(query.name = ifelse(is.na(query.name), "arVOG_0", query.name))
+  pa <- pa%>%mutate(score = score*score.percentage)%>%mutate(score = ifelse(is.na(score), 0, score))%>%mutate(query.name = ifelse(is.na(query.name), "baPOG_0", query.name))
+  ea <- ea%>%mutate(score = score*score.percentage)%>%mutate(score = ifelse(is.na(score), 0, score))%>%mutate(query.name = ifelse(is.na(query.name), "euVOG_0", query.name))
+  
+  if(discriminant_models_only == T){
+    aa <- aa%>%mutate(score = ifelse(score.percentage < 0.8, 0, score*score.percentage))%>%mutate(score = ifelse(is.na(score), 0, score))%>%mutate(query.name = ifelse(is.na(query.name), "arVOG_0", query.name))
+    pa <- pa%>%mutate(score = ifelse(score.percentage < 0.8, 0, score*score.percentage))%>%mutate(score = ifelse(is.na(score), 0, score))%>%mutate(query.name = ifelse(is.na(query.name), "baPOG_0", query.name))
+    ea <- ea%>%mutate(score = ifelse(score.percentage < 0.8, 0, score*score.percentage))%>%mutate(score = ifelse(is.na(score), 0, score))%>%mutate(query.name = ifelse(is.na(query.name), "euVOG_0", query.name))
+    
+  }else{
+    aa <- aa%>%mutate(score = score*score.percentage)%>%mutate(score = ifelse(is.na(score), 0, score))%>%mutate(query.name = ifelse(is.na(query.name), "arVOG_0", query.name))
+    pa <- pa%>%mutate(score = score*score.percentage)%>%mutate(score = ifelse(is.na(score), 0, score))%>%mutate(query.name = ifelse(is.na(query.name), "baPOG_0", query.name))
+    ea <- ea%>%mutate(score = score*score.percentage)%>%mutate(score = ifelse(is.na(score), 0, score))%>%mutate(query.name = ifelse(is.na(query.name), "euVOG_0", query.name))
+    
+  }
+  
+  ##keep only the top matching model
+  
+  aa1 <- aa%>%arrange(-score)%>%group_by(target.name)%>%top_n(n = 1, wt = score)
+  pa1 <- pa%>%arrange(-score)%>%group_by(target.name)%>%top_n(n = 1, wt = score)
+  ea1 <- ea%>%arrange(-score)%>%group_by(target.name)%>%top_n(n = 1, wt = score)
+  
 
+  
+  ## score the archaeal results ##
+  
+  ##create a data frame to store the output
+  res <- data.frame(genome = NA, archaeal_score = NA, phage_score = NA, eukaryotic_score = NA, call = NA, protein_count = NA)
+  
+  j <- 1
+  i <- 6
+  ##simulate varying numbers of proteins
+  for(j in 1:10){
+    for(i in 1:25){
+      printRemaining(i = ((j-1)*25 + i), length = 250, increment = 5)
+      ##select i proteins from genomes
+      aaTmp <- aa1%>%group_by(genome)%>%mutate(protein_count = n())%>%filter(protein_count >= i)
+      
+      if(nrow(aaTmp) > 0){
+      aaTmp <- aaTmp%>%dplyr::sample_n(i)
+      aaRes <- aaTmp%>%group_by(genome)%>%summarise(archaeal_score = sum(score))%>%
+        mutate(archaeal_score = ifelse(is.na(archaeal_score), 0, archaeal_score))
+      }
+      paTmp <- pa1%>%group_by(genome)%>%mutate(protein_count = n())%>%filter(protein_count >= i)
+      
+      if(nrow(paTmp) > 0){
+        paTmp <- paTmp%>%dplyr::sample_n(i)
+        paRes <- paTmp%>%group_by(genome)%>%summarise(phage_score = sum(score))%>%
+          mutate(phage_score = ifelse(is.na(phage_score), 0, phage_score))
+        
+      }
+      
+      eaTmp <- ea1%>%group_by(genome)%>%mutate(protein_count = n())%>%filter(protein_count >= i)
+      
+      if(nrow(eaTmp) > 0){
+        eaTmp <- eaTmp%>%dplyr::sample_n(i)
+        eaRes <- eaTmp%>%group_by(genome)%>%summarise(eukaryotic_score = sum(score))%>%
+          mutate(eukaryotic_score = ifelse(is.na(eukaryotic_score), 0, eukaryotic_score))
+        
+      }
+      
+      tmpRes <- aaRes%>%full_join(paRes, by = "genome")%>%full_join(eaRes, by = "genome")
+      
+      tmpRes <- tmpRes%>%
+        mutate(phage_score = ifelse(is.na(phage_score), 0, phage_score))%>%
+        mutate(archaeal_score = ifelse(is.na(archaeal_score), 0, archaeal_score))%>%
+        mutate(eukaryotic_score = ifelse(is.na(eukaryotic_score), 0, eukaryotic_score))%>%mutate(call = ifelse(archaeal_score >= phage_score,
+                                                                                                               ifelse(archaeal_score >= eukaryotic_score,
+                                                                                                                      ifelse(archaeal_score > 60, "archaeal", "none"),
+                                                                                                                      ifelse(eukaryotic_score > 150, "eukaryotic", "none")),
+                                                                                                               ifelse(phage_score >= eukaryotic_score, ifelse(phage_score > 110, "phage", "none"), ifelse(eukaryotic_score > 150, "eukaryotic", "none"))))
+      tmpRes <- tmpRes%>%mutate(protein_count = i)
+      
+      
+      res <- res%>%bind_rows(tmpRes)
+      
+    }
+  }
+  # for(j in 1:3){
+  #   for(i in 26:50){
+  #     printRemaining(i = ((j-1)*25 + i-25), length = 75, increment = 5)
+  #     
+  #     ##select i proteins from genomes
+  #     aaTmp <- aa1%>%group_by(genome)%>%mutate(protein_count = n())%>%filter(protein.count.full >= i)%>%sample_n(i)
+  #     paTmp <- pa1%>%group_by(genome)%>%mutate(protein_count = n())%>%filter(protein.count.full >= i)%>%sample_n(i)
+  #     eaTmp <- ea1%>%group_by(genome)%>%mutate(protein_count = n())%>%filter(protein.count.full >= i)%>%sample_n(i)
+  #     
+  #     
+  #     ##calucute contig scores
+  #     aaRes <- aaTmp%>%group_by(genome)%>%summarise(archaeal_score = sum(score))%>%
+  #       mutate(archaeal_score = ifelse(is.na(archaeal_score), 0, archaeal_score))
+  #     
+  #     paRes <- paTmp%>%group_by(genome)%>%summarise(phage_score = sum(score))%>%
+  #       mutate(phage_score = ifelse(is.na(phage_score), 0, phage_score))
+  #     
+  #     eaRes <- eaTmp%>%group_by(genome)%>%summarise(eukaryotic_score = sum(score))%>%
+  #       mutate(eukaryotic_score = ifelse(is.na(eukaryotic_score), 0, eukaryotic_score))
+  #     
+  #     
+  #     tmpRes <- aaRes%>%full_join(paRes, by = "genome")%>%full_join(eaRes, by = "genome")
+  #     
+  #     tmpRes <- tmpRes%>%
+  #       mutate(phage_score = ifelse(is.na(phage_score), 0, phage_score))%>%
+  #       mutate(archaeal_score = ifelse(is.na(archaeal_score), 0, archaeal_score))%>%
+  #       mutate(eukaryotic_score = ifelse(is.na(eukaryotic_score), 0, eukaryotic_score))%>%
+  #       mutate(call = ifelse(archaeal_score >= phage_score, ifelse(archaeal_score >= eukaryotic_score, ifelse(archaeal_score > 0, "archaeal", "none"), "eukaryotic"), ifelse(phage_score >= eukaryotic_score, "phage", "eukaryotic")))
+  #     
+  #     tmpRes <- tmpRes%>%mutate(protein_count = i)
+  #     
+  #     
+  #     res <- res%>%bind_rows(tmpRes)
+  #     
+  #   }
+  # }
+  # 
+  # 
+  
+  
+  runningTime <- proc.time() - ptm1
+  printRunningTime(runningTime = runningTime, type = "The simulation")
+  return(res)
+}
 aa <- read.table("arVOG_archaeal_test.txt")
 ap <- read.table("arVOG_phage_test.txt")
 ae <- read.table("arVOG_eukaryotic_test.txt")
@@ -62,6 +200,11 @@ archaeal_lookup <- archaeal_lookup%>%dplyr::rename(target.name = V1, genome = V3
 eukaryotic_lookup <- eukaryotic_lookup%>%dplyr::rename(target.name = V1, genome = V2)
 phage_lookup <- phage_lookup%>%dplyr::rename(target.name = V1)
 
+load("~/bin/r_git/R/r_files/eukaryotic_lookup.Rda")
+load("~/bin/r_git/R/r_files/archaeal_lookup.Rda")
+load("~/bin/r_git/R/r_files/phage_lookup.Rda")
+
+
 
 archaealModels <- read.table("archaeal_model_scores.txt", sep = "\t", comment.char = "", quote = "", fill = T, as.is = T, header = T)
 phageModels <- read.table("phage_model_scores.txt", sep = "\t", comment.char = "", quote = "", fill = T, as.is = T, header = T)
@@ -80,39 +223,49 @@ aa <- aa%>%mutate(score = score*score.percentage)
 pa <- pa%>%mutate(score = score*score.percentage)
 ea <- ea%>%mutate(score = score*score.percentage)
 
+proteins_to_ignore <- read.table("~/phd/PredVirusHost/update_march_2020/archaea_test/proteins_to_ignore.txt")
+
+proteins_to_ignore <- proteins_to_ignore %>% mutate(keep = F) %>% dplyr::rename(target.name = V1)
+
+aa <- aa %>% left_join(proteins_to_ignore) %>% filter(is.na(keep)) %>% select(-keep)
+pa <- pa %>% left_join(proteins_to_ignore) %>% filter(is.na(keep)) %>% select(-keep)
+ea <- ea %>% left_join(proteins_to_ignore) %>% filter(is.na(keep)) %>% select(-keep)
+
+
+archaealRes <- simulateSmallContigs(arVOGres = aa, baPOGres = pa, euVOGres = ea, lookup = archaeal_lookup, discriminant_models_only = F)
 
 ## score the archaeal results #####
 
 archaealRes <- data.frame(genome = NA, archaeal_score = NA, phage_score = NA, eukaryotic_score = NA, call = NA, protein_count = NA)
 i <- 30
 for(i in 1:25){
-aaTmp <- aa%>%group_by(genome)%>%mutate(protein_count = n())%>%filter(protein_count >= i)%>%sample_n(i)
-paTmp <- pa%>%group_by(genome)%>%mutate(protein_count = n())%>%filter(protein_count >= i)%>%sample_n(i)
-eaTmp <- ea%>%group_by(genome)%>%mutate(protein_count = n())%>%filter(protein_count >= i)%>%sample_n(i)
-
-aaRes <- aaTmp%>%group_by(genome)%>%summarise(archaeal_score = sum(score))%>%
-  mutate(archaeal_score = ifelse(is.na(archaeal_score), 0, archaeal_score))
-
-paRes <- paTmp%>%group_by(genome)%>%summarise(phage_score = sum(score))%>%
-  mutate(phage_score = ifelse(is.na(phage_score), 0, phage_score))
-
-eaRes <- eaTmp%>%group_by(genome)%>%summarise(eukaryotic_score = sum(score))%>%
-  mutate(eukaryotic_score = ifelse(is.na(eukaryotic_score), 0, eukaryotic_score))
-
-tmpRes <- aaRes%>%full_join(paRes)%>%full_join(eaRes)
-
-tmpRes <- tmpRes%>%
-  mutate(phage_score = ifelse(is.na(phage_score), 0, phage_score))%>%
-  mutate(archaeal_score = ifelse(is.na(archaeal_score), 0, archaeal_score))%>%
-  mutate(eukaryotic_score = ifelse(is.na(eukaryotic_score), 0, eukaryotic_score))%>%
-  mutate(call = ifelse(archaeal_score >= phage_score, ifelse(archaeal_score >= eukaryotic_score, "archaeal", "eukaryotic"), ifelse(phage_score >= eukaryotic_score, "phage", "eukaryotic")))%>%
-  full_join(archaeal_genome_info)
-
-tmpRes <- tmpRes%>%mutate(protein_count = i)
-
-
-archaealRes <- archaealRes%>%bind_rows(tmpRes)
-
+  aaTmp <- aa%>%group_by(genome)%>%mutate(protein_count = n())%>%filter(protein_count >= i)%>%sample_n(i)
+  paTmp <- pa%>%group_by(genome)%>%mutate(protein_count = n())%>%filter(protein_count >= i)%>%sample_n(i)
+  eaTmp <- ea%>%group_by(genome)%>%mutate(protein_count = n())%>%filter(protein_count >= i)%>%sample_n(i)
+  
+  aaRes <- aaTmp%>%group_by(genome)%>%summarise(archaeal_score = sum(score))%>%
+    mutate(archaeal_score = ifelse(is.na(archaeal_score), 0, archaeal_score))
+  
+  paRes <- paTmp%>%group_by(genome)%>%summarise(phage_score = sum(score))%>%
+    mutate(phage_score = ifelse(is.na(phage_score), 0, phage_score))
+  
+  eaRes <- eaTmp%>%group_by(genome)%>%summarise(eukaryotic_score = sum(score))%>%
+    mutate(eukaryotic_score = ifelse(is.na(eukaryotic_score), 0, eukaryotic_score))
+  
+  tmpRes <- aaRes%>%full_join(paRes)%>%full_join(eaRes)
+  
+  tmpRes <- tmpRes%>%
+    mutate(phage_score = ifelse(is.na(phage_score), 0, phage_score))%>%
+    mutate(archaeal_score = ifelse(is.na(archaeal_score), 0, archaeal_score))%>%
+    mutate(eukaryotic_score = ifelse(is.na(eukaryotic_score), 0, eukaryotic_score))%>%
+    mutate(call = ifelse(archaeal_score >= phage_score, ifelse(archaeal_score >= eukaryotic_score, "archaeal", "eukaryotic"), ifelse(phage_score >= eukaryotic_score, "phage", "eukaryotic")))%>%
+    full_join(archaeal_genome_info)
+  
+  tmpRes <- tmpRes%>%mutate(protein_count = i)
+  
+  
+  archaealRes <- archaealRes%>%bind_rows(tmpRes)
+  
 }
 
 
@@ -129,6 +282,16 @@ ep <- ep%>%left_join(eukaryoticModels)
 ap <- ap%>%mutate(score = score*score.percentage)
 pp <- pp%>%mutate(score = score*score.percentage)
 ep <- ep%>%mutate(score = score*score.percentage)
+
+proteins_to_ignore <- read.table("~/phd/PredVirusHost/update_march_2020/archaea_test/proteins_to_ignore_phage.txt")
+
+proteins_to_ignore <- proteins_to_ignore %>% mutate(keep = F) %>% dplyr::rename(target.name = V1)
+
+ap <- ap %>% left_join(proteins_to_ignore) %>% filter(is.na(keep)) %>% select(-keep)
+pp <- pp %>% left_join(proteins_to_ignore) %>% filter(is.na(keep)) %>% select(-keep)
+ep <- ep %>% left_join(proteins_to_ignore) %>% filter(is.na(keep)) %>% select(-keep)
+
+phageRes <- simulateSmallContigs(arVOGres = ap, baPOGres = pp, euVOGres = ep, lookup = phage_lookup, discriminant_models_only = F)
 
 
 phageRes <- data.frame(genome = NA, archaeal_score = NA, phage_score = NA, eukaryotic_score = NA, call = NA, protein_count = NA)
@@ -177,6 +340,23 @@ ae <- ae%>%mutate(score = score*score.percentage)
 pe <- pe%>%mutate(score = score*score.percentage)
 ee <- ee%>%mutate(score = score*score.percentage)
 
+proteins_to_ignore <- read.table("~/phd/PredVirusHost/update_march_2020/archaea_test/proteins_to_ignore_euk.txt")
+
+proteins_to_ignore <- proteins_to_ignore %>% mutate(keep = F) %>% dplyr::rename(target.name = V1)
+
+ae <- ae %>% left_join(proteins_to_ignore) %>% filter(is.na(keep)) %>% select(-keep)
+pe <- pe %>% left_join(proteins_to_ignore) %>% filter(is.na(keep)) %>% select(-keep)
+ee <- ee %>% left_join(proteins_to_ignore) %>% filter(is.na(keep)) %>% select(-keep)
+
+eukaryoticRes <- simulateSmallContigs(arVOGres = ae, baPOGres = pe, euVOGres = ee, lookup = eukaryotic_lookup, discriminant_models_only = F)
+
+save(archaealRes, file = "~/bin/r_git/R/r_files/archaealRes.Rda")
+save(eukaryoticRes, file = "~/bin/r_git/R/r_files/eukaryoticRes_small.Rda")
+save(phageRes, file = "~/bin/r_git/R/r_files/phageRes_small.Rda")
+
+
+
+
 aeRes <- ae%>%group_by(genome)%>%summarise(archaeal_score = sum(score))%>%
   mutate(archaeal_score = ifelse(is.na(archaeal_score), 0, archaeal_score))
 
@@ -216,18 +396,18 @@ archaealRes <- archaealRes%>%
   ))%>%
   mutate(call = ifelse(archaeal_score == 0, ifelse(phage_score == 0, ifelse(eukaryotic_score == 0, "none", call),call),call))%>%
   mutate(difference.abs = ifelse(call == "archaeal", 
-                                        ifelse(phage_score >= eukaryotic_score, 
-                                               archaeal_score - phage_score, 
-                                               archaeal_score - eukaryotic_score
-                                        ),
-                                        ifelse(call == "phage",ifelse(archaeal_score >= eukaryotic_score, 
-                                                                      phage_score - archaeal_score, 
-                                                                      phage_score - eukaryotic_score
-                                        ), ifelse(archaeal_score >= phage_score, 
-                                                 eukaryotic_score - archaeal_score, 
-                                                  eukaryotic_score - phage_score
-                                        ))
-                                        
+                                 ifelse(phage_score >= eukaryotic_score, 
+                                        archaeal_score - phage_score, 
+                                        archaeal_score - eukaryotic_score
+                                 ),
+                                 ifelse(call == "phage",ifelse(archaeal_score >= eukaryotic_score, 
+                                                               phage_score - archaeal_score, 
+                                                               phage_score - eukaryotic_score
+                                 ), ifelse(archaeal_score >= phage_score, 
+                                           eukaryotic_score - archaeal_score, 
+                                           eukaryotic_score - phage_score
+                                 ))
+                                 
   ))%>%
   filter(genome != "Podovirus_Lau218_strain_TahiMoana_complete_genome.")
 
@@ -252,18 +432,18 @@ phageRes <- phageRes%>%
   ))%>%
   mutate(call = ifelse(archaeal_score == 0, ifelse(phage_score == 0, ifelse(eukaryotic_score == 0, "none", call),call),call))%>%
   mutate(difference.abs = ifelse(call == "archaeal", 
-                                        ifelse(phage_score >= eukaryotic_score, 
-                                               archaeal_score - phage_score, 
-                                               archaeal_score - eukaryotic_score
-                                        ),
-                                        ifelse(call == "phage",ifelse(archaeal_score >= eukaryotic_score, 
-                                                                      phage_score - archaeal_score, 
-                                                                      phage_score - eukaryotic_score
-                                        ), ifelse(archaeal_score >= phage_score, 
-                                                  eukaryotic_score - archaeal_score, 
-                                                  eukaryotic_score - phage_score
-                                        ))
-                                        
+                                 ifelse(phage_score >= eukaryotic_score, 
+                                        archaeal_score - phage_score, 
+                                        archaeal_score - eukaryotic_score
+                                 ),
+                                 ifelse(call == "phage",ifelse(archaeal_score >= eukaryotic_score, 
+                                                               phage_score - archaeal_score, 
+                                                               phage_score - eukaryotic_score
+                                 ), ifelse(archaeal_score >= phage_score, 
+                                           eukaryotic_score - archaeal_score, 
+                                           eukaryotic_score - phage_score
+                                 ))
+                                 
   ))
 
 
@@ -656,4 +836,3 @@ ggplot(data = archaealRes, aes(x = archaeal_score, y = difference.percentage)) +
   geom_point()
 
 #####
-

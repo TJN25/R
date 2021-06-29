@@ -7,8 +7,8 @@ suppressMessages(library(reshape2, quietly = T, warn.conflicts = F))
 
 args = commandArgs(trailingOnly=TRUE)
 # print(args)
-id <- "GCA_000213655.1_267"
-outname <- "GCA_000222975.1_486"
+id <- "GCA_000210855.2_407"
+outname <- "GCA_000210855.2_407"
 filepath <- "~/phd/RNASeq/examples"
 
 

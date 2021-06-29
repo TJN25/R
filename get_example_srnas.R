@@ -95,6 +95,11 @@ plot_region <- function(i, adj.range = 5000, counter, dat = dat, write_data = F)
                   annotations=annot2, annotation_height=1.3)
     
     dev.off()
+    pdf(paste(filepath, "/", outname, "_example_files/", genome, "_", start_val, ".pdf %>% %>% %>% %>% %>% %>% %>% ", sep = ""))
+    plot_gene_map(dna_segs=dna_segs,
+                  annotations=annot2, annotation_height=1.3)
+    
+    dev.off()
   }else{
     plot_gene_map(dna_segs=dna_segs,
                   annotations=annot2, annotation_height=1.3)

@@ -1035,6 +1035,50 @@ run_all <- F
 if(run_all){
 datAll <- read.csv("~/phd/RNASeq/sra_run_tables.csv")
 
+filter_sra_paired <- function(x){
+  x == "PAIRED"
+}
+
+filter_sra_illumina <- function(x){
+  tolower(x) == "illumina"
+}
+filter_sra_not_cdna <- function(x){
+  tolower(x) != "cdna"
+}
+filter_sra_not_rtpcr <- function(x){
+  tolower(x) != "rt-pcr"
+}
+filter_sra_not_wgs <- function(x){
+  tolower(x) != "wgs"
+}
+filter_sra_not_wga <- function(x){
+  tolower(x) != "wga"
+}
+filter_sra_not_wca <- function(x){
+  tolower(x) != "wca"
+}
+filter_sra_not_wcs <- function(x){
+  tolower(x) != "wcs"
+}
+filter_sra_not_amplicon <- function(x){
+  tolower(x) != "amplicon"
+}
+filter_sra_not_other <- function(x){
+  tolower(x) != "other"
+}
+
+
+
+tmp <- datAll %>% filter(grepl(pattern = "RNA", x = Assay.Type))
+
+tmp <- tmp %>% filter(if_any(colnames(tmp), filter_sra_paired))
+tmp <- tmp %>% filter(if_any(colnames(tmp), filter_sra_illumina))
+
+summaryDat <- tmp %>% select(-Run, - Assay.Type, -BioSample, -Experiment, -Center.Name) %>% unique()
+
+
+
+
 assayTypes <- datAll %>% group_by(Assay.Type) %>% summarise(count = n())
 sraDatAll <- datAll %>% filter(grepl(pattern = "RNA", x = Assay.Type))
                       
@@ -1104,6 +1148,7 @@ sraDatAll <- sraDatAll %>% select(Run, Experiment, Organism, Strain, genus, Libr
 
 save(sraDatAll, file = "~/bin/r_git/R/r_files/sraDatAll.Rda")
 }
+
 
 ```
 
@@ -2849,6 +2894,9 @@ colnames(meltDat)[2] <- c("query.name")
 
 meltDat <- meltDat %>% filter(!is.na(query.genome), !is.na(target.genome))%>% group_by(target.genome, query.genome) %>% arrange(-as.numeric(distance)) %>% mutate(row_num = row_number()) %>% filter(row_num == 1) %>% select(-row_num)
 
+save(meltDat, file = "~/bin/r_git/R/r_files/distanceMelt.Rda")
+
+
 mat <- reshape2::acast(data = meltDat %>% select(target.genome, query.genome, distance), formula = target.genome ~ query.genome)
 
 distanceMat <- as.data.frame(mat)
@@ -3171,7 +3219,7 @@ The alifold score is made up of the combination of the MFE of the structure and 
 ```{bash rnaalifold_summary, eval=F}
 #done from ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/RNAALifold
 
-group="predicted"
+group="positive_control"
 cd ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/RNAALifold
 > ../${group}_alifold_score.txt;
 > ../${group}_mfe.txt;
@@ -3430,7 +3478,7 @@ rfam <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/rfam_descr
 
 ```{bash sRNA_read_depths, eval=F, include=T}
 ##Done in ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/alignments_rnaalifold
-group='predicted'
+group='positive_control'
 if [[ $group ==  'positive_control' ]];
 then
 cd ~/phd/RNASeq/srna_seqs/version_1/${group}/large_alignments/analysed_genomes/alignments
@@ -3791,6 +3839,31 @@ done
 
 ```
 
+
+```{bash check_for_matches_to_rfam, eval=F}
+
+cd ~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/alignments_rnaalifold 
+
+#mkdir -p hmmscan_out
+mkdir -p cmscan_out
+
+for file in *.stk
+do
+
+ID=`echo $file | cut -d '_' -f2- | cut -d '.' -f1,2`
+echo $ID
+
+writeseqs $ID
+
+#hmmscan --tblout hmmscan_out/${ID}.tbl ~/Downloads/Rfam.hmm ${ID}.fna > hmmscan_out/${ID}.out
+cmscan --cut_ga --rfam --nohmmonly --tblout cmscan_out/${ID}.tbl --fmt 2 --clanin ~/Downloads/Rfam.clanin.txt ~/Downloads/Rfam.cm ${ID}.fna > cmscan_out/${ID}.out
+done
+
+
+
+```
+
+
 #Process Scores
 ##summary_results 
 
@@ -3975,6 +4048,13 @@ genus_labels <- read.table("~/phd/RNASeq/contig_genus_lables.txt")
 colnames(genus_labels) <- c("target.name", "genus")
 
 pairs <- pairs %>% left_join(genus_labels)
+
+
+
+genus_name <- "Plautia"
+tmp <- pairs %>% filter(grepl(pattern = genus_name, x = genus, ignore.case = T)) %>% select(ID, genus) %>% unique()
+
+
 repDat <- pairs %>% select(ID, genus) %>% mutate(count = 1)
 mat <- reshape2::acast(repDat, formula = ID ~ genus)
 
@@ -4016,6 +4096,14 @@ sumsDat$rnaseq_count <- c(53, 22, 44, 21, 15, 33, 5, 5, 4, 2, 23, 36, 64, 5, 10,
 sumsDat <- sumsDat %>% mutate(srnas_genome_adj  = sums/genome_count, 
                               srnas_rnaseq_adj  = sums/rnaseq_count)
 
+fit <- lm(sums~rnaseq_count, data = sumsDat)
+
+summary(fit)
+
+ggplot() +
+  geom_point(data = sumsDat, aes(x = rnaseq_count, y = sums)) +
+  geom_abline(intercept = 141.679, slope = 6.991)
+
 ggplot() +
   geom_histogram(data = sumsDat, aes(x = sums), binwidth = 100)
 
@@ -4037,7 +4125,9 @@ sumsUpset <- rowSums(upsetSubsetPredicted)
 sumsDat <- data.frame(ID = row.names(upsetSubsetPredicted), sums = sumsUpset)
 upsetSubsetPC <- upsetSubsetPredicted
 
+# pred_with_IDs <- upsetSubsetPredicted
 
+# pred_with_IDs$ID <- row.names(predWith_IDs)
 
 UpSetR::upset(upsetSubsetPredicted, sets = colnames(upsetSubsetPredicted), mb.ratio = c(0.55, 0.45), order.by = "freq", keep.order = T)
 
@@ -4059,9 +4149,9 @@ dev.off()
 ```{r predicted_data_upsetr_by_category, eval=F}
 load('~/bin/r_git/R/r_files/upsetSubsetPredicted.Rda')
 
-load('~/bin/r_git/R/r_files/novel_rufs.Rda')
-load('~/bin/r_git/R/r_files/known_rufs.Rda')
-load('~/bin/r_git/R/r_files/noise_rufs.Rda')
+load('~/bin/r_git/R/r_files/novel_rufs_gz.Rda')
+load('~/bin/r_git/R/r_files/known_rufs_gz.Rda')
+load('~/bin/r_git/R/r_files/noise_rufs_gz.Rda')
 
 
 tree_order <- c("Escherichia", "Shigella", "Salmonella", "Enterobacter", "Klebsiella", "Plautia", "Citrobacter","Serratia", "Wigglesworthia", "Buchnera", "Sodalis", "Lonsdalea", "Brenneria", "Dickeya", "Edwardsiella", "Pantoea", "Erwinia", "Proteus", "Providencia", "Xenorhabdus", "Photorhabdus", "Mannheimia", "Aggregatibacter", "Alishewanella", "Actinobacillus", "Yersinia", "Vibrio", "Alteromonas", "Agarivorans", "Pseudoalteromonas", "Moritella", "Shewanella", "Psychrobacter", "Moraxella", "Acinetobacter", "Azotobacter", "Pseudomonas", "Marinobacter", "Methylomicrobium", "Methylomonas", "Cycloclasticus", "Methylococcus", "Francisella", "Pseudoxanthomonas", "Stenotrophomonas", "Xanthomonas", "Xylella", "Lysobacter", "Candidatus")
@@ -4076,6 +4166,13 @@ upsetSubsetPredicted <- upsetSubsetPredicted[,cols_order]
 sumsUpset <- rowSums(upsetSubsetPredicted)
 
 sumsDat <- data.frame(ID = row.names(upsetSubsetPredicted), sums = sumsUpset)
+
+ggplot() +
+  geom_histogram(data = sumsDat, aes(x = sums), binwidth = 1)
+
+sumsDat %>% nrow()
+sumsDat %>% filter(sums == 1) %>% nrow()
+
 
 
 novel_rufs <- novel_rufs %>% select(ID, probability)
@@ -4196,7 +4293,31 @@ upsetSubsetPC <- upsetSubsetPC[,cols_order]
 save(upsetSubsetPC, file= "~/bin/r_git/R/r_files/upsetSubsetPC.Rda")
 load("~/bin/r_git/R/r_files/upsetSubsetPC.Rda")
 
+sumsUpset <- colSums(upsetSubsetPC)
 
+sumsDat <- data.frame(ID = colnames(upsetSubsetPC), sums = sumsUpset)
+
+analysed_genomes <- c("Escherichia", "Shigella", "Salmonella", "Enterobacter", "Klebsiella","Serratia", "Edwardsiella", "Erwinia", "Photorhabdus", "Yersinia", "Alteromonas", "Acinetobacter", "Pseudomonas", "Methylomicrobium", "Stenotrophomonas", "Xanthomonas", "Xylella", "Lysobacter")
+
+cols_order <- match(analysed_genomes, sumsDat$ID)
+
+sumsDat <- sumsDat[cols_order,]
+
+
+sumsDat$genome_count <- c(6, 3, 5, 4, 3, 3, 1, 1, 2, 5, 4, 4,6, 1, 2, 3, 1, 1)
+sumsDat$rnaseq_count <- c(53, 22, 44, 21, 15, 33, 5, 5, 4, 2, 23, 36, 64, 5, 10, 20, 5, 6)
+
+fit <- lm(sums~rnaseq_count, data = sumsDat)
+
+summary(fit)
+
+ggplot() +
+  geom_point(data = sumsDat, aes(x = rnaseq_count, y = sums)) +
+  geom_abline(intercept = 49.3650, slope = 1.3336)
+
+pcSum <- colSums(upsetSubsetPC)
+
+pcSum <- as.data.frame(pcSum)
 
 UpSetR::upset(upsetSubsetPC, sets = colnames(upsetSubsetPC), mb.ratio = c(0.55, 0.45), order.by = "freq", keep.order = T)
 
@@ -4212,6 +4333,156 @@ dev.off()
 }
 
 ```
+
+```{r nc_data_upsetr}
+cumulativeDistribution <- function(dat, run.ks.test = T, alternative_pred, alternative_pc, alternative = 'two.sided', show.legend = F){
+  
+  if(missing('alternative_pred')){alternative_pred <- alternative}
+  if(missing('alternative_pc')){alternative_pc <- alternative}
+
+distsCumulativeCount <- cumulativeCounts(dists = dat, smooth = F)
+
+distsCumulativeCount <- distsCumulativeCount %>% filter(group != "Predicted Known")
+
+
+# dists_cum_count <- distsCumulativeCount
+# save(dists_cum_count, file = "~/bin/r_git/R/r_files/dists_cum_count.Rda")
+
+p <- ggplot() +
+  geom_line(data = distsCumulativeCount, aes(x= max_dist, y = cumulative_prop, group = group, colour = group), size = 2, show.legend = show.legend) + theme_classic() 
+
+pos <- dat %>% filter(group == "Positive Control")
+neg <- dat %>% filter(group == "Negative Control")
+pred <- dat %>% filter(group == "Predicted")
+
+
+if(run.ks.test == T){
+res <- ks.test(x = pred$max_dist, y = neg$max_dist, alternative = alternative_pred)
+
+print(res)
+
+
+res <- ks.test(x = pos$max_dist, y = neg$max_dist, alternative = alternative_pc)
+
+print(res)
+
+}
+return(p)
+}
+
+pairs <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/query_target_pairs.txt")
+
+pairs <- pairs[,c(1,3)]
+colnames(pairs) <- c("target.name", "ID")
+contig_labels <- read.table("~/phd/RNASeq/genome_contig_pairs.txt")
+colnames(contig_labels) <- c("target.name", "target.genome")
+pairs <- pairs %>% left_join(contig_labels, by = 'target.name')
+
+genus_labels <- read.table("~/phd/RNASeq/contig_genus_lables.txt")
+
+colnames(genus_labels) <- c("target.name", "genus")
+
+pairs <- pairs %>% left_join(genus_labels)
+
+pc_keep <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/positive_control_keep_list.txt")
+load("~/bin/r_git/R/r_files/randomForestTestDat.Rda")
+
+pc_keep <- randomForestTestDat %>% filter(group == "Negative Control") %>% select(ID)
+
+pc_keep <- pc_keep %>% mutate(keep = T)
+
+pairs <- pairs %>% left_join(pc_keep, by = "ID") %>% filter(!is.na(keep)) %>% select(-keep)
+
+repDat <- pairs %>% select(ID, genus) %>% mutate(count = 1)
+mat <- reshape2::acast(repDat, formula = ID ~ genus)
+
+
+upsetDat <- as.data.frame(mat)
+
+upsetDat$names <- row.names(upsetDat)
+upsetDat[upsetDat != 0] <- 1
+
+genus_selection <- read.table("~/bin/python_git/python_files/genera_list.txt")
+
+tmp <- genus_selection %>% dplyr::rename(genus = V1) %>% mutate(keep = T)
+
+conitgs_selected <- genus_labels %>% left_join(tmp) %>% 
+  filter(!is.na(keep)) %>% select(-keep) %>% left_join(contig_labels) %>% 
+  group_by(genus) %>% top_n(n = 1) %>% ungroup() %>% select(target.genome) %>% unique() 
+
+write_file <- F
+if(write_file){
+write.table(x = conitgs_selected, file = "~/phd/RNASeq/upsetr_genomes_list.txt", row.names = F, col.names = F, quote = F)
+}
+
+colVals<- match(x = genus_selection$V1, table = colnames(upsetDat))
+
+colVals <- colVals[!is.na(colVals)]
+
+upsetSubset <- upsetDat[,colVals]
+
+sumsUpset <- rowSums(upsetSubset)
+
+sumsDat <- data.frame(ID = row.names(upsetSubset), sums = sumsUpset)
+upsetSubsetPC <- upsetSubset
+
+
+tree_order <- c("Escherichia", "Shigella", "Salmonella", "Enterobacter", "Klebsiella", "Plautia", "Citrobacter","Serratia", "Wigglesworthia", "Buchnera", "Sodalis", "Lonsdalea", "Brenneria", "Dickeya", "Edwardsiella", "Pantoea", "Erwinia", "Proteus", "Providencia", "Xenorhabdus", "Photorhabdus", "Mannheimia", "Aggregatibacter", "Alishewanella", "Actinobacillus", "Yersinia", "Vibrio", "Alteromonas", "Agarivorans", "Pseudoalteromonas", "Moritella", "Shewanella", "Psychrobacter", "Moraxella", "Acinetobacter", "Azotobacter", "Pseudomonas", "Marinobacter", "Methylomicrobium", "Methylomonas", "Cycloclasticus", "Methylococcus", "Francisella", "Pseudoxanthomonas", "Stenotrophomonas", "Xanthomonas", "Xylella", "Lysobacter", "Candidatus")
+
+cols_order <- match(tree_order, colnames(upsetSubsetPC))
+
+cols_order[is.na(cols_order)] <- 0
+
+tmp <- data.frame(tree_order, cols_order)
+
+tmp <- tmp %>% filter(cols_order != 0)
+
+upsetSubsetNC <- upsetSubsetPC[,cols_order]
+
+save(upsetSubsetNC, file= "~/bin/r_git/R/r_files/upsetSubsetNC.Rda")
+load("~/bin/r_git/R/r_files/upsetSubsetNC.Rda")
+
+pcSum <- colSums(upsetSubsetNC)
+
+pcSum <- as.data.frame(pcSum)
+
+UpSetR::upset(upsetSubsetNC, sets = colnames(upsetSubsetNC), mb.ratio = c(0.55, 0.45), order.by = "freq", keep.order = T)
+
+load("~/bin/r_git/R/r_files/upsetSubsetNC.Rda")
+load("~/bin/r_git/R/r_files/upsetSubsetPredicted.Rda")
+load("~/bin/r_git/R/r_files/upsetSubsetPC.Rda")
+
+
+rowSumNC <- rowSums(upsetSubsetNC)
+rowSumPC <- rowSums(upsetSubsetPC)
+rowSumPredicted <- rowSums(upsetSubsetPredicted)
+
+rowSumNC <- data.frame(max_dist = rowSumNC, group = "Negative Control")
+rowSumPC <- data.frame(max_dist = rowSumPC, group = "Positive Control")
+rowSumPredicted <- data.frame(max_dist = rowSumPredicted, group = "Predicted")
+
+sumDat <- rowSumNC %>% bind_rows(rowSumPC, rowSumPredicted) %>% filter(max_dist > 0)
+
+cumulativeDistribution(dat = sumDat)
+
+
+ggplot() +
+  geom_freqpoly(data = sumDat, aes(x = max_dist, y = ..density.., group = group, color = group), binwidth = 1) +
+  xlim(min= 0, max = 10)
+
+write_data <- F
+if(write_data){
+svg(filename="~/phd/RNASeq/figures/upsetr_plot_nc.svg",
+     width=15,
+     height=10,
+     pointsize=12)
+UpSetR::upset(upsetSubsetNC, sets = colnames(upsetSubsetNC), mb.ratio = c(0.55, 0.45), order.by = "freq", keep.order = T)
+
+dev.off()
+}
+
+```
+
 
 `cd ~/phd/RNASeq`
 
@@ -4257,11 +4528,14 @@ On Macbook
 
 
 ```{r read_depths_setup, eval=F, include=T}
-ncRDepth <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/negative_control_read_depths_summary_reads.txt", as.is = T, stringsAsFactors = F)
-pcRDepth <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/positive_control_read_depths_summary.txt", as.is = T, stringsAsFactors = F)
+ncRDepth <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/negative_control_read_depths_summary_reads_v1.txt", as.is = T, stringsAsFactors = F)
+
+
+pcRDepth <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/positive_control_read_depths_summary_v1.txt", as.is = T, stringsAsFactors = F)
 predRDepth <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/predicted_read_depths_summary.txt", as.is = T, stringsAsFactors = F)
 
 predRDepthnewcalls <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/predicted_read_depths_summary_new_calls.txt", fill = T, as.is = T, stringsAsFactors = F)
+
 
 
 predRDepthnewcalls$V2 <- as.numeric(as.character(predRDepthnewcalls$V2))
@@ -4491,9 +4765,9 @@ predCov$right_pos[predCov$V1 == "no significant pairs  "] <- "-"
 predCov$V1[predCov$V1 == "no significant pairs  "] <- "-"
 
 # 
-# load("~/bin/r_git/R/r_files/ncRNAcode.Rda")
-# load("~/bin/r_git/R/r_files/pcRNAcode.Rda")
-# load("~/bin/r_git/R/r_files/predRNAcode.Rda")
+load("~/bin/r_git/R/r_files/ncRNAcode.Rda")
+load("~/bin/r_git/R/r_files/pcRNAcode.Rda")
+load("~/bin/r_git/R/r_files/predRNAcode.Rda")
 # 
 # ncRNAcode <- ncRNAcode %>% separate(col = srna, into = c("t1", "t2", "t3"), sep = "_", remove = F, extra = 'merge') %>% mutate(ID = paste(t2, t3, sep = "_")) %>% select(-t1, -t2, -t3) %>%  group_by(ID) %>% mutate(counter = row_number()) %>% filter(counter == 1) %>% select(-counter) %>% ungroup()
 # 
@@ -4523,20 +4797,25 @@ ncIDLen <- length(unique(ncCov$ID))
 pcCovMean <- pcCov %>% group_by(ID) %>% summarise(mean_score = mean(score))
 pcCovCount <- pcCov %>% group_by(ID) %>% summarise(count = n())
 pcCovMax <- pcCov %>% group_by(ID) %>% summarise(min_eval = min(e.value))
+pcCovPower <- pcCov %>% group_by(ID) %>% summarise(power = sum(power))
 pcCov <- pcCovMean %>% full_join(pcCovMax, by = "ID") %>% 
-  full_join(pcCovCount, by = "ID")
+  full_join(pcCovCount, by = "ID") %>% 
+  full_join(pcCovPower, by = "ID")
 
 ncCovMean <- ncCov %>% group_by(ID) %>% summarise(mean_score = mean(score))
 ncCovCount <- ncCov %>% group_by(ID) %>% summarise(count = n())
 ncCovMax <- ncCov %>% group_by(ID) %>% summarise(min_eval = min(e.value))
+ncCovPower <- ncCov %>% group_by(ID) %>% summarise(power = sum(power))
 ncCovRNA <- ncCovMean %>% full_join(ncCovMax, by = "ID") %>% 
-  full_join(ncCovCount, by = "ID") %>% filter(!is.na(mean_score))
+  full_join(ncCovCount, by = "ID")%>% 
+  full_join(ncCovPower, by = "ID") %>% filter(!is.na(mean_score)) 
 
 predCovMean <- predCov %>% group_by(ID) %>% summarise(mean_score = mean(score))
 predCovCount <- predCov %>% group_by(ID) %>% summarise(count = n())
 predCovMax <- predCov %>% group_by(ID) %>% summarise(min_eval = min(e.value))
-predCovRNA <- predCovMean %>% full_join(predCovMax, by = "ID") %>% 
-  full_join(predCovCount, by = "ID")
+predCovPower <- predCov %>% group_by(ID) %>% summarise(power = sum(power))
+predCovRNA <- predCovMean %>% full_join(predCovMax, by = "ID")  %>% 
+  full_join(predCovCount, by = "ID") %>% full_join(predCovPower, by = "ID")
 
 
 nc_ids <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/negative_control_alignment_ids.txt")
@@ -4682,28 +4961,27 @@ dev.off()
 ###alifold_cov
 
 ```{r alifold_cov, eval = T, include=T}
-pcCovAli <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/old/positive_control_alifold_covariation.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T, col.names = c("ID", "alifold_cov_score"))
+pcCovAli <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/positive_control_alifold_covariation.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T, col.names = c("ID", "alifold_cov_score"))
 ncCovAli <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/old/negative_control_alifold_covariation.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T, col.names = c("ID", "alifold_cov_score"))
 predCovAli <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/old/predicted_alifold_covariation.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T, col.names = c("ID", "alifold_cov_score"))
 
 
 
 
-save(pcCovAli, file = "~/bin/r_git/R/r_files/pcCovAli.Rda")
-save(ncCovAli, file = "~/bin/r_git/R/r_files/ncCovAli.Rda")
-save(predCovAli, file = "~/bin/r_git/R/r_files/predCovAli.Rda")
+# save(pcCovAli, file = "~/bin/r_git/R/r_files/pcCovAli_v2.Rda")
+# save(ncCovAli, file = "~/bin/r_git/R/r_files/ncCovAli.Rda")
+# save(predCovAli, file = "~/bin/r_git/R/r_files/predCovAli.Rda")
 
 
 
-load("~/bin/r_git/R/r_files/pcCovAli.Rda")
+load("~/bin/r_git/R/r_files/pcCovAli_v2.Rda")
 load("~/bin/r_git/R/r_files/ncCovAli.Rda")
 load("~/bin/r_git/R/r_files/predCovAli.Rda")
 
-
-
-
-
 pcCovRoc <- pcCovAli %>% mutate(response = 1) 
+
+colnames(pcCovRoc) <- c("alifold_cov_score", "ID", "response")
+pcCovRoc <- pcCovRoc %>% select(ID, alifold_cov_score, response)
 ncCovRoc <- ncCovAli %>% mutate(response = 0)
 rocData <- pcCovRoc %>% bind_rows(ncCovRoc) %>% filter(!is.na(alifold_cov_score))
 roc.curve(response = rocData$response, predicted = rocData$alifold_cov_score, 
@@ -5195,7 +5473,7 @@ if(write_data){
 ###MFE
 
 ```{r MFE, eval = T, echo=T}
-pcMFE <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/old/positive_control_mfe.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
+pcMFE <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/positive_control_mfe.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
 ncMFE <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/old/negative_control_mfe.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
 predMFE <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/old/predicted_mfe.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T)
 
@@ -5220,7 +5498,7 @@ ncMFE <- ncMFE %>% mutate(response = 0) %>%  filter(!is.na(V2))
 
 
 
-save(pcMFE, file= "~/bin/r_git/R/r_files/pcMFE.Rda")
+save(pcMFE, file= "~/bin/r_git/R/r_files/pcMFE_v2.Rda")
 save(ncMFE, file= "~/bin/r_git/R/r_files/ncMFE.Rda")
 save(predMFE, file= "~/bin/r_git/R/r_files/predMFE.Rda")
 
@@ -5229,7 +5507,7 @@ save(predMFE, file= "~/bin/r_git/R/r_files/predMFE.Rda")
 ```
 
 ```{r alifold_score, eval=F, echo=T}
-pcAlifoldScore <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/old/positive_control_alifold_score.txt",sep = "", fill = T)
+pcAlifoldScore <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/positive_control_alifold_score.txt",sep = "", fill = T)
 
 ncAlifoldScore <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/old/negative_control_alifold_score.txt",sep = "", fill = T)
 
@@ -5245,7 +5523,7 @@ colnames(ncAlifoldScore) <- c("ID", "alifold.score")
 colnames(predAlifoldScore) <- c("ID", "alifold.score")
 
 
-save(pcAlifoldScore, file= "~/bin/r_git/R/r_files/pcAlifoldScore.Rda")
+save(pcAlifoldScore, file= "~/bin/r_git/R/r_files/pcAlifoldScore_v2.Rda")
 save(ncAlifoldScore, file= "~/bin/r_git/R/r_files/ncAlifoldScore.Rda")
 save(predAlifoldScore, file= "~/bin/r_git/R/r_files/predAlifoldScore.Rda")
 
@@ -5274,25 +5552,39 @@ colnames(pcMotif) <- c("seqname", "source", "feature", "start", "end", "score", 
 colnames(ncMotif) <- c("seqname", "source", "feature", "start", "end", "score", "strand", "frame", "attribute", "ID")
 colnames(predMotif) <- c("seqname", "source", "feature", "start", "end", "score", "strand", "frame", "attribute", "ID")
 
+pcMotif <- pcMotif %>% group_by(feature, start, end, strand, ID) %>% summarise(score = max(score))
+ncMotif <- ncMotif %>% group_by(feature, start, end, strand, ID) %>% summarise(score = max(score))
+predMotif <- predMotif %>% group_by(feature, start, end, strand, ID) %>% summarise(score = max(score))
+
+
 pcMotifMean <- pcMotif %>% group_by(ID) %>% summarise(mean_score = mean(score))
 pcMotifMax <- pcMotif %>% group_by(ID) %>% summarise(max_score = max(score))
+pcMotifCount <- pcMotif %>% group_by(ID) %>% summarise(motif_count = n())
 
-pcMotif <- pcMotifMean %>% full_join(pcMotifMax, by = "ID")
+pcMotif <- pcMotifMean %>% full_join(pcMotifMax, by = "ID") %>% 
+  full_join(pcMotifCount, by = "ID")
 
 
 ncMotifMean <- ncMotif %>% group_by(ID) %>% summarise(mean_score = mean(score))
 ncMotifMax <- ncMotif %>% group_by(ID) %>% summarise(max_score = max(score))
-ncMotif <- ncMotifMean %>% full_join(ncMotifMax, by = "ID")
+ncMotifCount <- ncMotif %>% group_by(ID) %>% summarise(motif_count = n())
+
+ncMotif <- ncMotifMean %>% full_join(ncMotifMax, by = "ID")%>% 
+  full_join(ncMotifCount, by = "ID")
+
+
 
 predMotifMean <- predMotif %>% group_by(ID) %>% summarise(mean_score = mean(score))
 predMotiffMax <- predMotif %>% group_by(ID) %>% summarise(max_score = max(score))
+predMotifCount <- predMotif %>% group_by(ID) %>% summarise(motif_count = n())
 
-predMotif <- predMotifMean %>% full_join(predMotiffMax, by = "ID")
+predMotif <- predMotifMean %>% full_join(predMotiffMax, by = "ID") %>% full_join(predMotifCount, by = "ID")
 
+tmp <- predMotif %>% mutate(sum = mean_score*motif_count)
 
-save(pcMotif, file = "~/bin/r_git/R/r_files/pcMotif.Rda")
-save(ncMotif, file = "~/bin/r_git/R/r_files/ncMotif.Rda")
-save(predMotif, file = "~/bin/r_git/R/r_files/predMotif.Rda")
+save(pcMotif, file = "~/bin/r_git/R/r_files/pcMotif_2.Rda")
+save(ncMotif, file = "~/bin/r_git/R/r_files/ncMotif_2.Rda")
+save(predMotif, file = "~/bin/r_git/R/r_files/predMotif_2.Rda")
 
 ```
 
@@ -5315,11 +5607,18 @@ load("~/bin/r_git/R/r_files/pcRDepth.Rda")
 
 pcRDepthMaxs <- pcRDepth %>% dplyr::rename(ID = srna) %>% group_by(ID) %>% summarise(read.max.score  = sum(max.val))
 pcRDepthMeans <- pcRDepth %>% dplyr::rename(ID = srna) %>% group_by(ID) %>% summarise(reads.mean.score  = sum(mean.val))
+
+pcRDepthCounts <- pcRDepth %>% dplyr::rename(ID = srna) %>% group_by(ID, target.genome.accession) %>% filter(max.val > 0) %>% summarise(max.val = max(max.val)) %>% ungroup() %>% group_by(ID) %>% summarise(read.counts  = n())
+
 pcRDepth <- pcRDepthMaxs %>% full_join(pcRDepthMeans, by = "ID")
+pcRDepth <- pcRDepth %>% full_join(pcRDepthCounts, by = "ID")
 
 ncRDepthMaxs <- ncRDepth %>% dplyr::rename(ID = srna) %>% group_by(ID) %>% summarise(read.max.score  = sum(max.val))
 ncRDepthMeans <- ncRDepth %>% dplyr::rename(ID = srna) %>% group_by(ID) %>% summarise(reads.mean.score  = sum(mean.val))
+ncRDepthCounts <- ncRDepth %>% dplyr::rename(ID = srna) %>% group_by(ID, target.genome.accession) %>% filter(max.val > 0) %>% summarise(max.val = max(max.val)) %>% ungroup() %>% group_by(ID) %>% summarise(read.counts  = n())
+
 ncRDepth <- ncRDepthMaxs %>% full_join(ncRDepthMeans, by = "ID")
+ncRDepth <- ncRDepth %>% full_join(ncRDepthCounts, by = "ID")
 
 
 load("~/bin/r_git/R/r_files/pcCovariation.Rda") ##pcCov
@@ -5356,13 +5655,13 @@ ncMFE <- ncMFE %>% separate(col = V1, into = c("t1", "ID"), sep = "_", extra = "
 
 
 
-load("~/bin/r_git/R/r_files/pcMotif.Rda")
-load("~/bin/r_git/R/r_files/ncMotif.Rda")
+load("~/bin/r_git/R/r_files/pcMotif_2.Rda")
+load("~/bin/r_git/R/r_files/ncMotif_2.Rda")
 
 pcMotif <- pcMotif %>% separate(col = ID, into = c("t1", "t2"), sep = "_") %>% separate(t2, into = "ID", sep = "\\.", extra = "drop") %>% select(-t1) %>% 
-  dplyr::rename(motif.mean.score = mean_score, motif.max.score = max_score)
+  dplyr::rename(motif.mean.score = mean_score, motif.max.score = max_score, )
 
-ncMotif <- ncMotif %>% separate(col = ID, into = c("t1", "t2"), sep = "_", extra = "merge") %>% separate(t2, into = c("t3", "t4"), sep = "\\.", extra = "drop") %>% mutate(ID = paste(t3, t4, sep=".")) %>% select(ID, mean_score, max_score) %>% 
+ncMotif <- ncMotif %>% separate(col = ID, into = c("t1", "t2"), sep = "_", extra = "merge") %>% separate(t2, into = c("t3", "t4"), sep = "\\.", extra = "drop") %>% mutate(ID = paste(t3, t4, sep=".")) %>% select(ID, mean_score, max_score, motif_count) %>% 
   dplyr::rename(motif.mean.score = mean_score, motif.max.score = max_score)
 
 remaining_nc_srnas <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/negative_control_ids.txt", sep = "\t", fill =  T)
@@ -5372,6 +5671,8 @@ remaining_nc_srnas <- remaining_nc_srnas %>% dplyr::rename(ID = V1) %>% mutate(k
 
 load("~/bin/r_git/R/r_files/pcCovAli.Rda")
 load("~/bin/r_git/R/r_files/ncCovAli.Rda")
+colnames(pcCovAli) <- c("alifold_cov_score", "ID")
+
 
 pcCovAli <- pcCovAli %>% select(ID, alifold_cov_score)
 ncCovAli <- ncCovAli %>% separate(col = ID, into = c("t1", "t2"), sep = "_", extra = "merge")  %>% select(-t1) %>% mutate(ID = t2)  %>% select(ID, alifold_cov_score)
@@ -5444,8 +5745,10 @@ dat$cov.mean.score[is.na(dat$cov.mean.score)] <- 0
 dat$cov.min.eval[is.na(dat$cov.min.eval)] <- 10
 # dat$cov.combined.score[is.na(dat$cov.combined.score)] <- 0
 dat$cov.count[is.na(dat$cov.count)] <- 1
+dat$read.counts[is.na(dat$read.counts)] <- 0
 dat$motif.mean.score[is.na(dat$motif.mean.score)] <- 0
 dat$motif.max.score[is.na(dat$motif.max.score)] <- 0
+dat$motif_count[is.na(dat$motif_count)] <- 0
 dat$z_mean[is.na(dat$z_mean)] <- 10
 dat$z_max[is.na(dat$z_max)] <- 10
 dat$alifold.score[is.na(dat$alifold.score)] <- 0
@@ -5533,12 +5836,12 @@ dat <- dat %>%
 #   geom_freqpoly(data = dat %>% filter(group == "Positive Control"), aes(x = mfe.score.2, y = ..density..), binwidth = 5)
 
 
-dat <- dat %>% select(-mfe.score, -mfe.score.3, -alifold_cov_score, -alifold_cov_score.2, -alifold.score, -alifold_score.3)
+dat <- dat %>% select(-mfe.score, -mfe.score.3, -alifold_cov_score, -alifold_cov_score.2, -alifold.score, -alifold_score.3)  %>% mutate(motif.sum = motif.mean.score*motif_count)
 
-randomForestTestDat <- dat %>% dplyr::rename(alifold_cov_score = alifold_cov_score.3, mfe.score = mfe.score.2)
+randomForestTestDat <- dat %>% dplyr::rename(alifold_cov_score = alifold_cov_score.3, mfe.score = mfe.score.2) 
 
 
-save(randomForestTestDat, file = "~/bin/r_git/R/r_files/randomForestTestDat.Rda")
+save(randomForestTestDat, file = "~/bin/r_git/R/r_files/randomForestTestDat_2.Rda")
 
 
 dat <- dat %>% select(-ID) %>% unique() %>% mutate(cov.min.eval = -log(cov.min.eval),
@@ -5555,9 +5858,9 @@ dat <- dat %>% select(-ID) %>% unique() %>% mutate(cov.min.eval = -log(cov.min.e
 set.seed(101)
 randomNum <- runif(n = nrow(dat), min = 0, max = 1)
 dat$random <- randomNum
-dat3 <- dat %>% mutate(group.2 = ifelse(group == "Positive Control", 1, 0)) %>% select(-group)
+dat3 <- dat %>% mutate(group.2 = ifelse(group == "Positive Control", 1, 0)) %>% select(-group, -power)
 
-
+dat3 <- dat3 %>% filter(distance < 0.15)  %>% select(-motif_count, -read.counts)
 
 dNames <- colnames(dat3)
 pNames <- colnames(dat3)
@@ -5613,7 +5916,7 @@ dev.off()
 ```{r random_forest_setup, eval = F}
 
 load("~/bin/r_git/R/r_files/randomForestDatAll.Rda")
-load("~/bin/r_git/R/r_files/randomForestTestDat.Rda")
+load("~/bin/r_git/R/r_files/randomForestTestDat_2.Rda")
 
 replaceNAs <- function(dat){
   
@@ -5626,8 +5929,10 @@ dat$read.max.score[is.na(dat$read.max.score)] <- 0
 dat$cov.min.eval[is.na(dat$cov.min.eval)] <- 10
 # dat$cov.combined.score[is.na(dat$cov.combined.score)] <- 0
 # dat$cov.count[is.na(dat$cov.count)] <- 1
-# dat$motif.mean.score[is.na(dat$motif.mean.score)] <- 0
+dat$motif.mean.score[is.na(dat$motif.mean.score)] <- 0
 dat$motif.max.score[is.na(dat$motif.max.score)] <- 0
+dat$motif_count[is.na(dat$motif_count)] <- 0
+dat$motif.sum[is.na(dat$motif.sum)] <- 0
 # dat$z_mean[is.na(dat$z_mean)] <- 10
 dat$z_max[is.na(dat$z_max)] <- 10
 # dat$alifold.score[is.na(dat$alifold.score)] <- 0
@@ -5669,6 +5974,75 @@ rf_classifier
 save(rf_classifier, file = "~/bin/r_git/R/r_files/rf_classifier.Rda")
 ```
 
+```{r random_forest_goldilocks, eval = F}
+
+load("~/bin/r_git/R/r_files/randomForestDatAll.Rda")
+load("~/bin/r_git/R/r_files/randomForestTestDat_2.Rda")
+
+replaceNAs <- function(dat){
+  
+dat$mfe.score[is.na(dat$mfe.score)] <- 0
+dat$gc.score[is.na(dat$gc.score)] <- 50
+dat$distance[is.na(dat$distance)] <- 0
+# dat$reads.mean.score[is.na(dat$reads.mean.score)] <- 0
+dat$read.max.score[is.na(dat$read.max.score)] <- 0
+# dat$cov.mean.score[is.na(dat$cov.mean.score)] <- 0
+dat$cov.min.eval[is.na(dat$cov.min.eval)] <- 10
+# dat$cov.combined.score[is.na(dat$cov.combined.score)] <- 0
+# dat$cov.count[is.na(dat$cov.count)] <- 1
+# dat$motif.mean.score[is.na(dat$motif.mean.score)] <- 0
+dat$motif.max.score[is.na(dat$motif.max.score)] <- 0
+dat$motif_count[is.na(dat$motif_count)] <- 0
+dat$motif.sum[is.na(dat$motif.sum)] <- 0
+# dat$z_mean[is.na(dat$z_mean)] <- 10
+dat$z_max[is.na(dat$z_max)] <- 10
+# dat$alifold.score[is.na(dat$alifold.score)] <- 0
+dat$alifold_cov_score[is.na(dat$alifold_cov_score)] <- 0
+dat$read.counts[is.na(dat$read.counts)] <- 0
+# dat$alifold_cov_score[dat$alifold_cov_score > 0] <- 0
+return(dat)
+}
+
+randomForestTestDat <- replaceNAs(dat = randomForestTestDat)
+
+dat <- randomForestTestDat %>% select(-ID) %>% unique() %>% select(read.max.score, read.counts, distance, cov.min.eval, z_max, motif.max.score, alifold_cov_score, mfe.score, gc.score, srna.counts, motif.sum, group)
+set.seed(101)
+randomNum <- runif(n = nrow(dat), min = 0, max = 1)
+
+dat$random <- randomNum
+dat2 <- dat %>% mutate(group = ifelse(group == "Positive Control", 1, 0)) #%>% select(-na_count)
+
+dat2$group <- as.factor(dat2$group) 
+
+dat2[is.na(dat2)] <- 0
+
+dat2 <- dat2 %>% filter(distance < 0.15) %>% select(-read.max.score, -srna.counts, -read.counts)
+
+# dat2 <- dat2 %>% select(-cov.count, -cov.combined.score)
+
+
+
+
+colGroupNum <- match(x = "group", table = colnames(dat2))
+
+data_set_size <- floor(nrow(dat2)/2)
+indexes <- sample(1:nrow(dat2), size = data_set_size)
+
+
+training <- dat2[indexes,]
+validation1 <- dat2[-indexes,]
+save(indexes, file = "~/bin/r_git/R/r_files/indexes_gz.Rda")
+
+save(training, file = "~/bin/r_git/R/r_files/training_gz.Rda")
+save(validation1, file = "~/bin/r_git/R/r_files/validation1_gz.Rda")
+
+rf_classifier = randomForest(group ~ ., data=training, ntree=100, importance=TRUE)
+rf_classifier
+save(rf_classifier, file = "~/bin/r_git/R/r_files/rf_classifier_gz.Rda")
+```
+
+
+
 ###random_forest
 
 ```{r random_forest, eval = T}
@@ -5676,8 +6050,35 @@ load("~/bin/r_git/R/r_files/rf_classifier.Rda")
 load("~/bin/r_git/R/r_files/training.Rda")
 load("~/bin/r_git/R/r_files/validation1.Rda")
 load("~/bin/r_git/R/r_files/randomForestDatAll.Rda")
+load("~/bin/r_git/R/r_files/randomForestTestDat_2.Rda")
 
-dat <- randomForestTestDat %>% select(-ID) %>% unique() %>% select(read.max.score, distance, cov.min.eval, z_max, motif.max.score, alifold_cov_score, mfe.score, gc.score, srna.counts, group)
+replaceNAs <- function(dat){
+  
+dat$mfe.score[is.na(dat$mfe.score)] <- 0
+dat$gc.score[is.na(dat$gc.score)] <- 50
+dat$distance[is.na(dat$distance)] <- 0
+# dat$reads.mean.score[is.na(dat$reads.mean.score)] <- 0
+dat$read.max.score[is.na(dat$read.max.score)] <- 0
+# dat$cov.mean.score[is.na(dat$cov.mean.score)] <- 0
+dat$cov.min.eval[is.na(dat$cov.min.eval)] <- 10
+# dat$cov.combined.score[is.na(dat$cov.combined.score)] <- 0
+# dat$cov.count[is.na(dat$cov.count)] <- 1
+# dat$motif.mean.score[is.na(dat$motif.mean.score)] <- 0
+dat$motif.max.score[is.na(dat$motif.max.score)] <- 0
+dat$motif_count[is.na(dat$motif_count)] <- 0
+dat$motif.sum[is.na(dat$motif.sum)] <- 0
+# dat$z_mean[is.na(dat$z_mean)] <- 10
+dat$z_max[is.na(dat$z_max)] <- 10
+# dat$alifold.score[is.na(dat$alifold.score)] <- 0
+dat$alifold_cov_score[is.na(dat$alifold_cov_score)] <- 0
+dat$read.counts[is.na(dat$read.counts)] <- 0
+# dat$alifold_cov_score[dat$alifold_cov_score > 0] <- 0
+return(dat)
+}
+
+randomForestTestDat <- replaceNAs(dat = randomForestTestDat)
+
+dat <- randomForestTestDat %>% select(-ID) %>% unique() %>% select(read.max.score, distance, cov.min.eval, z_max, motif.max.score, alifold_cov_score, mfe.score, gc.score, srna.counts, motif.sum, group)
 
 set.seed(101)
 randomNum <- runif(n = nrow(dat), min = 0, max = 1)
@@ -5703,6 +6104,69 @@ dev.off()
 }
 
 ```
+
+```{r random_forest_gz_res, eval = T}
+load("~/bin/r_git/R/r_files/rf_classifier_gz.Rda")
+load("~/bin/r_git/R/r_files/training_gz.Rda")
+load("~/bin/r_git/R/r_files/validation1_gz.Rda")
+load("~/bin/r_git/R/r_files/randomForestDatAll.Rda")
+load("~/bin/r_git/R/r_files/randomForestTestDat_2.Rda")
+replaceNAs <- function(dat){
+  
+dat$mfe.score[is.na(dat$mfe.score)] <- 0
+dat$gc.score[is.na(dat$gc.score)] <- 50
+dat$distance[is.na(dat$distance)] <- 0
+# dat$reads.mean.score[is.na(dat$reads.mean.score)] <- 0
+dat$read.max.score[is.na(dat$read.max.score)] <- 0
+# dat$cov.mean.score[is.na(dat$cov.mean.score)] <- 0
+dat$cov.min.eval[is.na(dat$cov.min.eval)] <- 10
+# dat$cov.combined.score[is.na(dat$cov.combined.score)] <- 0
+# dat$cov.count[is.na(dat$cov.count)] <- 1
+dat$motif.mean.score[is.na(dat$motif.mean.score)] <- 0
+dat$motif.max.score[is.na(dat$motif.max.score)] <- 0
+dat$motif_count[is.na(dat$motif_count)] <- 0
+dat$motif.sum[is.na(dat$motif.sum)] <- 0
+# dat$z_mean[is.na(dat$z_mean)] <- 10
+dat$z_max[is.na(dat$z_max)] <- 10
+# dat$alifold.score[is.na(dat$alifold.score)] <- 0
+dat$alifold_cov_score[is.na(dat$alifold_cov_score)] <- 0
+# dat$alifold_cov_score[dat$alifold_cov_score > 0] <- 0
+return(dat)
+}
+
+randomForestTestDat <- replaceNAs(dat = randomForestTestDat)
+
+dat <- randomForestTestDat %>% filter(distance < 0.32) %>% select(-ID) %>% unique() %>% select(read.max.score, read.counts, distance, cov.min.eval, z_max, motif.max.score, alifold_cov_score, mfe.score, gc.score, srna.counts, group)
+
+set.seed(101)
+randomNum <- runif(n = nrow(dat), min = 0, max = 1)
+
+dat$random <- randomNum
+varImpPlot(rf_classifier)
+colGroupNum <- match(x = "group", table = colnames(validation1))
+# Make predictions
+prediction_for_table <- predict(rf_classifier,validation1[,-colGroupNum])
+table(observed=validation1[,colGroupNum],predicted=prediction_for_table)
+
+
+write_data <- F
+if(write_data){
+svg(filename="~/phd/RNASeq/figures/random_forest_gz.svg",
+     width=20,
+     height=20,
+     pointsize=12)
+varImpPlot(rf_classifier)
+
+
+dev.off()
+}
+
+ggplot() +
+  geom_freqpoly(data = dat, aes(x = read.counts, y = ..density.., group = group, color = group), binwidth = 3)
+
+```
+
+
 
 ###random_forest_roc
 
@@ -5734,21 +6198,23 @@ cutoffs <- data.frame(cut=perf@alpha.values[[1]], fpr=perf@x.values[[1]],
 
 ###random_forest_predicted_data
 
-```{r random_forsest_predicted_data, eval=T}
+```{r random_forsest_predicted_data, eval=F}
 replaceNAs <- function(dat){
   
 dat$mfe.score[is.na(dat$mfe.score)] <- 0
 dat$gc.score[is.na(dat$gc.score)] <- 50
 dat$distance[is.na(dat$distance)] <- 0
-dat$reads.mean.score[is.na(dat$reads.mean.score)] <- 0
+# dat$reads.mean.score[is.na(dat$reads.mean.score)] <- 0
 dat$read.max.score[is.na(dat$read.max.score)] <- 0
-dat$cov.mean.score[is.na(dat$cov.mean.score)] <- 0
+# dat$cov.mean.score[is.na(dat$cov.mean.score)] <- 0
 dat$cov.min.eval[is.na(dat$cov.min.eval)] <- 10
 # dat$cov.combined.score[is.na(dat$cov.combined.score)] <- 0
-dat$cov.count[is.na(dat$cov.count)] <- 1
+# dat$cov.count[is.na(dat$cov.count)] <- 1
 dat$motif.mean.score[is.na(dat$motif.mean.score)] <- 0
 dat$motif.max.score[is.na(dat$motif.max.score)] <- 0
-dat$z_mean[is.na(dat$z_mean)] <- 10
+dat$motif_count[is.na(dat$motif_count)] <- 0
+dat$motif.sum[is.na(dat$motif.sum)] <- 0
+# dat$z_mean[is.na(dat$z_mean)] <- 10
 dat$z_max[is.na(dat$z_max)] <- 10
 # dat$alifold.score[is.na(dat$alifold.score)] <- 0
 dat$alifold_cov_score[is.na(dat$alifold_cov_score)] <- 0
@@ -5759,16 +6225,18 @@ return(dat)
 load("~/bin/r_git/R/r_files/rf_classifier.Rda")
 load("~/bin/r_git/R/r_files/randomForestDat.Rda")
 load("~/bin/r_git/R/r_files/randomForestDatAll.Rda")
-load("~/bin/r_git/R/r_files/randomForestTestDat.Rda")
-load("~/bin/r_git/R/r_files/validation1.Rda")
-load("~/bin/r_git/R/r_files/indexes.Rda")
-
+load("~/bin/r_git/R/r_files/randomForestTestDat_2.Rda")
+load("~/bin/r_git/R/r_files/validation1_gz.Rda")
+load("~/bin/r_git/R/r_files/indexes_gz.Rda")
+load("~/bin/r_git/R/r_files/rf_classifier_gz.Rda")
 
 
 validation1 <- randomForestTestDat[-indexes,]
+
+
 validation1 <- replaceNAs(dat = validation1)
 
-validation1 <- validation1 %>% select(read.max.score, distance, cov.min.eval, z_max, motif.max.score, alifold_cov_score, mfe.score, gc.score, srna.counts, group, ID)
+validation1 <- validation1 %>% filter(distance < 0.32) %>% select(read.max.score, distance, cov.min.eval, z_max, motif.max.score, alifold_cov_score, mfe.score, gc.score, srna.counts, motif.sum, group, ID)
 
 set.seed(101)
 randomNum <- runif(n = nrow(validation1), min = 0, max = 1)
@@ -5796,8 +6264,8 @@ validation1 <- validation1 %>% select(read.max.score, distance, cov.min.eval, z_
 known_predicted <- known_predicted 
 known_predicted <-  randomForestDat  %>% left_join(known_predicted, by = "ID") %>% filter(!is.na(pred)) %>% select(-pred) %>% mutate(group = "Predicted Known") 
 
-dat <- randomForestDatAll %>% select(-ID) %>% unique() %>% select(read.max.score, distance, cov.min.eval, z_max, motif.max.score, alifold_cov_score, mfe.score, gc.score, srna.counts, group)
-datAll <- randomForestDatAll %>% select(-ID) %>% unique() %>% select(read.max.score, distance, cov.min.eval, z_max, motif.max.score, alifold_cov_score, mfe.score, gc.score, srna.counts, group)
+dat <- randomForestDatAll %>% unique() %>% mutate(motif.sum = motif.mean.score*motif_count) %>% select(read.max.score, distance, cov.min.eval, z_max, motif.max.score, alifold_cov_score, mfe.score, gc.score, srna.counts, motif.sum, group, ID)
+datAll <- randomForestDatAll %>% unique() %>% mutate(motif.sum = motif.mean.score*motif_count) %>% select(read.max.score, distance, cov.min.eval, z_max, motif.max.score, alifold_cov_score, mfe.score, gc.score, srna.counts, motif.sum, group, ID)
 set.seed(101)
 randomNum <- runif(n = nrow(dat), min = 0, max = 1)
 randomNumAll <- runif(n = nrow(datAll), min = 0, max = 1)
@@ -5806,11 +6274,13 @@ dat$random <- randomNum
 datAll$random <- randomNumAll
 
 colGroupNum <- match(x = "group", table = colnames(dat))
+colIDNum <- match(x = "ID", table = colnames(dat))
 colGroupNumAll <- match(x = "group", table = colnames(datAll))
+colIDNumAll <- match(x = "ID", table = colnames(datAll))
 # colCountNum <- match(x = "srna.counts.2", table = colnames(dat))
 
-prediction_randomForestDat <- predict(rf_classifier,dat[,-c(colGroupNum)],type="prob")
-prediction_randomForestDatAll <- predict(rf_classifier,datAll[,-c(colGroupNum)],type="prob")
+prediction_randomForestDat <- predict(rf_classifier,dat[,-c(colGroupNum, colIDNum)],type="prob")
+prediction_randomForestDatAll <- predict(rf_classifier,datAll[,-c(colGroupNum, colIDNumAll)],type="prob")
 dat$probability <- prediction_randomForestDat[,2]
 datAll$probability <- prediction_randomForestDatAll[,2]
 
@@ -5824,7 +6294,11 @@ load("~/bin/r_git/R/r_files/predRDepth.Rda")
 
 predRDepthMaxs <- predRDepth %>% dplyr::rename(ID = srna) %>% group_by(ID) %>% summarise(read.max.score  = sum(max.val))
 predDepthMeans <- predRDepth %>% dplyr::rename(ID = srna) %>% group_by(ID) %>% summarise(reads.mean.score  = sum(mean.val))
-predRDepth <- predRDepthMaxs %>% full_join(predDepthMeans, by = "ID") %>%  filter(read.max.score > 0)
+
+predRDepthCounts <- predRDepth %>% dplyr::rename(ID = srna) %>% group_by(ID, target.genome.accession) %>% filter(max.val > 0) %>% summarise(max.val = max(max.val)) %>% ungroup() %>% group_by(ID) %>% summarise(read.counts  = n())
+
+predRDepth <- predRDepthMaxs %>% full_join(predDepthMeans, by = "ID")
+predRDepth <- predRDepth %>% full_join(predRDepthCounts, by = "ID") %>%  filter(read.max.score > 0)
 
 load("~/bin/r_git/R/r_files/predCovariation.Rda") ##pcCovRNA
 
@@ -5851,7 +6325,7 @@ predMFE <- predMFE %>% dplyr::rename(ID = V1, mfe.score = V2) %>% select(ID, mfe
 
 
 
-load("~/bin/r_git/R/r_files/predMotif.Rda")
+load("~/bin/r_git/R/r_files/predMotif_2.Rda")
 
 predMotif <- predMotif %>% separate(col = ID, into = c("t1", "id"), sep = "_", extra = "merge") %>% select(-t1) %>% separate(col = id, into = c("t1", "t2"), sep = "\\.", extra = "drop")  %>% mutate(ID = paste(t1, t2, sep = ".")) %>% 
   dplyr::rename(motif.mean.score = mean_score, motif.max.score = max_score) %>% select(-t1, -t2)
@@ -5896,7 +6370,11 @@ validation1 <- validation1 %>% left_join(redundacy_counts_nc, by = "ID")
 validation1 <- validation1 %>% mutate(srna.counts.2 = ifelse(is.na(srna.counts.2), srna.counts.3, srna.counts.2))
 
 
-predDat <- predDat %>% mutate(alifold_cov_score = as.numeric(alifold_cov_score)) %>% bind_rows(known_predicted) %>% select(read.max.score, distance, cov.min.eval, z_max, motif.max.score, alifold_cov_score, mfe.score, gc.score, srna.counts, srna.counts.2, group, ID)
+predDat <- predDat %>% mutate(alifold_cov_score = as.numeric(alifold_cov_score)) 
+save(predDat, file="~/bin/r_git/R/r_files/predDat_all.Rda")
+predDat_all <- predDat
+
+predDat <- predDat%>% bind_rows(known_predicted) %>% mutate(motif.sum = motif.mean.score*motif_count) %>% select(distance, cov.min.eval, z_max, motif.max.score, alifold_cov_score, mfe.score, gc.score, srna.counts.2, motif.sum, group, ID)
 
 
 set.seed(101)
@@ -5917,11 +6395,14 @@ predDat$cov.min.eval[is.na(predDat$cov.min.eval)] <- 10
 # predDat$cov.count[is.na(predDat$cov.count)] <- 0
 # predDat$motif.mean.score[is.na(predDat$motif.mean.score)] <- 0
 predDat$motif.max.score[is.na(predDat$motif.max.score)] <- 0
+predDat$motif.sum[is.na(predDat$motif.sum)] <- 0
 # predDat$z_mean[is.na(predDat$z_mean)] <- 10
 predDat$z_max[is.na(predDat$z_max)] <- 10
 # predDat$alifold.score[is.na(predDat$alifold.score)] <- 10
 predDat$alifold_cov_score[is.na(predDat$alifold_cov_score)] <- 0
 predDat$srna.counts[is.na(predDat$srna.counts)] <- 1
+
+
 
 colGroupNum <- match(x = "group", table = colnames(predDat))
 colIDNum <- match(x = "ID", table = colnames(predDat))
@@ -5930,6 +6411,8 @@ colCountNum <- match(x = "srna.counts.2", table = colnames(predDat))
 
 prediction_for_predcited_data <- predict(rf_classifier,predDat[,-c(colIDNum, colGroupNum, colCountNum)], type = 'response')
 prob_for_predcited_data <- predict(rf_classifier,predDat[,-c(colIDNum, colGroupNum, colCountNum)], type = 'prob')
+
+prob_for_predcited_data[1:10,]
 
 predDat$probability <- prob_for_predcited_data[,2]
 
@@ -5942,18 +6425,80 @@ predDat <- predDat %>% full_join(predRNAcode, by = "ID")
 predDat$p.value[is.na(predDat$p.value)] <- 1
 
 
-save(predDat, file="~/bin/r_git/R/r_files/predDat.Rda")
-load("~/bin/r_git/R/r_files/predDat.Rda")
+save(predDat, file="~/bin/r_git/R/r_files/predDat_gz.Rda")
+load("~/bin/r_git/R/r_files/predDat_gz.Rda")
+
+predDat_all <- predDat_all %>% select(ID, read.max.score, read.counts)
+
+predDat <- predDat %>% left_join(predDat_all, by = "ID")
+
+predDat$probability[predDat$distance == 0 & predDat$z_max == 10 & predDat$motif.max.score == 0 & predDat$alifold_cov_score >= 0] <- 0
+
+predDat$probability[predDat$distance == 0 & predDat$z_max == 10  & predDat$alifold_cov_score >= 0] <- 0
+
+predDat$probability[predDat$distance == 0 & predDat$z_max == 10 & predDat$motif.max.score == 0 ] <- 0
+
+tmp <- predDat %>% arrange(-probability) %>% filter(group == "Predicted")
+
+predvrfamHMM <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/predicted_vs_rfam.res", fill = T)
+predvrfamHMM <- predvrfamHMM %>% select(V1, V2, V3, V5, V6) 
+
+predvrfamHMM <- predvrfamHMM %>% separate(V1, into = c(NA, "descr"), sep = ":", extra = "merge", remove = T) %>% filter(!is.na(descr))
+
+colnames(predvrfamHMM) <- c("descr", "rfam.id", "ruf.id", "e.value", "bit.score")
+
+predvrfamCM <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/predicted_vs_rfam_cm.res", fill = T)
+predvrfamCM <- predvrfamCM %>% select(V2, V3, V4, V18, V17) 
+colnames(predvrfamCM) <- c("descr", "rfam.id", "ruf.id", "e.value", "bit.score")
+
+predvrfam <- predvrfamHMM %>% bind_rows(predvrfamCM)
+
+
+
+predvrfam <- predvrfam %>% filter(e.value < 1e-05)
+
+predvrfamMins <- predvrfam %>% filter(e.value < 1e-05) %>% group_by(ruf.id) %>% summarise(min.eval = min(e.value)) %>% dplyr::rename(ID = ruf.id, rfam.score = min.eval)
+
+
+tmp <- predDat %>% left_join(predvrfamMins, by = "ID") %>% filter(group == "Predicted") %>% mutate(probability = ifelse(p.value > 0.05, probability, 0)) %>% arrange(-probability) %>% mutate(known = ifelse(!is.na(rfam.score), T, F)) %>% select(-random, -srna.counts, -srna.counts.2, -rfam.score) %>% mutate(d.val = ifelse(distance > 0.05, 1, 0),
+                          cov.val = ifelse(cov.min.eval < 1, 1, 0),
+                          ali.cov.val = ifelse(alifold_cov_score < -0.5, 1, 0),
+                          z.val = ifelse(z_max < -3.5, 1, 0),
+                          motif.val = ifelse(motif.max.score > 5, 1, 0),
+                          read.val = ifelse(read.max.score > 100, 1, 0)) %>% 
+  mutate(sig.features = d.val + cov.val + ali.cov.val + z.val + motif.val + read.val)
+
+
+
+write.csv(tmp, "~/phd/RNASeq/predDat.csv", quote = F, row.names = F)
+
+
+ids_to_expand <- tmp %>% filter(known == F, p.value > 0.05, read.max.score > 15, distance > 0) %>% select(ID)
+
+write.table(ids_to_expand, "~/phd/RNASeq/ids_to_expand.txt", quote = F, row.names = F, col.names = F)
+
+
+tmp <- predDat %>% mutate(d.val = ifelse(distance > 0.05, 1, 0),
+                          cov.val = ifelse(cov.min.eval < 1, 1, 0),
+                          ali.cov.val = ifelse(alifold_cov_score < -0.12, 1, 0),
+                          z.val = ifelse(z_max < -1, 1, 0),
+                          motif.val = ifelse(motif.max.score > 1, 1, 0))
+
+
+tmp <- tmp %>% mutate(all_scores = d.val + cov.val + ali.cov.val + z.val + motif.val)  %>% filter(group == "Predicted") %>% mutate(group.2 = ifelse(probability < 0.3, "noise", ifelse(probability > 0.5, "sRNA", "maybe")))
+
+ggplot() +
+  geom_point(data = tmp, aes(x = probability, y = all_scores, group = group.2, color = group.2)) 
 
 randomForestDatAll <- randomForestDatAll %>% mutate(p.value = 1)
 
-featuresSelected <- randomForestDatAll %>% unique() %>% select(read.max.score, distance, cov.min.eval, z_max, motif.max.score, alifold_cov_score, mfe.score, gc.score, srna.counts, group, p.value)
+featuresSelected <- randomForestDatAll %>% unique() %>% mutate(motif.sum = motif.mean.score*motif_count) %>% select(read.max.score, distance, cov.min.eval, z_max, motif.max.score, alifold_cov_score, mfe.score, gc.score, srna.counts, motif.sum, group, p.value)
 
-featuresSelected <- predDat %>% select(read.max.score, distance, cov.min.eval, z_max, motif.max.score, alifold_cov_score, mfe.score, gc.score, srna.counts, group, p.value) %>% bind_rows(featuresSelected) %>% 
+featuresSelected <- predDat %>% select(distance, cov.min.eval, z_max, motif.max.score, alifold_cov_score, mfe.score, gc.score, srna.counts, motif.sum, group, p.value) %>% bind_rows(featuresSelected) %>% 
   filter(!is.na(group))
 
-save(featuresSelected, file="~/bin/r_git/R/r_files/featuresSelected.Rda")
-load("~/bin/r_git/R/r_files/featuresSelected.Rda")
+save(featuresSelected, file="~/bin/r_git/R/r_files/featuresSelected_gz.Rda")
+load("~/bin/r_git/R/r_files/featuresSelected_gz.Rda")
 
 # redundacy_counts_pc <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/alignments_rnaalifold/positive_control_counts.txt")
 
@@ -5962,13 +6507,26 @@ load("~/bin/r_git/R/r_files/featuresSelected.Rda")
 # validation1 <- validation1 %>% left_join(redundacy_counts_pc, by = "ID")
 
 validatation2 <- validation1
-save(validatation2, file="~/bin/r_git/R/r_files/validatation2.Rda")
-load("~/bin/r_git/R/r_files/validatation2.Rda")
+save(validatation2, file="~/bin/r_git/R/r_files/validatation2_gz.Rda")
+load("~/bin/r_git/R/r_files/validatation2_gz.Rda")
+
+write.csv(datAll %>% filter(group == "Positive Control") %>% arrange(probability) %>% select( -random, -gc.score), "~/phd/RNASeq/datAll.csv", quote = F, row.names = F)
+
+datAll <- read.csv("~/phd/RNASeq/datAll.csv")
+
+table(datAll$keep[datAll$read.max.score > 0])
+
+datAll <- datAll %>% mutate(keep = ifelse(probability < 0.5, ifelse(keep == "y", F, T), T)) %>% filter(keep, read.max.score > 0)
 
 load("~/bin/r_git/R/r_files/randomForestClassified.Rda")
 
 
+tmp <- randomForestDatAll %>% select(ID, read.counts)
 
+validatation3 <- validatation2 %>% left_join(tmp, by = "ID")
+
+ggplot() +
+  geom_point(data = validatation3, aes(x = probability, y = read.counts, group = group, color = group)) 
 
 predCounts <- predDat %>% filter(group == "Predicted") %>% group_by(probability) %>% summarise(count = sum(srna.counts.2, na.rm = T)) %>% arrange(probability) %>% ungroup()  %>% mutate(num = as.integer(probability*100)) %>% tidyr::complete(num = seq(from = 0, to = 100, by = 1), fill = list(count = 0)) %>% mutate(probability = num/100) %>% select(-num)
 
@@ -5978,28 +6536,11 @@ pcAllCounts <- datAll %>% filter(group == "Positive Control")  %>% group_by(prob
 
 pcCounts <- validatation2 %>% filter(group == "Positive Control")  %>% group_by(probability) %>% summarise(count = n()) %>% arrange(probability) %>% ungroup()  %>% mutate(num = as.integer(probability*100)) %>% tidyr::complete(num = seq(from = 0, to = 100, by = 1), fill = list(count = 0)) %>% mutate(probability = num/100) %>% select(-num) %>% filter(!is.na(probability))
 
-ncCounts <- validatation2 %>% filter(group == "Negative Control")  %>% group_by(probability) %>% summarise(count = sum(srna.counts.2, na.rm = T)) %>% arrange(probability) %>% ungroup()  %>% mutate(num = as.integer(probability*100)) %>% tidyr::complete(num = seq(from = 0, to = 100, by = 1), fill = list(count = 0)) %>% mutate(probability = num/100) %>% select(-num)%>% filter(!is.na(probability))
+ncCounts <- datAll %>% filter(group == "Negative Control")  %>% group_by(probability) %>% summarise(count = sum(srna.counts.2, na.rm = T)) %>% arrange(probability) %>% ungroup()  %>% mutate(num = as.integer(probability*100)) %>% tidyr::complete(num = seq(from = 0, to = 100, by = 1), fill = list(count = 0)) %>% mutate(probability = num/100) %>% select(-num)%>% filter(!is.na(probability))
 
 ncTotal <- validatation2 %>% filter(group == "Negative Control") %>% nrow()
-pcTotal <- randomForestClassified %>% filter(group == "Positive Control") %>% nrow()
+pcTotal <- datAll %>% filter(group == "Positive Control") %>% nrow()
 predTotal <- predDat %>% nrow()
-
-ncSig <- validatation2 %>% filter(group == "Negative Control", probability > 0.15)   %>% nrow()
-pcSig <- randomForestClassified %>% filter(group == "Positive Control", probability > 0.15)   %>% nrow()
-predSig <- predDat %>% filter(group == "Predicted", probability > 0.15)   %>% nrow()
-
-ncSigHalf <- validatation2 %>% filter(group == 0, probability > 0.5)   %>% nrow()
-pcSigHalf <- randomForestClassified %>% filter(group == "Positive Control", probability > 0.5)   %>% nrow()
-predSigHalf <- predDat %>% filter(group == "Predicted", probability > 0.5) %>% nrow()
-
-
-ncSig/ncTotal
-pcSig/pcTotal
-predSig/predTotal
-
-ncSigHalf/ncTotal
-pcSigHalf/pcTotal
-predSigHalf/predTotal
 
 TSPred <- zoo::zoo(predCounts$count)
 TSPC <- zoo::zoo(pcCounts$count)
@@ -6009,16 +6550,16 @@ TSNC <- zoo::zoo(ncCounts$count)
 
 
 smoothPred <- zoo::rollapply(TSPred, width = 10, by = 1, FUN = mean, align = "center", partial = T) ##these values might need to be changed
-smoothPC <- zoo::rollapply(TSPC, width = 10, by = 1, FUN = mean, align = "center", partial = T) ##these values might need to be changed
-smoothPCall <- zoo::rollapply(TSPCall, width = 10, by = 1, FUN = mean, align = "center", partial = T) ##these values might need to be changed
+smoothPC <- zoo::rollapply(TSPC, width = 25, by = 1, FUN = mean, align = "center", partial = T) ##these values might need to be changed
+smoothPCall <- zoo::rollapply(TSPCall, width = 25, by = 1, FUN = mean, align = "center", partial = T) ##these values might need to be changed
 
-smoothNC <- zoo::rollapply(TSNC, width = 10, by = 1, FUN = mean, align = "center", partial = T) ##these values might need to be changed
+smoothNC <- zoo::rollapply(TSNC, width = 25, by = 1, FUN = mean, align = "center", partial = T) ##these values might need to be changed
 
 predTotal <- sum(predDat$srna.counts.2[predDat$group == "Predicted"], na.rm = T)
 # pcTotal <- sum(validation1$srna.counts.2[validation1$group == "Positive Control"], na.rm = T)
 # ncTotal <- sum(validation1$srna.counts.2[validation1$group == "Negative Control"], na.rm = T)
 
-pcTotal <- validatation2 %>% filter(group == "Positive Control") %>% nrow()
+pcTotal <- datAll %>% filter(group == "Positive Control") %>% nrow()
 ncTotal <- validatation2 %>% filter(group == "Negative Control") %>% nrow()
 pcAllTotal <- datAll %>% filter(group == "Positive Control") %>% nrow()
 # predTotal <- validation1 %>% filter(group == "Positive Control") %>% nrow()
@@ -6038,17 +6579,16 @@ smoothDat <- smoothPred %>% bind_rows(smoothPC, smoothNC)
 
 smoothDat$y[smoothDat$y == 0] <- min(smoothDat$y[smoothDat$y != 0])
 
-smoothDat$y[smoothDat$y < 0.0010893246] <- 0.0010893246
+smoothDat2 <- smoothDat
+
+smoothDat2$y[smoothDat2$y < 8e-4] <- 8e-4
 
 
-randomForestDistribution <- smoothDat
+randomForestDistribution <- smoothDat2
 
-save(randomForestDistribution, file = "~/bin/r_git/R/r_files/randomForestDistribution.Rda")
+save(randomForestDistribution, file = "~/bin/r_git/R/r_files/randomForestDistribution_gz.Rda")
 
-load("~/bin/r_git/R/r_files/randomForestDistribution.Rda")
-
-
-
+load("~/bin/r_git/R/r_files/randomForestDistribution_gz.Rda")
 
 p <- ggplot() +
   geom_path(data = randomForestDistribution, aes(x = x, y = y, group = group, color = group))  +
@@ -6069,7 +6609,7 @@ p
 
 write_data <- F
 if(write_data){
-ggsave(filename = "~/phd/RNASeq/figures/probabilites_rf_log.svg", plot = p)
+ggsave(filename = "~/phd/RNASeq/figures/probabilites_rf_log_gz.svg", plot = p)
 }
 # 
 # predDat2 <- predMFE %>% 
@@ -6103,8 +6643,10 @@ ggsave(filename = "~/phd/RNASeq/figures/probabilites_rf_log.svg", plot = p)
 ##Distributions
 
 ```{r cumulative_distributions, eval=T}
-load("~/bin/r_git/R/r_files/featuresSelected.Rda")
+load("~/bin/r_git/R/r_files/featuresSelected_gz.Rda")
+featuresSelected <- featuresSelected %>% filter(distance < 0.15)
 
+load("~/bin/r_git/R/r_files/predDat_gz.Rda")
 load("~/bin/r_git/R/r_files/ncRDepth.Rda")
 ncRDepthMaxs <- ncRDepth %>% dplyr::rename(ID = srna) %>% group_by(ID) %>% summarise(read.max.score  = sum(max.val))
 ncRDepthMeans <- ncRDepth %>% dplyr::rename(ID = srna) %>% group_by(ID) %>% summarise(reads.mean.score  = sum(mean.val))
@@ -6152,43 +6694,79 @@ return(p)
 
 colnames(featuresSelected)
 
-dat <- featuresSelected %>% dplyr::rename(max_dist = distance)
+
+dat <- featuresSelected %>% mutate(cov.min.eval = -log(cov.min.eval)) %>% mutate(cov.min.eval = ifelse(cov.min.eval < 0, 0, cov.min.eval)) %>% mutate(alifold_cov_score = -alifold_cov_score) %>% mutate(alifold_cov_score = ifelse(alifold_cov_score < 0, 0, alifold_cov_score)) %>% mutate(z_max = ifelse(z_max > 0, 0.1, -z_max)) %>% 
+  mutate(max_dist = alifold_cov_score + z_max + motif.max.score) %>% filter(p.value > 0.05, group != "Predicted Known")
+
+cumulativeDistribution(dat, show.legend = T, run.ks.test = F) +
+    scale_y_continuous(trans = "log10")
+
+
+
+dat <- featuresSelected %>% dplyr::rename(max_dist = distance) %>% filter(p.value > 0.05)
 distance.p <- cumulativeDistribution(dat, alternative = "two.sided")
 distance.p <- distance.p +
-   labs(y = "Cumulative Proportion", x = "Evolutionary distance")
+   labs(y = "Cumulative Proportion", x = "Evolutionary distance") +
+  scale_y_continuous(trans = "log10")
     # distance.p
 
-dat <- featuresSelected %>% select(group, read.max.score) %>% filter(group != "Negative Control") %>% bind_rows(ncRDepth) %>% dplyr::rename(max_dist = read.max.score) %>% filter(max_dist < 100000)
-reads.p <- cumulativeDistribution(dat, alternative = 'two.sided') 
+dat <- featuresSelected %>% select(group, read.max.score) %>% filter(group != "Negative Control") %>% bind_rows(ncRDepth) %>% dplyr::rename(max_dist = read.max.score) %>% filter(max_dist > 0)
+
+reads.p <- cumulativeDistribution(dat, alternative = 'two.sided', show.legend = F) 
 reads.p <- reads.p +
-   labs(y = "Cumulative Proportion", x = "Total reads")
+   labs(y = "Cumulative Proportion", x = "Total reads") +
+  scale_x_continuous(trans = "log10") 
+
+
+
+#reads.p
+
 
 dat <- featuresSelected %>% mutate(max_dist = -log(cov.min.eval)) %>% mutate(max_dist = ifelse(max_dist < 0, 0, max_dist))
+
+
+
 rscape.p <- cumulativeDistribution(dat)
 rscape.p <- rscape.p +
-   labs(y = "Cumulative Proportion", x = "Rscape covariance score")
+   labs(y = "Cumulative Proportion", x = "Rscape covariance score") +
+  scale_y_continuous(trans = "log10")
 # rscape.p
 
-dat <- featuresSelected %>% mutate(max_dist = ifelse(z_max == 10, -3, -z_max))
-z.p <- cumulativeDistribution(dat)
+dat <- featuresSelected %>% mutate(max_dist = ifelse(z_max == 10, 0.1, -z_max))  %>% filter(group != "Predicted", group != "Predicted Known") %>% select(group, max_dist) 
+dat <- predDat  %>% mutate(max_dist = ifelse(z_max == 10, 0.1, -z_max))  %>% filter(group != "Predicted Known") %>% select(group, max_dist)  %>% bind_rows(dat)
+
+
+
+z.p <- cumulativeDistribution(dat, show.legend = F)
 z.p <- z.p +
-   labs(y = "Cumulative Proportion", x = "Alifold z-score (negative energy)")
+   labs(y = "Cumulative Proportion", x = "Alifold z-score (negative energy)") +
+  scale_y_continuous(trans = "log10") +
+  scale_x_continuous(trans = "log10")
+  
 # z.p
 
-dat <- featuresSelected %>% dplyr::rename(max_dist = motif.max.score)
+tmp <- featuresSelected %>% mutate(present = ifelse(motif.max.score > 1, T, F)) %>% filter(group != "Predicted Known")
+
+tab <- with(tmp, table(present, group))
+
+prop.table(tab, 2)
+
+dat <- featuresSelected %>% dplyr::rename(max_dist = motif.sum) %>% filter(max_dist < 1000)
 motif.p <- cumulativeDistribution(dat)
 motif.p <- motif.p +
    labs(y = "Cumulative Proportion", x = "Motif score")
 
-dat <- featuresSelected %>% mutate(max_dist = -alifold_cov_score)
+dat <- featuresSelected %>% mutate(max_dist = -alifold_cov_score) %>% mutate(max_dist = ifelse(max_dist < 0, 0, max_dist))
 alifold.cov.p <- cumulativeDistribution(dat)
 alifold.cov.p <- alifold.cov.p +
-   labs(y = "Cumulative Proportion", x = "Alifold covariance score")
+   labs(y = "Cumulative Proportion", x = "Alifold covariance score") +
+  scale_y_continuous(trans = "log10")
 
 dat <- featuresSelected %>% mutate(max_dist = -mfe.score)
 mfe.p <- cumulativeDistribution(dat, alternative = 'two.sided')
 mfe.p <- mfe.p +
-   labs(y = "Cumulative Proportion", x = "MFE score (negative energy)")
+   labs(y = "Cumulative Proportion", x = "MFE score (negative energy)") +
+  scale_y_continuous(trans = "log10")
 
 
 
@@ -6245,7 +6823,9 @@ res <- ks.test(x = pos$gc.score, y = neg$gc.score, alternative = 'two.sided')
 
 print(res)
 
-all.p <- ggarrange(distance.p, reads.p, mfe.p, z.p, rscape.p, alifold.cov.p, counts.p,  motif.p, gc.p + rremove("x.text"),  
+
+
+all.p <- ggarrange(distance.p, reads.p, mfe.p, z.p, rscape.p, alifold.cov.p,  motif.p, gc.p + rremove("x.text"),  
           labels = LETTERS[1:9],
           ncol = 3, nrow = 3)
 
@@ -6253,7 +6833,7 @@ all.p <- ggarrange(distance.p, reads.p, mfe.p, z.p, rscape.p, alifold.cov.p, cou
 
 run_all <- F
 if(run_all){
-ggsave(filename = "~/phd/RNASeq/figures/all_distributions.svg", plot = all.p, width = 450, height = 307, units = "mm")
+ggsave(filename = "~/phd/RNASeq/figures/all_distributions_log_2.svg", plot = all.p, width = 450, height = 307, units = "mm")
 
   
   # ggsave(filename = "~/phd/RNASeq/figures/distance.svg", plot = distance.p)
@@ -6267,10 +6847,18 @@ ggsave(filename = "~/phd/RNASeq/figures/all_distributions.svg", plot = all.p, wi
 # ggsave(filename = "~/phd/RNASeq/figures/alifold_cov.svg", plot = alifold.cov.p)
 }
 
+
+
+
+
+
+
+
+
 ```
 
 ```{r precision_and_sensitivity, eval=F}
-load("~/bin/r_git/R/r_files/featuresSelected.Rda")
+load("~/bin/r_git/R/r_files/featuresSelected_gz.Rda")
 
 load("~/bin/r_git/R/r_files/ncRDepth.Rda")
 ncRDepthMaxs <- ncRDepth %>% dplyr::rename(ID = srna) %>% group_by(ID) %>% summarise(read.max.score  = sum(max.val))
@@ -6282,11 +6870,11 @@ colnames(ncSRNACounts) <- c("srna.counts", "ID")
 
 ncSRNACounts <- ncSRNACounts %>% mutate(group = "Negative Control") %>% select(group, srna.counts)
 
-load("~/bin/r_git/R/r_files/rf_classifier.Rda")
+load("~/bin/r_git/R/r_files/rf_classifier_gz.Rda")
 load("~/bin/r_git/R/r_files/randomForestDat.Rda")
 load("~/bin/r_git/R/r_files/randomForestDatAll.Rda")
-load("~/bin/r_git/R/r_files/validatation2.Rda")
-load("~/bin/r_git/R/r_files/indexes.Rda")
+load("~/bin/r_git/R/r_files/validatation2_gz.Rda")
+load("~/bin/r_git/R/r_files/indexes_gz.Rda")
 
 validatation1 <- validatation2
 
@@ -6299,7 +6887,11 @@ validation1 <- validatation1 %>% left_join(known_predicted, by = "ID")
 validation1 <- validation1 %>% mutate(p.value = 1) %>% select(read.max.score, distance, cov.min.eval, z_max, motif.max.score, alifold_cov_score, mfe.score, gc.score, srna.counts, group, ID, random, probability, p.value)
 
 
-load("~/bin/r_git/R/r_files/predDat.Rda")
+load("~/bin/r_git/R/r_files/predDat.Rda") 
+tmp <- predDat %>% select(ID, read.max.score)
+
+load("~/bin/r_git/R/r_files/predDat_gz.Rda")
+predDat <- predDat %>% left_join(tmp, by = "ID")
 
 predDat <- predDat %>% select(read.max.score, distance, cov.min.eval, z_max, motif.max.score, alifold_cov_score, mfe.score, gc.score, srna.counts, srna.counts.2, group, ID, random, probability, p.value)
 
@@ -6308,7 +6900,7 @@ probDat <- validation1 %>% bind_rows(predDat)
 ggplot() + 
   geom_freqpoly(data = probDat, aes(x = probability, y = ..density.., group = group, color = group), binwidth = 0.01)
 
-load("~/bin/r_git/R/r_files/featuresSelected.Rda")
+load("~/bin/r_git/R/r_files/featuresSelected_gz.Rda")
 
 set.seed(101)
 randomNum <- runif(n = nrow(featuresSelected), min = 0, max = 1)
@@ -6359,6 +6951,10 @@ neg_distance
 TP <- pos_distance$pos.count[pos_distance$group == "Positive Control"]
 FP <- pos_distance$pos.count[pos_distance$group == "Negative Control"]
 
+if(length(FP) == 0){
+  FP <- 0
+}
+
 FN <- neg_distance$pos.count[neg_distance$group == "Positive Control"]
 TN <- neg_distance$pos.count[neg_distance$group == "Negative Control"]
   
@@ -6377,36 +6973,88 @@ print(paste("FPR:", round(FP/(FP + TN), 3))) #FPR
 }
 colnames(featuresSelected)
 
-featuresSelected <- featuresSelected %>% filter(p.value > 0.05)
 
-score_summary(cuttoff = 0.186786, column = "distance")
-score_summary(cuttoff = 100, column = "read.max.score")
+featuresSelected <- featuresSelected %>% filter(p.value > 0.05) 
+
+score_summary(cuttoff = 0.05, column = "distance", dat = featuresSelected %>% filter(p.value > 0.012) %>% filter(distance < 0.15))
+score_summary(cuttoff = 100, column = "read.max.score",dat = featuresSelected %>% filter(p.value > 0.012) %>% filter(distance < 0.15))
+score_summary(cuttoff = 100, column = "read.max.score", dat = predDat)
 score_summary(cuttoff = 10, column = "srna.counts")
-score_summary(cuttoff = 3.5, column = "z_max", dat = featuresSelected %>% mutate(z_max  =-z_max))
+score_summary(cuttoff = 3.5, column = "z_max", dat = featuresSelected %>% filter(p.value > 0.012) %>% filter(distance < 0.15) %>%  mutate(z_max  =-z_max))
 
-score_summary(cuttoff = 0.2, column = "probability", dat = randomForestDatAll)
-score_summary(cuttoff = 0.2, column = "probability", dat = featuresSelected)
-score_summary(cuttoff = 0.2, column = "probability", dat = validatation2)
-score_summary(cuttoff = 0.5, column = "probability")
-score_summary(cuttoff = 0.8, column = "probability")
+score_summary(cuttoff = 0.3, column = "probability", dat = randomForestDatAll)
+score_summary(cuttoff = 0.3, column = "probability", dat = featuresSelected %>% filter(p.value > 0.05))
+score_summary(cuttoff = 0.3, column = "probability", dat = validatation2)
+score_summary(cuttoff = 0.3, column = "probability", dat = predDat%>% filter(p.value > 0.05))
+score_summary(cuttoff = 0.3, column = "probability")
+score_summary(cuttoff = 0.3, column = "probability")
 
-novel_rufs <- probDat %>% filter(group == "Predicted", probability >= 0.2, probability <= 0.8)
-known_rufs <- probDat %>% filter(group == "Predicted", probability > 0.8)
-noise_rufs <- probDat %>% filter(group == "Predicted", probability < 0.2)
+validatation2 %>% filter(probability > 0.3, group == "Positive Control") %>% nrow()
+
+
+predDat %>% filter(p.value > 0.05, probability < 0.3, group == "Predicted") %>% nrow()
+
+
+valueSelect <- function(dat, column, group_val, cutoff){
+  dat <- dat %>% filter(group == group_val)
+  colVal <- match(column, colnames(dat))
+  tmpPos <- dat[dat[,colVal] > cutoff,]
+  tmpNeg <- dat[dat[,colVal] <= cutoff,]
+  tmpPos <- tmpPos %>% filter(!is.na(group))
+  tmpNeg <- tmpNeg %>% filter(!is.na(group))
+  
+  pos_rate <- nrow(tmpPos)/(nrow(tmpPos) + nrow(tmpNeg))
+  neg_rate <- 1 -  pos_rate
+  
+  print(pos_rate)
+  print(nrow(tmpPos))
+}
+valueSelect(dat = featuresSelected %>% filter(distance < 0.15), group = "Negative Control", column = "distance", cutoff = 0.05)
+
+valueSelect(dat = featuresSelected %>% filter(p.value > 0.012) %>% filter(distance < 0.15, read.max.score != 0), group_val = "Positive Control", column = "read.max.score", cutoff = 100)
+
+valueSelect(dat = featuresSelected %>% filter(p.value > 0.012) %>% filter(distance < 0.15) %>%  mutate(z_max  =-z_max), group = "Negative Control", column = "z_max", cutoff = 3.5)
+
+
+valueSelect(dat = featuresSelected %>% filter(p.value > 0.5) %>% filter(distance < 0.15), group = "Negative Control", column = "probability", cutoff = 0.3)
+
+tmp <- predDat %>% filter(group == "Predicted") %>% mutate(group.2 = ifelse(probability < 0.3, "noise", ifelse(probability > 0.5, "sRNA", "maybe")))
+
+ggplot() +
+  geom_point(data = tmp, aes(x = probability, y = read.max.score, group = group.2, color = group.2)) +
+  scale_y_continuous(trans = 'log10')
+
+novel_rufs <- predDat %>% filter(group == "Predicted", probability >= 0.3, probability <= 0.5)
+known_rufs <- predDat %>% filter(group == "Predicted", probability > 0.5)
+noise_rufs <- predDat %>% filter(group == "Predicted", probability < 0.3)
 
 novelCount <- nrow(novel_rufs)
 knownCount <- nrow(known_rufs)
 noiseCount <- nrow(noise_rufs)
-allCount <- probDat %>% filter(group == "Predicted") %>% nrow()
+allCount <- predDat %>% filter(group == "Predicted") %>% nrow()
 
 
 novelCount/allCount
 knownCount/allCount
 noiseCount/allCount
 
-save(novel_rufs, file = "~/bin/r_git/R/r_files/novel_rufs.Rda")
-save(known_rufs, file = "~/bin/r_git/R/r_files/known_rufs.Rda")
-save(noise_rufs, file = "~/bin/r_git/R/r_files/noise_rufs.Rda")
+save(novel_rufs, file = "~/bin/r_git/R/r_files/novel_rufs_gz.Rda")
+save(known_rufs, file = "~/bin/r_git/R/r_files/known_rufs_gz.Rda")
+save(noise_rufs, file = "~/bin/r_git/R/r_files/noise_rufs_gz.Rda")
+
+load('~/bin/r_git/R/r_files/novel_rufs.Rda')
+load('~/bin/r_git/R/r_files/known_rufs.Rda')
+load('~/bin/r_git/R/r_files/noise_rufs.Rda')
+
+
+ggplot() + 
+  geom_freqpoly(data = noise_rufs, aes(x = gc.score, y = ..density..), binwidth = 10, color = 'red') + 
+  geom_freqpoly(data = known_rufs, aes(x = gc.score, y = ..density..), binwidth = 10, color = 'blue') +
+  geom_freqpoly(data = novel_rufs, aes(x = gc.score, y = ..density..), binwidth = 10, color = 'green')
+
+ggplot() + 
+  geom_freqpoly(data = featuresSelected, aes(x = motif.max.score, y = ..density.., group = group, color = group), binwidth = 1)
+
 
 pos_distance <- probDat %>% filter(probability > 0.5) %>% group_by(group) %>% summarise(pos.count = n())
 neg_distance <- probDat %>% filter(probability <= 0.5) %>% group_by(group) %>% summarise(pos.count = n())
@@ -6448,7 +7096,281 @@ featuresSelected %>% filter(probability > 0.8, group == "Predicted", p.value > 0
 ```
 
 
+```{r, eval=F}
+load("~/bin/r_git/R/r_files/distanceMelt.Rda")
 
+contig_labels <- read.table("~/phd/RNASeq/genome_contig_pairs.txt")
+colnames(contig_labels) <- c("target.name", "target.genome")
+
+taxa <- read.csv("~/phd/RNASeq/gammaproteobacteria_taxonomy.csv")
+
+taxa <- taxa %>% select(Genus, Order, Family) %>% 
+  dplyr::rename(target.genus = Genus, target.order = Order, target.family = Family)
+
+genus_labels <- read.table("~/phd/RNASeq/contig_genus_lables.txt")
+
+colnames(genus_labels) <- c("target.name", "target.genus")
+
+genus_labels <- genus_labels %>% left_join(contig_labels) %>% select(-target.name)
+
+genus_labels <- genus_labels %>% unique()
+
+genus_labels <- genus_labels %>% left_join(taxa) %>% filter(!is.na(target.family)) %>% unique()
+
+
+meltDat <- meltDat %>% select(target.genome, query.genome, distance) %>% group_by(target.genome, query.genome) %>% summarise(distance = max(distance)) %>% ungroup()
+
+genomes_analysed <- read.table("~/phd/RNASeq/analysed_genomes_list.txt", as.is = T, stringsAsFactors = F)
+colnames(genomes_analysed) <- c("target.genome")
+genomes_analysed <- genomes_analysed %>% unique()
+
+meltDat_analysed_1 <- genomes_analysed %>% left_join(meltDat, by = "target.genome")
+colnames(genomes_analysed) <- c("query.genome")
+
+meltDat_analysed <- genomes_analysed %>% left_join(meltDat_analysed_1, by = "query.genome")
+
+
+load(file = "~/bin/r_git/R/r_files/featuresSelected_v2.Rda")
+
+load("~/bin/r_git/R/r_files/randomForestDatAll.Rda")
+
+
+max_dists_pc <- randomForestDatAll %>% filter(group == "Positive Control", read.max.score > 1)
+p <- ggplot() +
+  geom_histogram(data = meltDat, aes(x = distance, y=..count../sum(..count..)), binwidth = 0.01) +
+  geom_histogram(data = meltDat_analysed, aes(x = distance, y=..count../sum(..count..)), fill = "blue", binwidth = 0.01) +
+  geom_freqpoly(data = max_dists_pc, aes(x = distance, y=..count../sum(..count..)), binwidth = 0.04) +
+  # geom_vline(xintercept = 0.01) +
+  # geom_vline(xintercept = 0.05) +
+  xlim(min = 0, max = 0.6) +
+    theme_bw()
+p
+
+ggsave(filename = "~/phd/thesis_figures/SVG/distances_srnas_and_genomes_2.svg", plot = p, width = 180, height = 83, units = "mm")
+
+
+df1 <- data.frame(x1 = c(0.01, 0.05, 0.15), x2 = c(0.063, 0.18,  0.24), y1 = c(1, 0.5, 0), y2 = c(1, 0.5, 0), group = c("Genus", "Family", "Order"))
+
+df2 <- data.frame(x1 = c(0.01, 0.05, 0.15), x2 = c(0.063, 0.18,  0.24), y1 = c(1, 0.5, 0), y2 = c(1, 0.5, 0), group = c("Genus", "Family", "Order"))
+
+  ggplot() +
+   geom_segment(aes(x = x1, y = y1, xend = x2, yend = y2, colour = group), data = df1, size = 3)
+
+
+p
+ggsave(filename = "~/phd/RNASeq/figures/distances_srnas_and_genomes.svg", plot = p, width = 450, height = 450, units = "mm")
+
+meltDat <- meltDat %>% left_join(genus_labels, by = "target.genome")
+
+genus_labels <- genus_labels %>% 
+  dplyr::rename(query.genome = target.genome, 
+                query.genus = target.genus,
+                query.family = target.family, 
+                query.order = target.order) 
+meltDat <- meltDat %>% left_join(genus_labels, by = "query.genome")
+
+meltDat[1:10,]
+
+minsGenus <- meltDat %>% group_by(target.genus, query.genus) %>% 
+  summarise(min_dist = min(distance)) %>% 
+  mutate(same.taxa = ifelse(target.genus == query.genus, T, F))
+
+maxsGenus <- meltDat %>% group_by(target.genus, query.genus) %>% 
+  summarise(max_dist = max(distance)) %>% 
+  mutate(same.taxa = ifelse(target.genus == query.genus, T, F))
+
+meansGenus <- meltDat %>% group_by(target.genus, query.genus) %>% 
+  summarise(mean_dist = mean(distance)) %>% 
+  mutate(same.taxa = ifelse(target.genus == query.genus, T, F))
+
+minsFamily <- meltDat %>% group_by(target.family, query.family) %>% 
+  summarise(min_dist = min(distance)) %>% 
+  mutate(same.taxa = ifelse(target.family == query.family, T, F))
+
+maxsFamily <- meltDat %>% group_by(target.family, query.family) %>% 
+  summarise(max_dist = max(distance))  %>% 
+  mutate(same.taxa = ifelse(target.family == query.family, T, F))
+
+meansFamily <- meltDat %>% group_by(target.family, query.family) %>% 
+  summarise(mean_dist = mean(distance))  %>% 
+  mutate(same.taxa = ifelse(target.family == query.family, T, F))
+
+
+minsOrder <- meltDat %>% group_by(target.order, query.order) %>% 
+  summarise(min_dist = min(distance)) %>% 
+  mutate(same.taxa = ifelse(target.order == query.order, T, F))
+
+maxsOrder <- meltDat %>% group_by(target.order, query.order) %>% 
+  summarise(max_dist = max(distance))  %>% 
+  mutate(same.taxa = ifelse(target.order == query.order, T, F))
+
+meansOrder <- meltDat %>% group_by(target.order, query.order) %>% 
+  summarise(mean_dist = mean(distance))  %>% 
+  mutate(same.taxa = ifelse(target.order == query.order, T, F))
+
+
+dat = maxsGenus
+
+genus_list <- c("Pseudomonas", "Enterobacter", "Serratia", "Klebsiella", "Escherichia")
+
+family_list <- c("Enterobacteriaceae", "Pseudomonadaceae", "Erwiniaceae", "Alteromonadaceae")
+
+order_list <- c("Enterobacterales", "Xanthomonadales")
+
+
+sd_range <- function(dat, n.of.sds = 2, select_list, use.order.list = T){
+  
+  colnames(dat) <- c("target", "query", "max_dist", "same.taxa")
+  if(use.order.list){
+dat <- dat %>% filter(same.taxa == T, target %in% select_list)
+  }else{
+  dat <- dat %>% filter(same.taxa == T)
+}
+mean_val <- mean(dat$max_dist)
+sd_val <- sd(dat$max_dist)
+min_val <- min(dat$max_dist)
+max_val <- max(dat$max_dist)
+
+
+print(paste("Min:", min_val, "Max:", max_val))
+
+print(paste(n.of.sds, "sd (lower):", (mean_val - sd_val*n.of.sds), n.of.sds, "sd (upper):", (mean_val + sd_val*n.of.sds)))
+}
+
+sd_range(dat = maxsGenus, select_list = genus_list, n.of.sds = 1)
+sd_range(dat = maxsFamily, select_list = family_list, n.of.sds = 1)
+sd_range(dat = maxsOrder %>% filter(target.order %in% c("Pseudomonadales", "Thiotrichales") == F), select_list = order_list, n.of.sds = 1, use.order.list = F)
+
+genus1 <- maxsGenus %>% ungroup() %>% filter(same.taxa, max_dist > 0) %>% select(max_dist) %>% mutate(group = "Genus")
+family1 <- maxsFamily %>% ungroup() %>% filter(same.taxa, max_dist > 0) %>% select(max_dist) %>% mutate(group = "Family")
+order1 <- maxsOrder %>% ungroup() %>% filter(same.taxa, max_dist > 0, target.order %in% c("Pasteurellaceae", "Pasteurellales", "Vibrionaceae") == F) %>% select(max_dist) %>% mutate(group = "Order")
+
+maxs1 <- genus1 %>% bind_rows(family1, order1)
+
+p <- ggplot() +
+geom_boxplot(data = maxs1 , aes(x = group, y = max_dist, fill = group)) + coord_flip()
+ 
+ggsave(filename = "~/phd/RNASeq/figures/distances_taxa_box_plot_small.svg", plot = p, width = 450, height = 450, units = "mm")
+
+assembly_summary <- read.table("~/phd/RNASeq/assembly_summary.txt", sep = "\t", fill = T, quote = "", comment.char = "")
+assembly_summary <- assembly_summary %>% select(V1, V5, V6, V7, V8, V18, V20, V12)
+colnames(assembly_summary) <- c("accession.1", "type", "taxid", "species taxid", "species", "accession.2", "genome_link", "assembly.type")
+
+accession_list <- meltDat %>% select(target.genome) %>% unique() %>% dplyr::rename(accession.1 = target.genome)
+
+accession_list <- accession_list %>% left_join(assembly_summary)
+
+taxid_list <- accession_list %>% select(taxid) %>% unique() %>% filter(!is.na(taxid))
+
+write.table(taxid_list, file= "~/phd/RNASeq/taxid_list.txt", quote = F, row.names = F, col.names = F)
+
+taxa_names <- read.table("~/phd/RNASeq/all_taxonomy_names_formatted.txt", sep = ":", header = F, fill = T)
+
+taxa_names <- taxa_names %>% separate(col = V1, into = c(NA, "Kingdom", "Phylum", "Class", "Order", "Family", "Genus"), sep = ";", remove = T, extra = 'drop') %>% dplyr::rename(taxid = V2)
+
+gca_taxa_names <- genus_labels %>%  dplyr::rename(accession.1 = target.genome, Genus = target.genus, Family = target.family, Order = target.order) %>% mutate(Kingdom = "Bacteria", Phylum = "Proteobacteria", Class = "Gammaproteobacteria") %>% select(accession.1, Kingdom, Phylum, Class, Order, Family, Genus)
+
+accession_list <- accession_list %>% filter(!is.na(accession.2)) %>% left_join(taxa_names) 
+
+all_dists <- meltDat %>% select(target.genome, query.genome, distance)
+
+gcf_gcf <- all_dists %>% filter(grepl("GCF", target.genome), grepl("GCF", query.genome))
+gcf_gca <- all_dists %>% filter(grepl("GCF", target.genome), grepl("GCA", query.genome))
+gca_gcf <- all_dists %>% filter(grepl("GCA", target.genome), grepl("GCF", query.genome))
+gca_gca <- all_dists %>% filter(grepl("GCA", target.genome), grepl("GCA", query.genome))
+
+
+
+tmp <- accession_list %>% dplyr::rename(target.genome = accession.1) %>% 
+  select(-type, -taxid, -`species taxid`, -species, -accession.2, -genome_link, -assembly.type)
+
+gcf_gcf <- gcf_gcf %>% left_join(tmp)
+
+tmp <- accession_list %>% dplyr::rename(query.genome = accession.1) %>% 
+  select(-type, -taxid, -`species taxid`, -species, -accession.2, -genome_link, -assembly.type)
+gcf_gcf <- gcf_gcf %>% left_join(tmp, by = "query.genome")
+
+
+
+
+
+
+tmp <- accession_list %>% dplyr::rename(target.genome = accession.1) %>% 
+  select(-type, -taxid, -`species taxid`, -species, -accession.2, -genome_link, -assembly.type)
+
+gcf_gca <- gcf_gca %>% left_join(tmp)
+
+tmp <- gca_taxa_names %>% dplyr::rename(query.genome = accession.1) 
+gcf_gca <- gcf_gca %>% left_join(tmp, by = "query.genome")
+
+
+
+
+tmp <- gca_taxa_names %>% dplyr::rename(target.genome = accession.1)
+
+gca_gcf <- gca_gcf %>% left_join(tmp)
+
+tmp <- accession_list %>% dplyr::rename(query.genome = accession.1) %>% 
+  select(-type, -taxid, -`species taxid`, -species, -accession.2, -genome_link, -assembly.type)
+gca_gcf <- gca_gcf %>% left_join(tmp, by = "query.genome")
+
+
+
+tmp <- gca_taxa_names %>% dplyr::rename(target.genome = accession.1) 
+
+gca_gca <- gca_gca %>% left_join(tmp)
+
+tmp <- gca_taxa_names %>% dplyr::rename(query.genome = accession.1)
+gca_gca <- gca_gca %>% left_join(tmp, by = "query.genome")
+
+all_dists <- gcf_gcf %>% bind_rows(gcf_gca, gca_gcf, gca_gca)
+
+
+maxsGenus <- all_dists %>% group_by(Genus.x, Genus.y) %>% 
+  summarise(max_dist = max(distance)) %>% 
+  mutate(same.taxa = ifelse(Genus.x == Genus.y, T, F))
+
+maxsFamily <- all_dists %>% group_by(Family.x, Family.y) %>% 
+  summarise(max_dist = max(distance)) %>% 
+  mutate(same.taxa = ifelse(Family.x == Family.y, T, F))
+
+maxsOrder <- all_dists %>% group_by(Order.x, Order.y) %>% 
+  summarise(max_dist = max(distance)) %>% 
+  mutate(same.taxa = ifelse(Order.x == Order.y, T, F))
+
+maxsClass <- all_dists %>% group_by(Class.x, Class.y) %>% 
+  summarise(max_dist = max(distance)) %>% 
+  mutate(same.taxa = ifelse(Class.x == Class.y, T, F))
+
+maxsPhylum <- all_dists %>% group_by(Phylum.x, Phylum.y) %>% 
+  summarise(max_dist = max(distance)) %>% 
+  mutate(same.taxa = ifelse(Phylum.x == Phylum.y, T, F))
+
+maxsKingdom <- all_dists %>% group_by(Kingdom.x, Kingdom.y) %>% 
+  summarise(max_dist = max(distance)) %>% 
+  mutate(same.taxa = ifelse(Kingdom.x == Kingdom.y, T, F))
+
+
+
+
+
+
+
+genus1 <- maxsGenus %>% ungroup() %>% filter(same.taxa, max_dist > 0) %>% select(max_dist) %>% mutate(group = "Genus")
+family1 <- maxsFamily %>% ungroup() %>% filter(same.taxa, max_dist > 0) %>% select(max_dist) %>% mutate(group = "Family")
+order1 <- maxsOrder %>% ungroup() %>% filter(same.taxa, max_dist > 0) %>% select(max_dist) %>% mutate(group = "Order")
+class1 <- maxsClass %>% ungroup() %>% filter(same.taxa, max_dist > 0) %>% select(max_dist) %>% mutate(group = "Class")
+phylum1 <- maxsPhylum %>% ungroup() %>% filter(same.taxa, max_dist > 0) %>% select(max_dist) %>% mutate(group = "Phylum")
+kingdom1 <- maxsKingdom %>% ungroup() %>% filter(same.taxa, max_dist > 0) %>% select(max_dist) %>% mutate(group = "Kingdom")
+
+
+maxs1 <- genus1 %>% bind_rows(family1, order1, class1, phylum1, kingdom1)
+
+p <- ggplot() +
+geom_boxplot(data = maxs1 , aes(x = group, y = max_dist, fill = group)) + coord_flip()
+ p
+ggsave(filename = "~/phd/RNASeq/figures/distances_taxa_box_plot.svg", plot = p, width = 450, height = 450, units = "mm")
+```
 
 ##ROC
 
@@ -6487,7 +7409,7 @@ dists <- max_dists_pred %>% bind_rows(max_dists_pc, max_dists_nc) %>% dplyr::ren
 
 head(dists)
 
-rocData <- dists %>% filter(group != "Predicted") %>% mutate(response = ifelse(group == "Positive Control", 1, 0))
+rocData <- dists %>% filter(group != "Predicted") %>% mutate(response = ifelse(group == "Positive Control", 1, 0)) %>% filter(max_dist < 0.15)
 roc.curve(response = rocData$response, predicted = rocData$max_dist,
           main="ROC curve for Maximum Phylogenetic Distance")
 
@@ -6524,13 +7446,22 @@ load("~/bin/r_git/R/r_files/ncRDepth.Rda")
 load("~/bin/r_git/R/r_files/pcRDepth.Rda")
 load("~/bin/r_git/R/r_files/predRDepth.Rda")
 
-pcRDepth <- pcRDepth %>% mutate(response = 1) %>% filter(max.val > 0)
-ncRDepth <- ncRDepth %>% mutate(response = 0)
-rocData <- pcRDepth %>% bind_rows(ncRDepth) 
+load( file = "~/bin/r_git/R/r_files/max_dists_pred.Rda")
+load(file = "~/bin/r_git/R/r_files/max_dists_pc.Rda")
+load(file = "~/bin/r_git/R/r_files/max_dists_nc.Rda")
+
+max_dists_pc <- max_dists_pc %>% separate(col = id, into = c("ID", "t2"), sep = "\\.")  %>% select(-t2)  %>% left_join(pc_keep, by = "ID") %>% filter(!is.na(keep)) %>% select(-keep) %>% dplyr::rename(srna = ID)
+
+max_dists_nc <-  max_dists_nc %>% separate(col = id, into = c(NA, "srna"), sep = "_", extra = "merge", remove = T) %>% select(-complete)
+
+
+pcRDepth <- pcRDepth %>% mutate(response = 1) %>% filter(max.val > 0) %>% left_join(max_dists_pc, by = "srna")
+ncRDepth <- ncRDepth %>% mutate(response = 0)  %>% left_join(max_dists_nc, by = "srna")
+rocData <- pcRDepth %>% bind_rows(ncRDepth) %>% filter(distance < 0.15)
 
 rocDataMaxMax <- rocData %>% group_by(srna, response) %>% summarise(max.max.val = max(max.val))
 rocDataMeanSum <- rocData %>% group_by(srna, response) %>% summarise(max.max.val = sum(mean.val))
-rocDataMaxSum <- rocData %>% group_by(srna, response) %>% summarise(max.max.val = sum(max.val))
+rocDataMaxSum <- rocData %>% group_by(srna, response) %>% summarise(max.max.val = sum(max.val)) 
 
 
 
@@ -6570,12 +7501,21 @@ load("~/bin/r_git/R/r_files/pcAlifold.Rda")
 load("~/bin/r_git/R/r_files/ncAlifold.Rda")
 load("~/bin/r_git/R/r_files/predAlifold_v2.Rda")
 
-pcAlifold <- pcAlifold %>% mutate(response = 1) %>% filter(STDV > 0) %>% unique()
-ncAlifold <- ncAlifold %>% mutate(response = 0)
+
+load( file = "~/bin/r_git/R/r_files/max_dists_pred.Rda")
+load(file = "~/bin/r_git/R/r_files/max_dists_pc.Rda")
+load(file = "~/bin/r_git/R/r_files/max_dists_nc.Rda")
+
+max_dists_pc <- max_dists_pc  %>% dplyr::rename(ID = id)
+max_dists_nc <-  max_dists_nc %>% dplyr::rename(ID = id)
+
+
+pcAlifold <- pcAlifold %>% separate(col = ID, into = c(NA, "id"), sep = "_", extra = "merge", remove = T) %>% dplyr::rename(ID = id) %>% mutate(response = 1) %>% filter(STDV > 0) %>% unique() %>% left_join(max_dists_pc, by = "ID")
+ncAlifold <- ncAlifold %>% mutate(response = 0) %>% left_join(max_dists_nc, by = "ID")
 
 
 
-rocData <- pcAlifold %>% bind_rows(ncAlifold)
+rocData <- pcAlifold %>% bind_rows(ncAlifold) %>% filter(distance < 0.15)
 rocData <- rocData[!is.na(rocData$z_mean),] 
 rocData <- rocData[!is.na(rocData$z_max),] 
 
@@ -6604,11 +7544,17 @@ load("~/bin/r_git/R/r_files/ncCovariation.Rda")
 load("~/bin/r_git/R/r_files/predCovariation.Rda")
 load("~/bin/r_git/R/r_files/featuresSelected.Rda")
 
+load( file = "~/bin/r_git/R/r_files/max_dists_pred.Rda")
+load(file = "~/bin/r_git/R/r_files/max_dists_pc.Rda")
+load(file = "~/bin/r_git/R/r_files/max_dists_nc.Rda")
+
+max_dists_pc <- max_dists_pc %>% separate(col = id, into = c("ID", "t2"), sep = "\\.") 
+max_dists_nc <-  max_dists_nc  %>% separate(col = id, into = c(NA, "ID"), sep = "_", extra = "merge")
 
  
-pcCov <- pcCov %>% mutate(response = 1) 
-ncCovRNA <- ncCovRNA %>% mutate(response = 0)
-rocData <- pcCov %>% bind_rows(ncCovRNA) %>% mutate(combined_score = count * mean_score) %>% filter(!is.na(combined_score))
+pcCov <- pcCov %>% separate(col = ID, into = c("ID", NA), sep = "_", extra = "drop")  %>% mutate(response = 1) %>% left_join(max_dists_pc, by = "ID")
+ncCovRNA <- ncCovRNA %>% mutate(response = 0) %>% left_join(max_dists_nc, by = "ID")
+rocData <- pcCov %>% bind_rows(ncCovRNA) %>% mutate(combined_score = count * mean_score) %>% filter(!is.na(combined_score), distance < 0.15)
 roc.curve(response = rocData$response, predicted = rocData$min_eval, 
           main="ROC curve for Covariation Scores")
 
@@ -6643,7 +7589,7 @@ load("~/bin/r_git/R/r_files/featuresSelected.Rda")
 
 pcCovRoc <- featuresSelected %>% filter(group == "Positive Control") %>% mutate(response = 1) 
 ncCovRoc <- featuresSelected %>% filter(group == "Negative Control") %>% mutate(response = 0) 
-rocData <- pcCovRoc %>% bind_rows(ncCovRoc) %>% filter(!is.na(alifold_cov_score)) 
+rocData <- pcCovRoc %>% bind_rows(ncCovRoc) %>% filter(!is.na(alifold_cov_score), distance < 0.15) 
 roc.curve(response = rocData$response, predicted = rocData$alifold_cov_score, 
           main="ROC curve for Alifold Covariation Scores")
 
@@ -6674,14 +7620,19 @@ load("~/bin/r_git/R/r_files/predGCrf.Rda")
 load("~/bin/r_git/R/r_files/pcGCrf.Rda")
 load("~/bin/r_git/R/r_files/ncGCrf.Rda")
 
-pcGC <- pcGCrf 
-ncGC <- ncGCrf 
-predGC <- predGCrf 
 
-pcGC <- pcGCrf %>% mutate(response = 1)
-ncGC <- ncGCrf %>% mutate(response = 0)
+load( file = "~/bin/r_git/R/r_files/max_dists_pred.Rda")
+load(file = "~/bin/r_git/R/r_files/max_dists_pc.Rda")
+load(file = "~/bin/r_git/R/r_files/max_dists_nc.Rda")
 
-rocData <- pcGC %>% bind_rows(ncGC)
+max_dists_pc <- max_dists_pc %>% dplyr::rename(ID = id)
+max_dists_nc <-  max_dists_nc  %>% separate(col = id, into = c(NA, "ID"), sep = "_", extra = "merge")
+
+pcGC <- pcGCrf %>% left_join(max_dists_pc, by = "ID")%>% mutate(response = 1)
+ncGC <- ncGCrf %>% left_join(max_dists_nc, by = "ID")%>% mutate(response = 0)
+
+
+rocData <- pcGC %>% bind_rows(ncGC) %>% filter(distance < 0.15)
 
 roc.curve(response = rocData$response, predicted = rocData$gc.percent,
           main="ROC curve for GC%")
@@ -6707,7 +7658,7 @@ load("~/bin/r_git/R/r_files/featuresSelected.Rda")
 
 pcCovRoc <- featuresSelected %>% filter(group == "Positive Control") %>% mutate(response = 1) 
 ncCovRoc <- featuresSelected %>% filter(group == "Negative Control") %>% mutate(response = 0) 
-rocData <- pcCovRoc %>% bind_rows(ncCovRoc) %>% filter(!is.na(mfe.score)) 
+rocData <- pcCovRoc %>% bind_rows(ncCovRoc) %>% filter(!is.na(mfe.score), distance < 0.15) 
 
 roc.curve(response = rocData$response, predicted = rocData$mfe.score,
           main="ROC curve for MFE")
@@ -6732,16 +7683,24 @@ dev.off()
 
 ```{r motifs_roc, eval = T}
 
-load("~/bin/r_git/R/r_files/pcMotif.Rda")
-load("~/bin/r_git/R/r_files/ncMotif.Rda")
-load("~/bin/r_git/R/r_files/predMotif.Rda")
+load("~/bin/r_git/R/r_files/pcMotif_2.Rda")
+load("~/bin/r_git/R/r_files/ncMotif_2.Rda")
+load("~/bin/r_git/R/r_files/predMotif_2.Rda")
 
-ncMotif <- ncMotif %>% mutate(response = 0)
-pcMotif <- pcMotif %>% mutate(response = 1)
 
-rocData <- pcMotif %>% bind_rows(ncMotif)
+load( file = "~/bin/r_git/R/r_files/max_dists_pred.Rda")
+load(file = "~/bin/r_git/R/r_files/max_dists_pc.Rda")
+load(file = "~/bin/r_git/R/r_files/max_dists_nc.Rda")
 
-roc.curve(response = rocData$response, predicted = rocData$max_score,
+max_dists_pc <- max_dists_pc %>% separate(col = id, into = c("ID", NA), sep = "\\.") 
+max_dists_nc <-  max_dists_nc  %>% separate(col = id, into = c(NA, "ID"), sep = "_", extra = "merge")
+
+ncMotif <- ncMotif %>% mutate(response = 0)%>% separate(col = ID, into = c("t1", "t2", NA, NA), sep = "\\.", remove = T) %>% mutate(id = paste(t1, t2, sep= "."))%>% separate(col = id, into = c(NA, "ID"), sep = "_", extra = "merge", remove = T) %>% select(ID, response, max_score, mean_score, motif_count) %>% left_join(max_dists_nc, by = "ID")
+pcMotif <- pcMotif %>% mutate(response = 1) %>% separate(col = ID, into = c("id", NA, NA), sep = "\\.") %>% separate(col = id, into = c(NA, "ID"), sep = "_", extra = "merge") %>% select(ID, response, max_score, mean_score, motif_count) %>% left_join(max_dists_pc, by = "ID")
+
+rocData <- pcMotif %>% bind_rows(ncMotif) %>% filter(distance < 0.15) %>% mutate(motif_sum = motif_count*mean_score)
+
+roc.curve(response = rocData$response, predicted = rocData$motif_sum,
           main="ROC curve for motifs")
 
 write_data <- F
@@ -6789,6 +7748,24 @@ dev.off()
 ```
 
 ##Examples
+
+
+```{r, eval=F}
+
+load("~/bin/r_git/R/r_files/predDat_without_reads.Rda")
+
+predNoReads <- predDat
+load("~/bin/r_git/R/r_files/predDat_v2.Rda")
+
+cds_ids <- predDat %>% filter(p.value < 0.05) %>% select(ID)
+
+write.table(cds_ids, file = "~/phd/RNASeq/examples/genes/cds_ids.txt", quote = F, col.names = F, row.names = F)
+predDat <- predDat %>% select(ID, probability, read.max.score, distance, cov.min.eval, alifold_cov_score, z_max, motif.max.score, srna.counts, mfe.score, p.value)
+
+
+tmp <- predDat %>% filter(grepl(pattern = "GCA_", ID), cov.min.eval < 1, p.value > 0.05, motif.max.score > 5, z_max < -1, probability > 0.5) %>% select(ID)
+```
+
 
 -   GCA_000835925.1_174 RF01675
 
@@ -7230,6 +8207,62 @@ ggplot() +
 ```
 
 
+
+
+
+##upsetr high probability only
+
+```{r, eval=F}
+load("~/bin/r_git/R/r_files/featuresSelected.Rda")
+
+
+
+```
+
+
+##Other figures
+```{r, eval=F}
+pred <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/seqs_count.txt", fill = T)
+pc <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/seqs_count.txt", fill = T)
+nc <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/seqs_count.txt", fill = T)
+
+load("~/bin/r_git/R/r_files/randomForestDatAll.Rda")
+load("~/bin/r_git/R/r_files/predDat_all.Rda")
+
+control_ids <- randomForestDatAll %>% 
+  mutate(keep = ifelse(group == "Positive Control", ifelse(read.max.score > 15, T, F), T)) %>% select(ID, keep) %>% unique() 
+pred_ids <- predDat_all %>% select(ID) %>% unique()%>%
+  mutate(keep = T)
+
+pred <- pred %>% dplyr::rename(ID = V1, count = V2) %>% 
+  left_join(pred_ids, by = "ID") %>% filter(!is.na(keep)) %>% 
+  mutate(group = "Predicted")
+pc <- pc %>% dplyr::rename(ID = V1, count = V2) %>% 
+  left_join(control_ids, by = "ID") %>% filter(keep) %>% 
+  mutate(group = "Positive Control")
+nc <- nc %>% dplyr::rename(ID = V1, count = V2) %>% 
+  left_join(control_ids, by = "ID") %>% filter(keep) %>% 
+  mutate(group = "Negative Control")
+
+counts <- pred %>% bind_rows(pc, nc)
+
+decay = data.frame(x = c(1:100))
+# decay <- decay %>% mutate(y = exp(-0.5x))
+ggplot() +
+  geom_line(data = decay, aes(x = x, y = exp(-x)), color = 'blue') +
+  geom_line(data = decay, aes(x = x, y = exp(-2*x)), color = "red") +
+  geom_line(data = decay, aes(x = x, y = exp(-0.5*x)))
+
+  
+p <- ggplot() +
+  geom_freqpoly(data = counts, aes(x = count, y = ..density.., group = group, color = group), binwidth = 1) +
+  scale_x_continuous(trans = "log10", limits = c(1, NA)) +
+  theme_bw()
+
+ggsave(filename = "~/phd/RNASeq/figures/counts_distribution.svg", plot = p)
+}
+  
+```
 
 #Scripts
 
@@ -9920,5 +10953,50 @@ do
 sed 's/  /__/g' $file | sed 's/ /--/g' | sed 's/__/ /g' | tr -s ' ' | sed 's/ --/ /g' | sed 's/-- / /g' | sed 's/--!/ !/g' | tr ' ' '\t' | sed 's/--/_/g' > $file.formatted.tblout
 
 done
+
+```
+
+
+
+###other
+
+```{r eval=F}
+load("~/bin/r_git/R/r_files/sraDatAll.Rda")
+colnames(sraDatAll)
+
+sraDat <- sraDatAll %>% filter(LibraryLayout == "PAIRED")
+
+genusCount <- sraDat %>% group_by(genus) %>% summarise(genus.count =  n())
+
+genomeCount <- sraDat %>% group_by(Organism, genus) %>% summarise(count =  n()) %>% arrange(-count)
+
+genomeCount <- genomeCount %>% full_join(genusCount)
+
+```
+
+```{r, eval=F}
+dat_1 <- read.csv("~/Downloads/SraRunInfo_1.csv")
+
+tmp_1 <- dat_1 %>% select(ReleaseDate, Run)  %>% mutate(ReleaseDate = as.Date(ReleaseDate), count = 1, Run = as.character(Run))
+
+
+dat_2 <- read.csv("~/Downloads/SraRunInfo.csv")
+length(unique(dat_2$Experiment))
+
+
+tmp_2 <- dat_2 %>% select(ReleaseDate, Run)  %>% mutate(ReleaseDate = as.Date(ReleaseDate), count = 1, Run = as.character(Run))
+
+
+rnaseq <-tmp_1 %>% bind_rows(tmp_2) %>% unique() %>% arrange(ReleaseDate)
+
+ggplot(rnaseq, aes(x=ReleaseDate, y=cumsum(count))) + geom_line()
+
+
+imgvr <- data.frame(ReleaseDate = c())
+
+mgrast <- data.frame(ReleaseDate = c(2000))
+
+
++ scale_y_continuous(trans = "log10")
 
 ```
