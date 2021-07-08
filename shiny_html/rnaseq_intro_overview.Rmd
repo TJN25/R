@@ -1,0 +1,1007 @@
+---
+title: "rnaseq_intro_and_overview"
+author: "Thomas Nicholson"
+date: "06/07/2021"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    number_sections: true
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(warn = -1) 
+#  suppressMessages(library(comparativeSRA))
+library(tidyverse)
+library(VennDiagram)
+library(shiny)
+library(ggplot2)
+library(gplots)
+library(viridis)
+library(RColorBrewer)
+library(stringi)
+# library(plyr)
+library(devtools)
+# library(tidyr)
+library(shinyjs)
+library(shinyWidgets)
+library(DT)
+library(lubridate)
+library(dplyr)
+library(svglite)
+library(genoPlotR)
+library(drake)
+library(ape)
+library(Biostrings)
+library(ggtree)
+#  library(treeio)
+library(geiger)
+library(ROSE)
+library(reshape2)
+library(igraph)
+library("viridis") 
+library(randomForest)
+library(ROCR)
+library(corrplot)
+library(kableExtra)
+library(reticulate)
+library(rjson)
+library(GenomicRanges)
+library(comparativeSRA)
+library(ggpubr)
+filePath <- "~/phd/RNASeq/r_files/"
+#  use_python("/Users/thomasnicholson/anaconda3/bin/python")
+#  use_condaenv("comparativesrna")
+source('~/bin/r_git/R/render_toc.R')
+```
+
+```{r functions, include=F}
+plotKnownvsConserved <- function(dat, columns, not_zero = F){
+  dat <- dat%>%mutate(conserved = F)
+if(not_zero){
+  for(i in 1:nrow(dat)){
+    dat[i, ncol(dat)] <- ("1" %in% dat[i, columns])
+    if(dat[i, ncol(dat)] == F){
+    dat[i, ncol(dat)] <- ("0-1" %in% dat[i, columns])
+    }
+
+  }
+}else{
+  for(i in 1:nrow(dat)){
+    dat[i, ncol(dat)] <- ("1" %in% dat[i, columns])
+  }
+}
+
+
+  conservedSet <- dat%>%filter(conserved)
+  knownSet <- dat%>%filter(new_feature == F)
+
+  vennSet <- conservedSet%>%bind_rows(knownSet)%>%unique()
+
+
+
+  area1 <- nrow(subset(vennSet, conserved == T))
+  area2 <- nrow(subset(vennSet, new_feature == F))
+  cross.area <- nrow(subset(vennSet, new_feature == F & conserved == T))
+
+  grid.newpage()
+  draw.pairwise.venn(area1 = area1, area2 = area2, cross.area = cross.area, fill = c("blue", "red"),
+                     scaled = T,
+                     #cat.default.pos= "text",
+                     #cat.pos = c(-50, 50),
+                     #category = c("Conserved and Expressed", "Known")
+                     category = c("", "")
+  )
+}
+
+assignConservationLevel <- function(ids_lookup, main_col = 7, genera_col, species_col, any_col = c(7:ncol(ids_lookup))){
+  ids_lookup <- ids_lookup%>%mutate(type = "")
+  for(i in 1:nrow(ids_lookup)){
+    if("1" %in% ids_lookup[i, main_col]){
+      ids_lookup[i, ncol(ids_lookup)] <- "Family_1"
+    }else if("0-1" %in% ids_lookup[i, main_col]){
+      ids_lookup[i, ncol(ids_lookup)] <- "Family_0-1"
+    }else if("1" %in% ids_lookup[i, genera_col]){
+      ids_lookup[i, ncol(ids_lookup)] <- "Genera_1"
+    }else if("0-1" %in% ids_lookup[i, genera_col]){
+      ids_lookup[i, ncol(ids_lookup)] <- "Genera_0-1"
+    }else if("1" %in% ids_lookup[i, species_col]){
+      ids_lookup[i, ncol(ids_lookup)] <- "Species_1"
+    }else if("0-1" %in% ids_lookup[i, species_col]){
+      ids_lookup[i, ncol(ids_lookup)] <- "Species_0-1"
+    }else if("1" %in% ids_lookup[i, any_col]){
+      ids_lookup[i, ncol(ids_lookup)] <- "Species_1"
+    }else if("0-1" %in% ids_lookup[i, any_col]){
+      ids_lookup[i, ncol(ids_lookup)] <- "Species_0-1"
+    }
+
+  }
+  return(ids_lookup)
+}
+firstup <- function(x) {
+  substr(x, 1, 1) <- toupper(substr(x, 1, 1))
+  x
+}
+
+cumulativeCounts <- function(dists, smooth = T){
+
+  groups <- unique(dists$group)
+  for(i in groups){
+    dat <- dists %>% filter(group == i)
+    dat <- dat %>% mutate(count = 1) %>% 
+    arrange(-max_dist) %>% group_by(group) %>% 
+    mutate(cumulativeCount = cumsum(count)) %>% ungroup() %>% 
+    group_by(group, max_dist) %>% summarise(cumulative_prop = max(cumulativeCount)/ nrow(dat))
+    
+    if(smooth){
+      dat <- as.data.frame(spline(x = dat$max_dist,y =  dat$cumulative_prop))
+    }
+    dat <- dat %>% ungroup() %>% mutate(group = i)
+    if(exists('combinedDat')){
+      combinedDat <- combinedDat %>% bind_rows(dat)
+    }else{
+      combinedDat <- dat 
+    }
+  }
+  return(combinedDat)  
+
+}
+
+```
+
+```{python pysetup, eval=F, include=F}
+import sys
+from Bio import SeqIO
+import Bio
+import pandas as pd
+import seaborn as sns
+import os
+import random
+# from BCBio import GFF
+from Bio.Seq import Seq
+import matplotlib.pyplot as plt
+import numpy as np
+from pylab import savefig
+from matplotlib.pyplot import figure
+import json
+run_all = False
+```
+
+```{python py_functions, eval=F, include=F}
+def package_test():
+	print("comparativesrna.py loaded")
+
+def file_len(fname):
+    with open(fname) as f:
+        for i, l in enumerate(f):
+            pass
+    return i
+
+
+def intergenicSequence(accession, my_seq, shuffled):
+    start = 0
+    end = 0
+    random_seq = Seq("AG", generic_dna)
+    try:
+
+        in_handle = open("/Users/thomasnicholson/phd/RNASeq/sequences/%s.gff" % accession)
+        for rec in GFF.parse(in_handle):
+            for feature in rec.features:
+                qualifiers = feature.qualifiers
+                try:
+                    location = feature.location
+                    end = location.start
+                    intergeneicSeq = my_seq[start:end]
+                    if shuffled == True:
+                        shuffledSeq = ''.join(random.sample(str(intergeneicSeq), len(intergeneicSeq)))
+                        random_seq = random_seq + shuffledSeq
+                    else:
+                        random_seq = random_seq + intergeneicSeq
+                    start = location.end
+                    #print(len(random_seq))
+                except KeyError:
+                    pass
+
+        in_handle.close()
+
+    except IOError:
+        print("/Users/thomasnicholson/phd/RNASeq/sequences/%s.gff not found" % accession)
+        sys.exit(2)
+    return random_seq
+
+
+def intergenicPositions(accession):
+    start = 0
+    end = 0
+    positions = [0]
+    try:
+
+        in_handle = open("/Users/thomasnicholson/phd/RNASeq/sequences/%s.gff" % accession)
+        for rec in GFF.parse(in_handle):
+            i = 0
+            for feature in rec.features:
+                qualifiers = feature.qualifiers
+                try:
+                    qualifiers['gene_biotype']
+                except KeyError:
+                    continue
+                try:
+                    i += 1
+                    location = feature.location
+                    end = location.start - 49
+                    if end < start:
+                        continue
+                    tmpPos = range(start,end)
+                    positions = positions + tmpPos
+                    start = location.end + 50
+                except KeyError:
+                    pass
+
+        in_handle.close()
+
+    except IOError:
+        print("/Users/thomasnicholson/phd/RNASeq/sequences/%s.gff not found" % accession)
+        sys.exit(2)
+    return positions
+
+
+def makeoutputdirectory(write_path):
+    if os.path.isdir(write_path) == False:
+        try:
+            os.mkdir(write_path)
+        except OSError:
+            print("Creation of the directory %s failed" % write_path)
+            sys.exit(2)
+    directory = os.listdir(write_path)
+    if len(directory) != 0:
+        print("Examples of files in %s" % write_path)
+        print(directory[0:4])
+        query_user = input("%s is not an empty directory. Continue anyway y/n (this may write over existing files): " % write_path)
+        if query_user == "y":
+            print("Using %s as directory" % write_path)
+        else:
+            print("Exiting script")
+            sys.exit(2)
+
+
+def concatenateSequence(fastaFile):
+    my_seq = fastaFile[0].seq
+    i = 0
+    for seq in fastaFile:
+        if i == 0:
+            i += 1
+            continue
+        i += 1
+        my_seq = my_seq + seq.seq
+    return my_seq
+
+
+def selectRandomLocation(inFile, positions,fileLength, random_seq, accession):
+
+    randomFile = open("/Users/thomasnicholson/phd/RNASeq/new_calls/random/python_version_1/%s_random_no_shuffle_new_calls.txt" % accession, "w")
+    randomFile.write("start\tend\tstrand\tsequence\n")
+
+    shuffledIndexes = random.sample(positions, fileLength)
+    seqLength = len(random_seq)
+    seqIndexes = random.sample(range(0,seqLength), fileLength)
+
+    srnaLengths = []
+    srnaStrands = []
+    srnaIDs = []
+    i = 0
+    for line in inFile:
+        i += 1
+        words = line.rstrip()
+        words = words.split("\t")
+        start = words[2]
+        try:
+            start = int(start)
+        except ValueError:
+            continue
+        end = words[3]
+        end = int(end)
+        srna = words[-1]
+        srna_length = end - start
+        srnaLengths.append(srna_length)
+        strand = words[4]
+        srnaStrands.append(strand)
+        srnaIDs.append(srna)
+    for i in range(0,len(shuffledIndexes)):
+        index = shuffledIndexes[i]
+        length = srnaLengths[i]
+        strand = srnaStrands[i]
+        seqIndex = seqIndexes[i]
+        srna = srnaIDs[i]
+        if strand == "+":
+            start = index
+            end = start + length
+            seqStart = seqIndex
+            seqEnd  = seqStart + length
+        else:
+            end = index
+            start = end - length
+            seqEnd = seqIndex
+            seqStart  = seqEnd - length
+        if start < 1:
+            continue
+        if end < 1:
+            continue
+        if length < 50:
+            continue
+        if length > 500:
+            continue
+        if seqStart < 1:
+            continue
+        if seqEnd < 1:
+            continue
+        if seqEnd > seqLength:
+            continue
+        if seqStart > seqLength:
+            continue
+        sequence  = random_seq[seqStart:seqEnd]
+        randomFile = open("/Users/thomasnicholson/phd/RNASeq/new_calls/random/python_version_1/%s_random_no_shuffle_new_calls.txt" % accession, "a")
+        randomFile.write("%s\t%s\t%s\t%s\n" % (start, end, strand, sequence))
+
+        srna_type = "random"
+
+        write_path = "/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/negative_control_no_shuffle"
+        srnaFile = open("%s/%s.fna" % (write_path, accession), "a")
+        srnaFile.write(">%s[%s-%s,%s,%s]\n%s\n" % (srna, seqStart, seqEnd, strand, srna_type, sequence))
+
+
+def getreaddepths(accession):
+    try:
+        df = None
+        for filename in os.listdir("/Users/thomasnicholson/phd/RNASeq/plot_files/%s/" % accession):
+            filesize = os.path.getsize(
+                "/Users/thomasnicholson/phd/RNASeq/plot_files/%s/%s" % (accession, filename))
+            if filesize == 0:
+                print("No data in %s" % filename)
+                continue
+            plotFile = pd.read_csv(
+                os.path.join("/Users/thomasnicholson/phd/RNASeq/plot_files/%s/" % accession, filename),
+                sep='\t', header=None)
+            print(filename)
+            plotFile['selected'] = plotFile.iloc[:].max(axis=1)
+            tmpDf = plotFile.iloc[:, 2]
+            if df is not None:
+                df = pd.concat([df.reset_index(drop=True), tmpDf], axis=1)
+            else:
+                df = tmpDf
+        dfOut = df
+        dfOut['mean'] = df.iloc[:].mean(axis=1)
+        dfOut['median'] = df.median(axis=1)
+        dfOut['max'] = df.max(axis=1)
+        return dfOut
+
+    except IOError:
+        print("Cannot open a file in /Users/thomasnicholson/phd/RNASeq/plot_files/%s/" % accession)
+
+
+def sRNA_read_depths(inFile, read_depths_df,accession, random):
+    if random == False:
+        outFile  = open("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/read_depths/%s_read_depths.txt" % accession, 'w')
+        outFile.write("ID\tstart\tend\tgroup\tfeature\tmean_mean\tmean_median\tmean_max\tmedian_mean\tmedian_median\tmedian_max\tmax_mean\tmax_median\tmax_max\n")
+        outFile.close()
+        outFile  = open("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/read_depths/%s_read_depths.txt" % accession, 'a')
+    else:
+        outFile  = open("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/read_depths_negative_control/%s_read_depths.txt" % accession, 'w')
+        outFile.write("ID\tstart\tend\tgroup\tfeature\tmean_mean\tmean_median\tmean_max\tmedian_mean\tmedian_median\tmedian_max\tmax_mean\tmax_median\tmax_max\n")
+        outFile.close()
+        outFile  = open("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/read_depths_negative_control/%s_read_depths.txt" % accession, 'a')
+
+    if random == False:
+        for line in inFile:
+            words = line.rstrip()
+            words = words.split("\t")
+            srna = words[-1]
+            start = words[2]
+            try:
+                start = int(start)
+            except ValueError:
+                continue
+            end = words[3]
+            end = int(end)
+            new_feature = words[8]
+            feature = words[1]
+            if new_feature == "FALSE":
+                srna_type = "known"
+            else:
+                srna_type = "novel"
+
+            subsetDF = read_depths_df[start:end]
+
+            mean_mean = subsetDF['mean'].mean()
+            mean_median = subsetDF['mean'].median()
+            mean_max = subsetDF['mean'].max()
+            median_mean = subsetDF['median'].mean()
+            median_median = subsetDF['median'].median()
+            median_max = subsetDF['median'].mean()
+            max_mean = subsetDF['max'].mean()
+            max_median = subsetDF['max'].median()
+            max_max = subsetDF['max'].max()
+
+            outFile.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (srna, start, end, srna_type, feature, mean_mean, mean_median, mean_max, median_mean, median_median, median_max, max_mean, max_median, max_max))
+    else:
+        i = 0
+        for line in inFile:
+            i += 1
+            words = line.rstrip()
+            words = words.split("\t")
+            srna = "%s_%s" % (accession, i)
+            start = words[0]
+            try:
+                start = int(start)
+            except ValueError:
+                continue
+            end = words[1]
+            end = int(end)
+            feature = "intergenic"
+            srna_type = "negative_control"
+
+            subsetDF = read_depths_df[start:end]
+
+            mean_mean = subsetDF['mean'].mean()
+            mean_median = subsetDF['mean'].median()
+            mean_max = subsetDF['mean'].max()
+            median_mean = subsetDF['median'].mean()
+            median_median = subsetDF['median'].median()
+            median_max = subsetDF['median'].mean()
+            max_mean = subsetDF['max'].mean()
+            max_median = subsetDF['max'].median()
+            max_max = subsetDF['max'].max()
+
+            outFile.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (
+            srna, start, end, srna_type, feature, mean_mean, mean_median, mean_max, median_mean, median_median,
+            median_max, max_mean, max_median, max_max))
+
+
+def single_fasta(fastaFile, folder):
+    for seq in fastaFile:
+        id = seq.id
+        outname = id.split("[")
+        outname = outname[0]
+        my_seq = seq.seq
+        outFile = open("/Users/thomasnicholson/phd/RNASeq/srna_seqs/version_1/%s/%s.fna" % (folder, outname), "w")
+        outFile.write(">%s\n%s\n" % (id, my_seq))
+
+
+def openNHMMER(nhmmername):
+    nhmmerDF = pd.read_csv(nhmmername, delim_whitespace=True, header=None, comment='#')
+    nhmmerDF.columns = ["target_name", "accession", "query_name", "accession_2", "hmmfrom", "hmmto", "alifrom", "alito", "envfrom", "envto", "sq_len", "strand", "E_value", "score", "bias", "description_of_target"]
+    nhmmerDF[["ID", "descriptors"]] = nhmmerDF.target_name.str.split("[", expand = True)
+    nhmmerDF[["ID_2", "descriptors_2"]] = nhmmerDF.query_name.str.split("[", expand = True)
+    d = nhmmerDF.groupby('ID')['ID_2'].apply(list).to_dict()
+    return(d)
+
+
+def openReadDepths(readdepthsname, d):
+    readdepthsDF = pd.read_csv(readdepthsname, sep = "\t", comment='#')
+    readdepthsDF = readdepthsDF[readdepthsDF['ID'] != "ID"]
+
+    ##when being done in jupyter the columns were all read in as string and the lines below were necessary...
+    ##it seems to work fine now
+
+    # print(readdepthsDF.dtypes)
+    # readdepthsDF[["mean_value", "mean_decimal"]] = readdepthsDF.max_mean.str.split(".", expand = True)
+    # print(1)
+    # readdepthsDF[["median_value", "median_decimal"]] = readdepthsDF.max_median.str.split(".", expand = True)
+    # readdepthsDF[["max_value", "max_decimal"]] = readdepthsDF.max_max.str.split(".", expand = True)
+    # readdepthsDF[['mean_value', 'median_value', 'max_value']] = readdepthsDF.loc[:,['mean_value', 'median_value', 'max_value']].apply(pd.to_numeric)
+
+
+    readdepthsDF["mean_value"] = readdepthsDF['max_mean']
+    readdepthsDF["median_value"] = readdepthsDF['max_median']
+    readdepthsDF["max_value"] = readdepthsDF['max_max']
+    readdepthsDF[['mean_value', 'median_value', 'max_value']] = readdepthsDF.loc[:,['mean_value', 'median_value', 'max_value']].apply(pd.to_numeric)
+
+
+    idList = list(d.keys())
+    readdepthsKept = readdepthsDF[readdepthsDF['ID'].isin(idList)]
+    return(readdepthsKept)
+
+
+def writeReadDepths(outname, readDepths, d):
+    seen = []
+    d2 = {}
+    i = 0
+
+    outFile = open(outname, "w")
+    outFile.write(
+        "ID\tmean_mean\tmean_median\tmean_max\tmedian_mean\tmedian_median\tmedian_max\tmax_mean\tmax_median\tmax_max\tID_2\n")
+    outFile.close()
+    outFile = open(outname, "a")
+    values = []
+    for key in d:
+        #     print(i)
+        #     i += 1
+        #     if i > 100:
+        #         break
+        #     if key in seen:
+        #         continue
+        #     print(key)
+        #     print(seen)
+        values = d[key]
+        seen.append(values)
+        df = readDepths[readDepths['ID'].isin(values)]
+        #     print(df['mean_value'].dtypes)
+
+        #     print(df['mean_value'].dtypes)
+        mean_mean = df['mean_value'].mean()
+        mean_median = df['mean_value'].median()
+        mean_max = df['mean_value'].max()
+        median_mean = df['median_value'].mean()
+        median_median = df['median_value'].median()
+        median_max = df['median_value'].max()
+        max_mean = df['max_value'].mean()
+        max_median = df['max_value'].median()
+        max_max = df['max_value'].max()
+        #     print(key)
+        #     print("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (key,mean_mean,mean_median,mean_max,median_mean,median_median,median_max,max_mean,max_median,max_max,values))
+        outFile.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (
+        key, mean_mean, mean_median, mean_max, median_mean, median_median, median_max, max_mean, max_median, max_max,
+        values))
+    outFile.close()
+
+
+def writeSequences(inFile,my_seq,accession,write_path):
+    i = 0
+    for line in inFile:
+        i += 1
+        words = line.rstrip()
+        words = words.split("\t")
+        srna = words[-1]
+        start = words[2]
+        try:
+            start = int(start)
+        except ValueError:
+            continue
+        end = words[3]
+        end = int(end)
+        if end - start > 50:
+            strand = words[4]
+            new_feature = words[8]
+            feature = words[1]
+            overlap = words[7]
+            if new_feature == "FALSE":
+                srna_type = "known"
+            else:
+                srna_type = "novel"
+            srnaSeq = my_seq[start:end]
+            srnaSeqRev = srnaSeq.reverse_complement()
+            if strand == "-":
+                srnaSeq = srnaSeqRev
+            if srna_type == "known":
+                srnaPCFile = open("%s/positive_control/%s.fna" % (write_path, accession), "a")
+                srnaPCFile.write(">%s[%s-%s,%s,%s,%s,%s]\n%s\n" % (srna, start, end, strand, srna_type, feature, overlap, srnaSeq))
+            else:
+                srnaPredictedFile = open("%s/predicted/%s.fna" % (write_path, accession), "a")
+                srnaPredictedFile.write(">%s[%s-%s,%s,%s,%s,%s]\n%s\n" % (srna, start, end, strand, srna_type, feature, overlap, srnaSeq))
+                
+def get_overlap_vals(subsetDat, overlaps):
+    dat_len = len(subsetDat.index)
+    overlapping_ids = []
+    lengths = []
+    start_val = 0
+    end_val = 0
+    for i in range(0,dat_len):
+        query_val = subsetDat.iloc[i]['query_id']    
+        new_start_val = min([subsetDat.iloc[i]['target_start'], subsetDat.iloc[i]['target_end']])
+        new_end_val = max([subsetDat.iloc[i]['target_start'], subsetDat.iloc[i]['target_end']]) 
+        if end_val > new_start_val:
+            overlapping_ids.append(query_val)
+            len_1 = end_val - start_val
+            len_2 = new_end_val - new_start_val
+            shortest_seq = min([len_1, len_2])
+            overlap_start = max([start_val, new_start_val])
+            overlap_end = min([end_val, new_end_val])
+            overlap = (overlap_end - overlap_start)/shortest_seq
+            overlaps.append(overlap)
+        else:
+            end_val = new_end_val
+            start_val = new_start_val
+            overlapping_ids = [query_val]
+    return(overlaps)
+
+def get_overlap_list(subsetDat):
+    overlapping_ids = []
+    overlap_list = []
+    lengths = []
+    start_val = 0
+    end_val = 0
+    shortest_seq = max(subsetDat['target_end'])
+    dat_len = len(subsetDat.index)
+    for i in range(0,dat_len):
+        query_val = subsetDat.iloc[i]['query_id']    
+        new_start_val = min([subsetDat.iloc[i]['target_start'], subsetDat.iloc[i]['target_end']])
+        new_end_val = max([subsetDat.iloc[i]['target_start'], subsetDat.iloc[i]['target_end']])  
+        if end_val > new_start_val:
+            len_2 = new_end_val - new_start_val
+            shortest_seq = min([shortest_seq, len_2])
+            overlap_start = max([start_val, new_start_val])
+            overlap_end = min([end_val, new_end_val])
+            overlap = (overlap_end - overlap_start)/shortest_seq
+            
+            if overlap >= 0.5 and overlap_end - overlap_start >= 50:
+                if query_val not in overlapping_ids:
+                    overlapping_ids.append(query_val)
+                end_val = max([end_val, new_end_val])
+            else:
+                overlap_list.append(overlapping_ids)
+                shortest_seq = max(subsetDat['target_end'])
+                end_val = new_end_val
+                start_val = new_start_val
+                overlapping_ids = [query_val]
+        else:
+            overlap_list.append(overlapping_ids)
+            end_val = new_end_val
+            start_val = new_start_val
+            overlapping_ids = [query_val]
+        if i == dat_len - 1:
+            overlap_list.append(overlapping_ids)
+    return(overlap_list)
+
+def get_overlap_count(overlap_list, d):
+    for l in overlap_list:
+        list_len = len(l)
+        if list_len == 0:
+            continue
+        for i in range(0,list_len - 1):
+            for j in range(i+1, list_len):
+                ids =[l[i], l[j]]
+                ids.sort()
+                current_id = "_".join(ids)
+                if current_id in d:
+                    d[current_id] += 1
+                else:
+                    d[current_id] = 1
+    return(d)
+
+def unique_set_of_overlaps(all_overlaps, ids_checked, id1, id2):
+    make_new = True
+    counter = 0
+    if id1 in ids_checked:
+        if id1 in all_overlaps:
+            if id2 not in all_overlaps[id1]:
+                all_overlaps[id1].append(id2)    
+        else:
+            counter = 0
+            item_list = []
+            for item in all_overlaps:
+                if id1 in all_overlaps[item]:
+                    item_list.append(item)
+                    if id2 not in all_overlaps[item]:
+                        all_overlaps[item].append(id2)
+                    make_new = False
+                    counter += 1
+            if counter > 1:
+                print(item_list[1:])
+                for item in item_list[1:]:
+                    for value in all_overlaps[item]:
+                        if value not in all_overlaps[item_list[0]]:
+                            all_overlaps[item_list[0]].append(value)
+                    all_overlaps.pop(item, None)
+                     
+    else:
+        ids_checked.append(id1)
+    return(all_overlaps, ids_checked, make_new, counter)                
+                
+def combined_alignments(query, combined_d, ids_checked, query_matches):
+    combined_ids = [query]
+    ids_checked.append(query)
+    max_query = query
+    for i in range(0, len(query_ids)):
+        ids =[query, query_ids[i]]
+        ids.sort()
+        current_id = "_".join(ids)
+        if current_id in query_matches:
+            if query_ids[i] in ids_checked:
+                for key, value in combined_d.items():
+                    if query_ids[i] in value:
+                        max_query = key
+            else:
+                combined_ids.append(query_ids[i])
+                ids_checked.append(query_ids[i])
+                
+                
+    if max_query in combined_d:
+        for item in combined_ids:
+            if item not in combined_d[max_query]:
+                combined_d[max_query].append(item)
+    else:
+        combined_d[max_query] = combined_ids
+    return(combined_d, ids_checked)
+
+
+
+```
+
+```{r toc, echo=FALSE, include=F}
+render_toc("~/bin/r_git/R/shiny_html/analysis_markdown_pdf.Rmd")
+```
+
+# Overview {#overview}
+
+------------------------------------------------------------------------
+
+## Abstract
+
+Small non-coding RNAs are involved in regulation of a wide range of cell processes. There are a number of tools that exist that try to identify these RNAs using a range of methods, however challenges with predicting non-coding RNAs from the sequence alone and transcriptional noise making the use of RNASeq data unreliable has hindered annotation of functional elements. While these methods manage to predict RNAs it can be hard to determine whether results from RNASeq data are the result of a real RNA or noise and to deal with this problem we are using a comparative approach by taking RNASeq data from multiple genomes within a clade. We have designed a pipeline that identifies peaks in intergenic regions of RNASeq data that may by functional RNAs and uses genome alignments to check if there are conserved regions of expression that would indicate the transcription that is observed is for functional RNAs. By using a comparative approach we aim to improve the signal to noise ratio in our results and better list of candidate small non-coding RNAs.
+
+## Intro {#srna_overview}
+
+Prokaryotes are the most numerous organisms on Earth, making a vast impact on every aspect of biology. A key component of the function of prokaryotes is how small non-coding RNAs (sRNA) contribute to cell functions (Gorski et al. 2017; Wagner and Romby 2015). RNAs play a critical role in a wide range of biological functions such as:
+
+-   Transcription/Translation
+
+    -   rRNA, tRNA, 6sRNA etc.
+
+-   Immune response
+
+    -   CRISPR-cas
+
+-   Gene regulation
+
+    -   Riboswitches, sRNAs binding to mRNA etc.
+
+-   Virulence
+
+![Figure 1. Examples of ncRNAs in bacteria](sRNA_examples.png)
+
+Identifying sRNAs has been a significant challenge (Freyhult et al. 2006). While a number of different approaches are available each have limitations. Annotations based on sequence can be done based on known RNA families (Kalvari et al. 2018) are possible but cannot find novel sRNAs and are more likely to find the most highly conserved sRNAs. As many sRNAs are not widely conserved (Lindgreen et al. 2014) this means use of comparative transcriptomics will be more limited for non-coding RNA analysis, and experiments more carefully designed to ensure that the evolutionary distance between analyzed genomes is considered, to make the analysis of the data meaningful. Experimental approaches such as transposon insertion sequencing (Barquist et al. 2013) can find novel sRNAs, these experiments are time consuming and expensive. High-throughput RNA sequencing allowed for another way to look for sRNAs throughout genomes, using RNA-Seq experiments to look for signals of expression. This allows novel features to be identified, and conservation is not going to contribute. The challenge with using data from RNA-Seq experiments has been in identifying putative sRNAs from the expression data. Transcriptional noise, the expression of non-functional transcripts (Jose et al. 2019), has been shown to occur (Struhl 2007; Lybecker et al. 2014; Wade and Grainger 2014) with spurious promoters likely to be resulting in a lot of transcripts that have no function (Costa 2007; Hüttenhofer et al. 2005), with Lloréns-Rico et al. (2016) showing that AT% of genomes correlates with the number of sRNAs found, suggesting that this is the result of suprious promoters. Many tools that aim to predict putative sRNAs (Leonard et al. 2019; Yu et al. 2018; Mcclure et al. 2013) struggle to agree on predictions from the same dataset with the number of predicted transcripts and the exact start and end of the transcripts differing greatly. Experimental conditions are also very important with sRNAs often responding to environmental cues (Gottesman et al. 2006). These tools are likely struggling as the non-functional transcripts are not easily distinguished from functional sRNAs using expression data alone. A more comprehensive approach that carries out downstream analysis is necessary to better separate the transcriptional noise from the putative sRNAs.
+
+## Results {#res}
+
+```{r results_setup_values, include=F}
+
+pc_models <- list.files("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/alignments/", pattern = ".stk")
+
+pc_models_nr <- list.files("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/alignments_rnaalifold/", pattern = ".stk")
+
+
+genera_list <- list.files("~/phd/RNASeq/genera/")
+genera_list <- genera_list[genera_list != "test"]
+genera_count <- length(genera_list)
+strain_count <- 0
+experiment_count <- 0
+for(genus in genera_list){
+  strain_list <- list.files(paste("~/phd/RNASeq/genera/", genus, sep = ""), pattern = ".data")
+  n.strains <- length(strain_list)
+  if(n.strains == 0){
+    next
+  }
+  for(strain in strain_list){
+    experiment_list <- list.files(paste("~/phd/RNASeq/genera", genus, strain, "plot_files/", sep = "/"), pattern = "ncRNA.plot")
+    n.experiments <- length(experiment_list)
+    if(n.experiments == 0){
+      next
+    }
+    experiment_count <- experiment_count + n.experiments
+    strain_count <- strain_count + 1
+  }
+}
+
+known_files <- list.files("~/phd/RNASeq/srna_seqs/version_1/seqs_predicted/positive_control/single_seqs/done", pattern = ".fna")
+known_count <- length(known_files)
+
+novel_files <- list.files("~/phd/RNASeq/srna_seqs/version_1/seqs_predicted/predicted/single_seqs/", pattern = ".fna")
+novel_count <- length(novel_files)
+
+novel_alignments <- list.files("~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/alignments_rnaalifold/", pattern = ".stk")
+novel_alignments <- length(novel_alignments)
+
+nc_alignments <- list.files("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/alignments_rnaalifold/", pattern = ".stk")
+nc_alignments <- length(nc_alignments)
+
+```
+
+A clade of Gammaproteobacteria was selected. These included a number of well studied species, with a number of RNA-seq experiments to analyse and less well studied species that had fewer RNA-seq experiments and less known about the sRNAs.
+
+![Figure 2. Taxonomy of the genera in the selected clade and the number of strains for each genus](/Users/thomasnicholson/phd/RNASeq/figures/subset_tree.png)
+
+A representative set of bacterial genomes were also selected. We took 2 genomes from each genus available in the Refseq95 dataset. Annotations of ncRNAs were made using the rFam models.
+
+There were `r prettyNum(length(pc_models))` Rfam models that were found in these genomes, with `r prettyNum(length(pc_models_nr))` models analysed after combining models that overlapped (e.g. eukaryotic SSU and bacterial SSU), 4 were found across all genomes in the gammaproteobacteria clade. There were also a number of models found in large numbers of genomes, however there were far more showing up in well studied species.
+
+```{r, echo=F}
+load("~/bin/r_git/R/r_files/upsetSubsetPC.Rda")
+
+UpSetR::upset(upsetSubsetPC, sets = colnames(upsetSubsetPC), mb.ratio = c(0.55, 0.45), order.by = "freq", nintersects = 15, keep.order = T)
+
+```
+
+Analysis of `r prettyNum(experiment_count)` RNA-seq data sets across `r prettyNum(strain_count)` genomes (from `r prettyNum(genera_count)` genera) resulted in `r prettyNum((known_count + novel_count), big.mark = ",")` unique regions of expression being identified in intergenic regions of these genomes. These were separated into previously annotated sRNAs, of which there were `r prettyNum(known_count, big.mark = ",")` and `r prettyNum(novel_count, big.mark = ",")` novel expressed regions. These were clustered into `r prettyNum(novel_alignments, big.mark = ",")` putative sRNA models that do not match known sRNAs. The same approach using random intergenic regions resulted in `r prettyNum(nc_alignments, big.mark = ",")` models that do not match known sRNAs or predicted sRNAs.
+
+Similar patterns were observed in the clustering of the putative sRNAs, with the Enterobacteriaceae having large clusters and other closely related species and genera sharing a few putative sRNAs. Overall there are more sRNAs being predicted here than previously found meaning it is important to differentiate the sRNAs from transcriptional noise.
+
+```{r, echo=F}
+load('~/bin/r_git/R/r_files/upsetSubsetPredicted.Rda')
+
+
+UpSetR::upset(upsetSubsetPredicted, sets = colnames(upsetSubsetPredicted), mb.ratio = c(0.55, 0.45), order.by = "freq", keep.order = T)
+```
+
+The distribution of the number of sequences per alignment is similar across each of the groups, with the majority of the models containing a single sequence and exponentially fewer alignemtns as the number of sequences increases.
+
+```{r, echo=F}
+seqs_per_alignment_pred <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/seqs_per_alignment.txt")
+seqs_per_alignment_pc <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/seqs_per_alignment.txt")
+seqs_per_alignment_nc <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/seqs_per_alignment.txt")
+
+seqs_per_alignment_pred <- seqs_per_alignment_pred %>% mutate(group = "Predicted")
+
+seqs_per_alignment_pc <- seqs_per_alignment_pc %>% mutate(group = "Positive Control")
+
+seqs_per_alignment_nc <- seqs_per_alignment_nc %>% mutate(group = "Negative Control")
+
+seqs_per_alignment <- seqs_per_alignment_pred %>% bind_rows(seqs_per_alignment_pc, seqs_per_alignment_nc)
+
+ggplot() + 
+  geom_freqpoly(data = seqs_per_alignment, aes(x = V1, y = ..density.., group = group, color = group), binwidth = 2) +
+  xlim(min = 0, max = 40)
+
+
+```
+
+With a large number of known sRNAs and putative sRNA showing conservation over a large distance the first measure considered for evaluating the quality of an sRNA was evolutionary conservation. The maximum evolutionary distance between genomes contributing to the same model drops off quickly for each of the data sets showing that most sRNAs are not highly conserved and other approaches will be needed, however for the sRNAs that are highly conserved it is a good measure to use for analysing putative sRNAs.
+
+```{r, echo=F}
+load("~/bin/r_git/R/r_files/dists_cum_count.Rda")
+
+ggplot() +
+  geom_line(data = dists_cum_count, aes(x= max_dist, y = cumulative_prop, group = group, colour = group))
+
+```
+
+Use of evolutionary conservation to determine whether any given non-conding sequence is an sRNA is a good approach for highly conserved sRNAs with an AUC of 0.849 (Figure 2), however does not provide any way of analysing novel sRNAs that may have evolved more recently. Another way of evaluating conservation is to look at covariation in the models. A number of different approaches to scoring the observed covariation were used, with each performing similarly (AUC=0.680), however this scoring approach appears more complex with highly conserved sRNAs able to be differentiated from random sequences very well, while less conserved sRNAs cannot be differentiated at all, which can be seen on the ROC curve (Figure 2).
+
+In order to determine whether an expressed region is an sRNAs or spurious expression when there is no significant conservation other measures can also be used. The expression levels and the conservation of that expression when the sRNA is found in more than one genome is another reasonable approach. Like the evolutionary conservation measure, expression levels are able to be used to distinguish sRNAs from random sequence well (AUC = 0.854, Figure 2.), however there is the same problem that occurred with evolutionary conservation, where the sRNAs that are highly conserved are more likely to be highly expressed in a wide range of conditions, thus not accounting for newer sRNAs that have condition specific expression.
+
+Taking into account the secondary structure of sRNAs and looking at the conservation of the secondary structure, along with the minimum free energy (MFE) of a given structure is another measure that can be used in determining whether a given sequence might be an sRNA. For this, three measures were used. The absolute value of the MFE (AUC=0.617) which on it's own provides little towards predicting sRNAs, the z-score of the MFE, obtained by shuffling the given sequence multiple times and calculating MFE for each shuffle and the presence of common RNA motifs within the structure. The MFE z-score performs well (AUC=0.792) compared to the MFE value alone, and scoring motifs found in a sequence also gave better predictive value (AUC=0.669) than absolute MFE.
+
+Another consideration when looking at non-coding RNAs and the promoter regions is the GC content, as some groups (Lloréns-Rico et al. 2016) have suggested that most of the expression is noise. Using GC content to predict sRNAs performed worst (AUC=0.543) out of all the measures and appear very similar to random.
+
+![Figure 2. ROC](/Users/thomasnicholson/phd/RNASeq/figures/roc_curve_all_ccombinations.png)
+
+Attempting to use any of these predictive measures to analyse the set of putative sRNAs from expressed regions resulted in a lot of models that were no different to random sequences still showing up, and did not help with determining the level of transcriptional noise that could be expected. It is necessary to combine these metrics together in order to better predict sRNAs.
+
+When looking at which measure correlates together (Figure 3.) there are two clusters with minimal overlap. As expected evolutionary distance and covariation correlate, while the secondary structure measures all correlate, along with the expression level measures. GC content shows a slight correlation with MFE, an effect that disappears when the z-score is used.
+
+```{r, echo=F}
+load("~/bin/r_git/R/r_files/rhoMatrix.Rda")
+load("~/bin/r_git/R/r_files/sigMatrix.Rda")
+
+
+heatmap.2(rhoMatrix, cellnote=sigMatrix,notecex=1.5,notecol="black", col=rev(redblue(40)), density.info="none", trace="none", dendrogram=c("column"), symm=F,symkey=T,symbreaks=T, scale="none", key.title = "", srtRow=45, adjRow=c(0, 1), srtCol=45, adjCol=c(1,1), breaks=(-20:20)/20,
+margins = c(8, 8), cexRow=1.5, cexCol=1.5,font=2)
+
+```
+
+When all of the metrics were analysed together using a random forest the separation of these two clusters was observed again (Figure 4.) Expression levels and MFE were the most significant measures in predicting sRNAs, with evolutionary conservation also contributing. All of the metrics performed significantly better than random, including the GC content.
+
+```{r, echo=F}
+load("~/bin/r_git/R/r_files/rf_classifier.Rda")
+varImpPlot(rf_classifier)
+```
+
+A summary of the best performing metrics can be seen in Table 1 where the sensitivity of each of the individual measures is poor, while the random forest managed to capture 87% of the known sRNAs. When the positive predictive value is considered it can be seen that due to the high number of expressed regions, although these metrics showed strong predictive value in the ROC curves, the overall predictive value is very low. Only the random forest prediction is able to keep the sensitivity high while not including large numbers of models built from random sequence.
+
+Using the random forest predictions we can establish a likely upper and lower bound for transcriptional noise. When maximising the sensitivity of the random forest predictions the precision goes down to 62.7% with 2.5% of the random sequences being labelled as sRNAs. With this threshold 14.7% of the predicted sRNAs are no different to random intergenic sequences as a lower estimate of noise. When balancing precision and sensitivity, 53.7% of the predicted sRNAs are labeled as random sequences. Taking into account the 12.8% of known sRNAs that are also labeled as random sequences, an upper bound would be \~40% of non-coding RNA expression is noise.
+
+```{r, echo=F}
+load("~/bin/r_git/R/r_files/randomForestDistribution.Rda")
+
+ggplot() +
+  geom_path(data = randomForestDistribution, aes(x = x, y = y, group = group, color = group))
+```
+
+Further analysis of the expressed regions predicted as sRNAs shows that many of them are likely the result of expression of a codon that made it through filtering steps and while this is not transcriptional noise, it shows that it can be difficult to differentiate expression of a protein coding region from an sRNA if there is any overlap of expression.
+
+## Overview of Methods {#methods}
+
+```{r data_counts, include=F}
+genera_list <- list.files("~/phd/RNASeq/genera/")
+genera_list <- genera_list[genera_list != "test"]
+genera_count <- length(genera_list)
+strain_count <- 0
+experiment_count <- 0
+for(genus in genera_list){
+  strain_list <- list.files(paste("~/phd/RNASeq/genera/", genus, sep = ""), pattern = ".data")
+  n.strains <- length(strain_list)
+  if(n.strains == 0){
+    next
+  }
+  for(strain in strain_list){
+    experiment_list <- list.files(paste("~/phd/RNASeq/genera", genus, strain, "plot_files/", sep = "/"), pattern = "ncRNA.plot")
+    n.experiments <- length(experiment_list)
+    if(n.experiments == 0){
+      next
+    }
+    experiment_count <- experiment_count + n.experiments
+    strain_count <- strain_count + 1
+  }
+}
+
+```
+
+Here, we have looked at a number of different tools and tried two different approaches to attempt to better categorise the expressed regions into putative sRNAs, sRNAs matching known families and transcriptional noise.
+
+This was done by taking RNA-Seq data from a clade of Gammaproteobacteria was selected:
+
+-   \>6 families
+-   `r genera_count` genera
+-   `r strain_count` strain
+-   `r experiment_count` experiments
+
+These included a number of well studied species, with a number of RNA-seq experiments to analyse and less well studied species that had fewer RNA-seq experiments and less known about the sRNAs.
+
+From these experiments, sRNAs were predicted based on expressed regions in RNA-Seq data using multiple RNA-Seq datasets for each genome.
+
+These predicted regions can be used to evaluate signal to noise in expression data by classifying the RUFs into two categories:
+
+-   Similar to known sRNAs
+-   Indistinguishable from randomly selected regions
+
+Categorising the RUFs requires using metrics that can idenitfy sRNAs. A number of different measures were chosen:
+
+-   Conservation of transcription
+-   Conservation of sequence
+-   GC content
+-   Covariation observed in sequence alignments
+-   Secondary structure
+-   Presence of ncRNA motifs
+
+These metrics were evaluated using two datasets:
+
+-   Annotations from a search of Rfam models
+
+-   Random intergenic sequences of the same lengths as the predicted sRNAs
+
+A representative set of bacterial genomes were selected by taking two genomes from each genus available in the Refseq95 dataset. These genoem were used for the conservation of sequence step and the annotations using rFam models.
+
+![Figure 4. Workflow of methods]()
+
+## Summary of strains used {#strains_used}
+
+```{r summary_of_strains, echo = F, eval = T, results='asis'}
+load("~/bin/r_git/R/r_files/accession_info.Rda")
+accession_info <- accession_info %>% 
+  mutate(strain_short = substr(Strain, start = 1, stop = 30)) %>% 
+  select(Accession, RNASeq.file.counts, strain_short)
+
+set.seed(101)
+rand.selection <- runif(10, min = 1, max = nrow(accession_info))
+
+accession_info[rand.selection,] %>%  
+  kable(caption = "Table 1. Number of experiments per strain") %>%
+  kable_styling()
+
+load("~/bin/r_git/R/r_files/assembly_summary.Rda") # made from ~/phd/RNASeq/SRA_bacteria_RNAseq.txt
+
+
+assembly_summary <- assembly_summary %>% separate(col = SPECIES, into = c("Genus"), extra = "drop", remove = F, sep = " ")
+
+
+genomes <- assembly_summary %>% filter(DESIGN == "PAIRED", grepl(pattern = "Illumina", x = INSTRUMENT)) %>% group_by(Genus) %>% select(Genus, GENOME_ACCESSION) %>% unique() %>% summarise(genome_count = n())
+experiments <- assembly_summary %>% filter(DESIGN == "PAIRED", grepl(pattern = "Illumina", x = INSTRUMENT)) %>% group_by(Genus) %>% select(Genus, GENOME_ACCESSION, ACCESSION) %>% unique() %>% summarise(experiment_count = n())
+
+counts <- genomes %>% full_join(experiments, by = "Genus")
+
+load("~/bin/r_git/R/r_files/sraDatAll.Rda")
+
+rand.selection <- runif(5, min = 1, max = nrow(assembly_summary))
+
+assembly_summary[rand.selection,] %>%  
+  kable(caption = "Table 2. List of experiments (1)") %>%
+  kable_styling()
+
+rand.selection <- runif(5, min = 1, max = nrow(sraDatAll))
+
+sraDatAll[rand.selection,]%>%  
+  kable(caption = "Table 3. List of experiments (2)") %>%
+  kable_styling()
+
+```
