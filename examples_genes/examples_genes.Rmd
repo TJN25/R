@@ -1,0 +1,499 @@
+---
+title: "Example_srnas"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse, quietly = T, warn.conflicts = F)
+library(stringi, quietly = T, warn.conflicts = F)
+library(ape, quietly = T, warn.conflicts = F)
+library(genoPlotR, quietly = T, warn.conflicts = F)
+```
+
+
+```{r}
+get_subset_data <- function(id_val = "0", outname = "0", filepath = "0", write_data = F){
+  
+  if(id_val == "0"){
+    stop("Error: id_val not defined")
+  }
+  
+  if(write_data){
+    stop_val <- F
+    err_msg <- "Error:"
+    if(outname == "0"){
+      stop_val <- T
+      err_msg <- paste(err_msg, "outname not defined.")
+    }
+    if(filepath == "0"){
+      stop_val <- T
+      err_msg <- paste(err_msg, "filepath not defined.")
+    }
+    if(stop_val){
+      stop(err_msg)
+    }
+  }
+  
+contig_labels <- read.table("~/phd/RNASeq/genome_contig_pairs.txt")
+colnames(contig_labels) <- c("query.name", "genome")
+
+dat <- read.table(paste("~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/alignments_rnaalifold/alignments_", id_val, ".stk", sep = ""), comment.char = "#", fill = T)
+
+dat <- dat %>% separate(V1, into = c("query.name", "location"), sep = "/", remove = T, extra = 'drop') %>%  select(query.name, location) %>% 
+  mutate(found = T) %>% mutate(rev.query.name = stri_reverse(query.name)) %>%  separate(rev.query.name, into = c("t1"), sep = "\\|", remove = F) %>% mutate(query.name = stri_reverse(t1))
+
+dat <- dat %>% left_join(contig_labels, by = "query.name")
+
+genus_labels <- read.table("~/phd/RNASeq/contig_genus_lables.txt")
+
+colnames(genus_labels) <- c("query.name", "genus")
+
+genus_labels$genus[genus_labels$genus == "Methylococcaceae"] <- "Moraxella"
+
+dat <- dat %>% left_join(genus_labels, by = "query.name") %>%  unique() %>%  separate(location, into = c("start", "end"), sep = "-", remove = F) %>% filter(!is.na(genome)) %>% mutate(srna = id)
+
+summaryDat <- dat %>% select(genome, genus) %>% unique() %>% filter(!is.na(genome))
+
+subsetDat <- dat 
+if(write_data){
+write.csv(x = subsetDat, file = paste(filepath, "/", outname, "_example_files/", outname, "_list.csv", sep = ""), row.names = F, quote = F)
+}
+return(subsetDat)
+}
+
+plot_region <- function(i, adj.range = 5000, counter, dat = dat, write_data = F, dna_segs, dna_seg_labels, draw.plots = T){
+  
+  genome <- as.character(dat$genome[i])
+  # print(genome)
+  genus <- dat$genus[i]
+  gff  <- tryCatch({
+    gff <- read.gff(paste("~/phd/RNASeq/annotation_files/", genome,".gff", sep = ""))
+    
+    gff
+  }, error =  function(e) {
+    print(paste("Error: ~/phd/RNASeq/annotation_files/", genome,".gff not found", sep = ""))
+    return(F)
+  })
+  if(length(gff) == 1){
+      returned_list <- list()
+  returned_list$counter <- counter 
+  return(returned_list)
+  }
+  
+  start_val <- as.numeric(dat$start[i])
+  end_val <- as.numeric(dat$end[i])
+  contig <- dat$query.name[i]
+  strand_val <- ifelse(start_val < end_val, '+', '-')
+  
+  subgff <- gff %>% filter(start > (start_val - adj.range), start < (start_val + adj.range), type == 'CDS', seqid == contig) %>% 
+    separate(attributes, into = c(NA, "t1"), extra = 'merge', remove = F, sep = "product=") %>% separate(t1, into = "Name", sep = ";", extra = 'drop')
+  
+  
+  names1 <- c("start", "end", subgff$Name, "rna_1")
+  starts1 <- c((start_val - 5000), (start_val + 5000 - 1), subgff$start, min(start_val, end_val))
+  ends1 <- c((start_val - 5000 + 1), (start_val + 5000),subgff$end, max(start_val, end_val))
+  
+  starts1[starts1 < (start_val - adj.range)] <- start_val - adj.range
+  ends1[ends1 > (start_val + adj.range)] <- start_val + adj.range
+  
+  strands1 <- c("+", "-", as.character(subgff$strand), strand_val)
+
+    df1 <- data.frame(name=names1, start=starts1, end=ends1,
+                    strand=strands1, col="Blue")
+  
+    # min_start <- min(df1$start)
+    # df1 <- df1 %>% mutate(start = start - min_start, 
+    #                       end = end - min_start)
+    
+    if(strand_val == "-"){
+    # df1 <- df1 %>% mutate(strand = ifelse(strand == "+", "-", "+"),
+    #                       tmpend = -start, tmpstart = -end) 
+    #     max_end <- -(min(df1$tmpstart))
+    # 
+    # 
+    # df1 <- df1 %>% 
+    #   mutate(start = tmpstart + max_end, 
+    #          end = tmpend + max_end)
+        df1 <- df1 %>% mutate(col = ifelse(name == "rna_1", "Red", "Blue"),
+                        fill = ifelse(name == "rna_1", "Red", "Blue"))
+    dna_seg1 <- reverse(dna_seg(df1))
+      dna_seg_labels[[counter]] <- paste(genome, "_", end_val, "_-", sep = "")
+
+    }else{
+      dna_seg_labels[[counter]] <- paste(genome, "_", start_val, "_+", sep = "")
+        df1 <- df1 %>% mutate(col = ifelse(name == "rna_1", "Red", "Blue"),
+                        fill = ifelse(name == "rna_1", "Red", "Blue"))
+dna_seg1 <- dna_seg(df1)
+  }
+  
+
+  
+
+  
+  
+  is.dna_seg(dna_seg1)
+  
+  # if(counter == 1){
+  # dna_segs <- list(dna_seg1)
+  # }else{
+    dna_segs[[counter]] <- dna_seg1
+  # }
+  
+  mid_pos <- middle(dna_segs[[1]])
+  
+  # comparison1 <- as.comparison(data.frame(start1=dna_segs[[1]]$start, end1=dna_segs[[1]]$end,
+  #                                         start2=dna_segs[[2]]$start,
+  #                                         end2=dna_segs[[2]]$end))
+  
+  annot2 <- genoPlotR::annotation(x1=c(mid_pos),
+                                  x2=c(dna_segs[[1]]$end),
+                                  text=c(dna_segs[[1]]$name),
+                                  rot=c(90), col=c("black"))
+  
+  
+  if(write_data){
+    svg(filename=paste(filepath, "/", outname, "_example_files/", genome, "_", start_val, ".svg", sep = ""),
+        width=20,
+        height=20,
+        pointsize=12)
+    plot_gene_map(dna_segs=dna_segs,
+                  annotations=annot2, annotation_height=1.3)
+    
+     dev.off()
+    pdf(paste(filepath, "/", outname, "_example_files/", genome, "_", start_val, ".pdf", sep = ""))
+    plot_gene_map(dna_segs=dna_segs,
+                  annotations=annot2, annotation_height=1.3)
+    
+    dev.off()
+  }else if(draw.plots){
+    plot_gene_map(dna_segs=dna_segs,
+                  annotations=annot2, annotation_height=1.3)
+  }
+  counter <- counter + 1
+  
+  returned_list <- list()
+  returned_list$dna_segs <- dna_segs
+  returned_list$annot2 <- annot2 
+  returned_list$counter <- counter 
+  returned_list$dna_seg_labels <- dna_seg_labels
+  return(returned_list)
+  
+}
+
+dna_segs_loop <- function(subsetDat = subsetDat, max_genomes = 10, adj.range = 5000, write_data = F, draw.plots = F,  all.names = F){
+counter <- 1
+i <- 1
+dna_segs <- list()
+dna_seg_labels <- list()
+
+for(i in 1:nrow(subsetDat)){
+  # print(i)
+  returned_list <- plot_region(i = i, counter = counter, dat = subsetDat, write_data = F, adj.range = adj.range, dna_segs = dna_segs, dna_seg_labels = dna_seg_labels, draw.plots = draw.plots)
+  
+  if(counter == returned_list$counter){
+    next
+  }
+  
+  dna_segs <- returned_list$dna_segs
+  annot2 <- returned_list$annot2
+  counter <- returned_list$counter
+  dna_seg_labels <- returned_list$dna_seg_labels
+  
+  if(counter > max_genomes){
+    break
+  }
+}
+
+annots <- lapply(dna_segs, function(x){
+mid <- middle(x)
+annot <- annotation(x1=x$start, text=x$name, rot=45)
+
+})
+
+genes_listed <- list()
+i <- 5
+if(length(dna_segs) == 0){
+  returned_list$dna_segs <- dna_segs
+  return(returned_list)
+}
+
+if(all.names == F){
+for(i in 1:length(annots)){
+
+  tmp <- data.frame(dna_segs[[i]])
+  tmp <- tmp %>% arrange(start)
+  row_val <- which(tmp$name == "rna_1")
+  row_vals <- c((row_val -2):(row_val + 2))
+  # row_vals <- c(1:nrow(tmp))
+  names_to_keep <- tmp$name[row_vals]
+  
+  if(length(genes_listed) > 0){
+    for(item in genes_listed){
+      if(length(item) > 0){
+        
+    names_to_keep[item == names_to_keep] <- ""
+      
+
+      }
+    }
+  }
+  
+    rows_to_keep <- match(x = names_to_keep, table = annots[[i]]$text)
+
+    rows_to_keep <- rows_to_keep[!is.na(rows_to_keep)]
+    
+    
+  
+  if(length(rows_to_keep) > 0){
+  annots[[i]]$text[-rows_to_keep] <- ""
+  }else{
+  annots[[i]]$text <- ""
+  }
+
+  
+  genes_listed[[i]] <- names_to_keep
+}
+}
+returned_list$dna_segs <- dna_segs
+returned_list$dna_seg_labels <- dna_seg_labels
+returned_list$annots <- annots
+
+return(returned_list)
+
+}
+
+id <- "GCA_000007565.2_196"
+outname <- "GCA_000007565.2_196"
+filepath <- "~/phd/RNASeq/examples"
+
+load("~/bin/r_git/R/r_files/predDat.Rda")
+
+
+
+
+predDat <- predDat %>% filter(probability > 0.5, group == "Predicted") %>% arrange(-probability, z_max, cov.min.eval)
+dev.off()
+
+
+
+for(id in predDat$ID){
+
+  
+  if(file.exists(paste("~/phd/RNASeq/examples/genes/plots/", id, ".svg", sep = ""))){
+    print(paste("~/phd/RNASeq/examples/genes/plots/", id, ".svg already exists", sep = ""))
+    next
+  }
+print(id)
+
+id <- "GCA_900243355.1_129"
+subsetDat <- get_subset_data(id_val = id)
+
+returned_list <- dna_segs_loop(subsetDat = subsetDat, max_genomes = 20, write_data = F, all.names = T)
+
+plot_gene_map(dna_segs=returned_list$dna_segs, dna_seg_labels = returned_list$dna_seg_labels, annotation_cex = 0.5,
+                  annotations=returned_list$annots,
+dna_seg_scale=TRUE,
+n_scale_ticks = 4)
+
+if(length(returned_list$dna_segs) == 0){
+  write.csv(probDat %>% filter(ID == id), paste("~/phd/RNASeq/examples/genes/tables/", id, ".csv", sep = ""), row.names = F, quote = F)
+          svg(filename=paste("~/phd/RNASeq/examples/genes/plots/", id, ".svg", sep = ""),
+        width=20,
+        height=20,
+        pointsize=12)    
+
+dev.off()
+  next
+}
+
+returned_list$dna_segs
+returned_list$dna_seg_labels
+
+# plot_gene_map(dna_segs=returned_list$dna_segs, dna_seg_labels = returned_list$dna_seg_labels, annotation_cex = 0.5,
+                  # annotations=returned_list$annots,
+# dna_seg_scale=TRUE,
+# n_scale_ticks = 4)
+
+    # pdf("~/phd/RNASeq/tmp/test.pdf")
+ tryCatch({
+        svg(filename=paste("~/phd/RNASeq/examples/genes/plots/", id, ".svg", sep = ""),
+        width=20,
+        height=20,
+        pointsize=12)    
+    
+plot_gene_map(dna_segs=returned_list$dna_segs, dna_seg_labels = returned_list$dna_seg_labels, annotation_cex = 0.5,
+                  annotations=returned_list$annots,
+dna_seg_scale=TRUE,
+n_scale_ticks = 4)
+    
+dev.off()
+  }, error =  function(e) {
+    print(paste("Error: ", id," not plotted", sep = ""))
+    
+  }) 
+
+
+ tryCatch({
+
+write.csv(predDat %>% filter(ID == id), paste("~/phd/RNASeq/examples/genes/tables/", id, ".csv", sep = ""), row.names = F, quote = F)
+  }, error =  function(e) {
+    print(paste("Error: ", id," table not written", sep = ""))
+    
+  }) 
+
+}
+
+
+load("~/bin/r_git/R/r_files/predDat_without_reads.Rda")
+
+predNoReads <- predDat
+load("~/bin/r_git/R/r_files/predDat_v2.Rda")
+
+tmp <- predDat %>% select(ID, read.max.score)
+
+predDat <- predNoReads %>% left_join(tmp)
+
+cds_ids <- predDat %>% filter(p.value < 0.05) %>% select(ID)
+returned_list$dna_segs
+
+for(id in predDat$ID){
+  
+  dat <- predDat %>% filter(ID == id) %>% select(read.max.score, distance, alifold_cov_score, z_max, motif.max.score, probability)
+  
+  colnames(dat) <- c("Reads", "Distance", "Covariance", "Z.Score", "Motif.Score", "Probability")
+  
+  write.csv(dat[1,] , paste("~/phd/RNASeq/examples/genes/tables/small/", id, ".csv", sep = ""), row.names = F, quote = F)
+
+}
+
+
+
+write.table(predDat %>% select(ID), file = "~/phd/RNASeq/predicted_ids.txt", quote = F, row.names = F, col.names = F)
+
+```
+
+
+```{r test, eval= F, include=F}
+
+## simple example
+## dna segments
+## data.frame with several genes
+names1 <- c("feat1", "feat2", "feat3")
+starts1 <- c(2, 1000, 1050)
+ends1 <- c(600, 800, 1345)
+strands1 <- c("-", -1, 1)
+cols1 <- c("blue", "grey", "red")
+
+df1 <- data.frame(name=names1, start=starts1, end=ends1,
+strand=strands1, col=cols1)
+dna_seg1 <- dna_seg(df1)
+is.dna_seg(dna_seg1)
+## with only one gene, or two, and merging
+gene2a <- dna_seg(list(name="feat1", start=50, end=900, strand="-", col="blue"))
+genes2b <- dna_seg(data.frame(name=c("feat2", "feat3"), start=c(800, 1200),
+end=c(1100, 1322), strand=c("+", 1),
+col=c("grey", "red")))
+dna_seg2 <- c.dna_seg(gene2a, genes2b)
+is.dna_seg(dna_seg2)
+## reading from file
+dna_seg3_file <- system.file('extdata/dna_seg3.tab', package = 'genoPlotR')
+dna_seg3 <- read_dna_seg_from_tab(dna_seg3_file)
+is.dna_seg(dna_seg3)
+## comparison
+## from a data.frame
+comparison1 <- as.comparison(data.frame(start1=starts1, end1=ends1,
+start2=dna_seg2$start,
+end2=dna_seg2$end))
+is.comparison(comparison1)
+## from a file
+comparison2_file <- system.file('extdata/comparison2.tab',
+package = 'genoPlotR')
+comparison2 <- read_comparison_from_tab(comparison2_file,
+color_scheme="red_blue")
+is.comparison(comparison1)
+## plot
+plot_gene_map(dna_segs=list(dna_seg1, dna_seg2, dna_seg3),
+comparisons=list(comparison1, comparison2))
+
+
+
+
+
+
+
+
+## loading data
+data(three_genes)
+## Calculating middle positions
+mid_pos <- middle(dna_segs[[1]])
+# Create first annotation
+annot1 <- annotation(x1=mid_pos, text=dna_segs[[1]]$name)
+plot_gene_map(dna_segs=dna_segs, comparisons=comparisons, annotations=annot1)
+## Exploring options
+annot2 <- annotation(x1=c(mid_pos[1], dna_segs[[1]]$end[2]),
+                     x2=c(NA, dna_segs[[1]]$end[3]),
+text=c(dna_segs[[1]]$name[1], "region1"),
+rot=c(30, 0), col=c("grey", "black"))
+plot_gene_map(dna_segs=dna_segs, comparisons=comparisons,
+annotations=annot2, annotation_height=1.3)
+## Annotations on all the segments
+annots <- lapply(dna_segs, function(x){
+mid <- middle(x)
+annot <- annotation(x1=mid, text=x$name, rot=30)
+})
+plot_gene_map(dna_segs=dna_segs, comparisons=comparisons,
+annotations=annots, annotation_height=1.8, annotation_cex=1)
+##
+## Using a bigger dataset from a 4-genome comparison
+##
+data(barto)
+## Adding a tree
+tree <- newick2phylog("(BB:2.5,(BG:1.8,(BH:1,BQ:0.8):1.9):3);")
+## Showing several subsegments
+xlims2 <- list(c(1445000, 1415000, 1380000, 1412000),
+c( 10000, 45000, 50000, 83000, 90000, 120000),
+c( 15000, 36000, 90000, 120000, 74000, 98000),
+c( 5000, 82000))
+## Adding annotations for all genomes, allow segments to be placed out
+## of the longest segment
+annots <- lapply(barto$dna_segs, function(x){
+mid <- middle(x)
+annot <- annotation(x1=mid, text=x$name, rot=30)
+# removing gene names starting with "B" and keeping 1 in 4
+idx <- grep("^[^B]", annot$text, perl=TRUE)
+annot[idx[idx %% 4 == 0],]
+})
+plot_gene_map(barto$dna_segs, barto$comparisons, tree=tree,
+annotations=annots,
+xlims=xlims2,
+limit_to_longest_dna_seg=FALSE,
+dna_seg_scale=TRUE)
+
+
+
+## Prepare dna_seg
+names <- paste("Eco", sprintf("%04d", 1:20), sep="")
+gene <- c("-", "atpC", "atpB", "atpA", "atp2",
+"-", "-", "cda1", "cda2", "cda3",
+"vcx23", "vcx22", "vcx21", "cde20",
+"-", "gfrU", "gfrT", "gfrY", "gfrX", "gfrW")
+ds <- dna_seg(data.frame(name=names, start=(1:20)*3, end=(1:20)*3+2,
+strand=rep(1, 20), gene=gene,
+stringsAsFactors=FALSE))
+## Original annotation
+annot1 <- annotation(x1=middle(ds), text=ds$gene, rot=30)
+## auto_annotate with various options
+annot2 <- auto_annotate(ds)
+annot3 <- auto_annotate(ds, keep_genes_only=FALSE, rot=45)
+annot4 <- auto_annotate(ds, keep_genes_only=FALSE,
+locus_tag_pattern="Eco", col="red")
+## Plot
+plot_gene_map(list(ds, ds, ds, ds),
+annotations=list(annot1, annot2, annot3, annot4))
+
+
+```
+
