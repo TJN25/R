@@ -52,6 +52,7 @@ library(rjson)
 library(GenomicRanges)
 library(comparativeSRA)
 library(ggpubr)
+library(UpSetR)
 filePath <- "~/phd/RNASeq/r_files/"
 # use_python("/Users/thomasnicholson/anaconda3/bin/python")
 # use_condaenv("comparativesrna")
@@ -1342,6 +1343,60 @@ ggsave(filename = "~/phd/RNASeq/figures/upsetr_tree.svg", plot = p, width = 8, h
 
 
 ***
+
+```{r test_peak_calling_threshold}
+plotDat <- read.table("~/phd/RNASeq/genera/Salmonella/GCA_000210855.2.data/plot_files/ERR2020347.plot")
+plotDatncRNA <- read.table("~/phd/RNASeq/genera/Escherichia/GCA_000017745.1.data/plot_files/SRR1185095_ncRNA.plot")
+callsDatFwd10 <- rnaPeakCalling(dat = plotDatncRNA, col.num = 2, small_peaks = F, plot_threshold = 10)
+callsDatFwd11 <- rnaPeakCalling(dat = plotDatncRNA, col.num = 2, small_peaks = F, plot_threshold = 11)
+callsDatFwd12 <- rnaPeakCalling(dat = plotDatncRNA, col.num = 2, small_peaks = F, plot_threshold = 12)
+callsDatFwd13 <- rnaPeakCalling(dat = plotDatncRNA, col.num = 2, small_peaks = F, plot_threshold = 13)
+callsDatFwd14 <- rnaPeakCalling(dat = plotDatncRNA, col.num = 2, small_peaks = F, plot_threshold = 14)
+callsDatFwd15 <- rnaPeakCalling(dat = plotDatncRNA, col.num = 2, small_peaks = F, plot_threshold = 15)
+callsDatFwd16 <- rnaPeakCalling(dat = plotDatncRNA, col.num = 2, small_peaks = F, plot_threshold = 16)
+callsDatFwd17 <- rnaPeakCalling(dat = plotDatncRNA, col.num = 2, small_peaks = F, plot_threshold = 17)
+callsDatFwd18 <- rnaPeakCalling(dat = plotDatncRNA, col.num = 2, small_peaks = F, plot_threshold = 18)
+callsDatFwd19 <- rnaPeakCalling(dat = plotDatncRNA, col.num = 2, small_peaks = F, plot_threshold = 19)
+callsDatFwd20 <- rnaPeakCalling(dat = plotDatncRNA, col.num = 2, small_peaks = F, plot_threshold = 20)
+
+callsDatFwd10 <- callsDatFwd10 %>% mutate(group = "10")
+callsDatFwd11 <- callsDatFwd11 %>% mutate(group = "11")
+callsDatFwd12 <- callsDatFwd12 %>% mutate(group = "12")
+callsDatFwd13 <- callsDatFwd13 %>% mutate(group = "13")
+callsDatFwd14 <- callsDatFwd14 %>% mutate(group = "14")
+callsDatFwd15 <- callsDatFwd15 %>% mutate(group = "15")
+callsDatFwd16 <- callsDatFwd16 %>% mutate(group = "16")
+callsDatFwd17 <- callsDatFwd17 %>% mutate(group = "17")
+callsDatFwd18 <- callsDatFwd18 %>% mutate(group = "18")
+callsDatFwd19 <- callsDatFwd19 %>% mutate(group = "19")
+callsDatFwd20 <- callsDatFwd20 %>% mutate(group = "20")
+
+callsDatFwdEscherichia <- callsDatFwd10 %>% bind_rows(callsDatFwd11, callsDatFwd12, callsDatFwd13, callsDatFwd14, callsDatFwd15, callsDatFwd16, callsDatFwd17, callsDatFwd18, callsDatFwd19, callsDatFwd20)
+
+# save(callsDatFwdSalmonela, file = "~/bin/r_git/R/r_files/callsDatFwdSalmonela.Rda")
+
+binwidth_val <- 10
+max_length <- 200
+
+p <- ggplot() + 
+  geom_freqpoly(data = callsDatFwd %>% filter(feature.length < max_length) %>% filter(group %in% c(10,12,14,17,18,20)), aes(x = feature.length, group = group, color = group), binwidth = binwidth_val)
+p
+ggsave(filename = "~/phd/thesis_figures/SVG/read_depths_threshold_hist_2.svg")
+
+ggplot() + 
+  geom_freqpoly(data = callsDatFwd10[callsDatFwd10$feature.length < max_length,], aes(x = feature.length), binwidth = binwidth_val, color = "red") + 
+  geom_freqpoly(data = callsDatFwd15[callsDatFwd15$feature.length < max_length,], aes(x = feature.length), binwidth = binwidth_val, color = "blue") + 
+  geom_freqpoly(data = callsDatFwd20[callsDatFwd20$feature.length < max_length,], aes(x = feature.length), binwidth = binwidth_val) + 
+  geom_freqpoly(data = callsDatFwd18[callsDatFwd18$feature.length < max_length,], aes(x = feature.length), binwidth = binwidth_val, color = "green") + 
+  geom_freqpoly(data = callsDatFwd13[callsDatFwd13$feature.length < max_length,], aes(x = feature.length), binwidth = binwidth_val, color = "yellow") + 
+  geom_freqpoly(data = callsDatFwd12[callsDatFwd12$feature.length < max_length,], aes(x = feature.length), binwidth = binwidth_val, color = "pink") + 
+  geom_freqpoly(data = callsDatFwd14[callsDatFwd14$feature.length < max_length,], aes(x = feature.length), binwidth = binwidth_val, color = "grey") + 
+  geom_freqpoly(data = callsDatFwd16[callsDatFwd16$feature.length < max_length,], aes(x = feature.length), binwidth = binwidth_val, color = "brown") + 
+  geom_freqpoly(data = callsDatFwd17[callsDatFwd17$feature.length < max_length,], aes(x = feature.length), binwidth = binwidth_val, color = "purple") + 
+  geom_freqpoly(data = callsDatFwd19[callsDatFwd19$feature.length < max_length,], aes(x = feature.length), binwidth = binwidth_val, color = "orange") 
+
+
+```
 
 
 ## Call peaks on individual RNA-Seq experiments {#call_peaks}
@@ -4984,7 +5039,6 @@ dev.off()
 ### alifold_cov
 
 ```{r alifold_cov, eval = T, include=T}
-# pcCovAli <- read.table("~/phd/RNASeq/srna_seqs/version_1/positive_control/large_alignments/positive_control_alifold_covariation.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T, col.names = c("ID", "alifold_cov_score"))
 # ncCovAli <- read.table("~/phd/RNASeq/srna_seqs/version_1/negative_control/large_alignments/old/negative_control_alifold_covariation.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T, col.names = c("ID", "alifold_cov_score"))
 # predCovAli <- read.table("~/phd/RNASeq/srna_seqs/version_1/predicted/large_alignments/old/predicted_alifold_covariation.txt", sep = "", comment.char = "#", as.is = T, header = F, fill = T, col.names = c("ID", "alifold_cov_score"))
 # 
@@ -5249,6 +5303,25 @@ genomesGC <- genomesGC %>% left_join(genomesGCTotals, by = "ID") %>%
 save(genomesGC, file = "~/bin/r_git/R/r_files/genomesGC.Rda")
 ```
 
+Get the genus accessions and the genus names
+
+```{bash genus_accessions, eval = F}
+cd ~/phd/RNASeq/genera
+do
+cd ~/phd/RNASeq/genera/$folder
+for file in *.data;
+do
+accession=`basename $file .data`
+echo "$folder $accession" >> ~/phd/RNASeq/genera/genus_accession_lookup.txt
+done
+cd ~/phd/RNASeq/genera
+done
+cat genus_accession_lookup.txt > tmp
+cat tmp | grep -v "*" > genus_accession_lookup.txt
+
+```
+
+
 ```{r gc_content_rf_relative_setup, eval=F}
 load("~/bin/r_git/R/r_files/genomesGC.Rda")
 
@@ -5261,11 +5334,25 @@ colnames(counts) <- c("number.of.srnas", "ID")
 
 genomesGC <- genomesGC %>% left_join(counts, by = "ID") %>% left_join(lengths, by = "ID")
 
-genomesGC <- genomesGC %>% mutate(srna.per.mb = (number.of.srnas/genome.length)*1000000) %>% filter(!is.na(srna.per.mb))
+genomesGC_srna_counts <- genomesGC %>% mutate(srna.per.mb = (number.of.srnas/genome.length)*1000000) %>% filter(!is.na(srna.per.mb)) %>% filter(srna.per.mb < 500)
+accessions_lookup <- read.table("~/phd/RNASeq/genera/genus_accession_lookup.txt")
+
+accessions_lookup <- accessions_lookup %>% dplyr::rename(genera = V1, ID = V2)
+
+genomesGC_srna_counts <- genomesGC_srna_counts %>% left_join(accessions_lookup)
 
 
-ggplot() +
-  geom_point(data = genomesGC, aes(x = 100 - gc.percent, y = srna.per.mb))
+
+save(genomesGC_srna_counts, file = "~/bin/r_git/R/r_files/genomesGC_srna_counts.Rda")
+
+load("~/bin/r_git/R/r_files/accession_info.Rda")
+
+p <- ggplot() +
+  geom_point(data = genomesGC_srna_counts , aes(x = 100 - gc.percent, y = srna.per.mb, group = genera, color = genera))
+
+p
+
+ggsave(filename = "~/phd/thesis_figures/SVG/genome_gc_vs_srna_count.svg", plot = p)
 
 ```
 
@@ -7013,7 +7100,7 @@ score_summary(cuttoff = 0.3, column = "probability", dat = featuresSelected %>% 
 score_summary(cuttoff = 0.3, column = "probability", dat = validatation2)
 score_summary(cuttoff = 0.3, column = "probability", dat = predDat%>% filter(p.value > 0.05))
 score_summary(cuttoff = 0.3, column = "probability")
-score_summary(cuttoff = 0.3, column = "probability")
+score_summary(cuttoff = 0.67, column = "probability")
 
 validatation2 %>% filter(probability > 0.3, group == "Positive Control") %>% nrow()
 
@@ -8279,13 +8366,45 @@ ggplot() +
   geom_line(data = decay, aes(x = x, y = exp(-2*x)), color = "red") +
   geom_line(data = decay, aes(x = x, y = exp(-0.5*x)))
 
-  
+cumulativeCounts <- function(dists, smooth = T){
+
+  groups <- unique(dists$group)
+  for(i in groups){
+    dat <- dists %>% filter(group == i)
+    dat <- dat %>% mutate(count = 1) %>% 
+    arrange(-max_dist) %>% group_by(group) %>% 
+    mutate(cumulativeCount = cumsum(count)) %>% ungroup() %>% 
+    group_by(group, max_dist) %>% summarise(cumulative_prop = max(cumulativeCount)/ nrow(dat))
+    
+    if(smooth){
+      dat <- as.data.frame(spline(x = dat$max_dist,y =  dat$cumulative_prop))
+    }
+    dat <- dat %>% ungroup() %>% mutate(group = i)
+    if(exists('combinedDat')){
+      combinedDat <- combinedDat %>% bind_rows(dat)
+    }else{
+      combinedDat <- dat 
+    }
+  }
+  return(combinedDat)  
+
+}
+countsCumul <- counts %>% dplyr::rename(max_dist = count) 
+countsCumul <- cumulativeCounts(dists = countsCumul, smooth = F)
+
 p <- ggplot() +
-  geom_freqpoly(data = counts, aes(x = count, y = ..density.., group = group, color = group), binwidth = 1) +
-  scale_x_continuous(trans = "log10", limits = c(1, NA)) +
-  theme_bw()
+  geom_line(data = countsCumul, aes(x= max_dist, y = cumulative_prop, group = group, colour = group)) +
+  xlim(min = 0, max = 200)
 p
-ggsave(filename = "~/phd/RNASeq/figures/counts_distribution.svg", plot = p)
+
+
+# 
+# p <- ggplot() +
+#   geom_freqpoly(data = counts, aes(x = count, y = ..density.., group = group, color = group), binwidth = 1) +
+#   scale_x_continuous(trans = "log10", limits = c(1, NA)) +
+#   theme_bw()
+# p
+ggsave(filename = "~/phd/thesis_figures/SVG/counts_distribution.svg", plot = p)
 }
   
 ```
@@ -8311,14 +8430,23 @@ nc <- ncSRNApid %>%
 
 counts <- pred %>% bind_rows(pc, nc)
 
-  
-p <- ggplot() +
-  geom_freqpoly(data = counts, aes(x = srna.pid, y = ..density.., group = group, color = group), binwidth = 1) +
-  scale_x_continuous(limits = c(0, 100)) +
-  scale_y_continuous(trans = "log10") +
-  theme_bw()
+countsCumul <- counts %>% mutate(max_dist = -srna.pid) 
+countsCumul <- cumulativeCounts(dists = countsCumul, smooth = F)
 
+p <- ggplot() +
+  geom_line(data = countsCumul, aes(x= -max_dist, y = cumulative_prop, group = group, colour = group)) +
+  xlim(min = 0, max = 100)
 p
+
+
+# 
+# p <- ggplot() +
+#   geom_freqpoly(data = counts, aes(x = srna.pid, y = ..density.., group = group, color = group), binwidth = 1) +
+#   scale_x_continuous(limits = c(0, 100)) +
+#   scale_y_continuous(trans = "log10") +
+#   theme_bw()
+# 
+# p
 
 ggsave(filename = "~/phd/thesis_figures/SVG/pid_distribution.svg", plot = p)
 }
@@ -8331,7 +8459,7 @@ assembly_summary <- assembly_summary %>% select(V1, V5, V6, V7, V8, V18, V20, V1
 colnames(assembly_summary) <- as.character(unlist(assembly_summary[2,]))
 datesDat <- assembly_summary %>% select(seq_rel_date) %>% filter(seq_rel_date != "", seq_rel_date != "seq_rel_date") %>% mutate(count = 1, group = "Prokaryotic Genomes") %>% arrange(seq_rel_date)
 
-save(datesDat, file = "~/bin/r_git/R/r_files/datesDat.Rda")
+# save(datesDat, file = "~/bin/r_git/R/r_files/datesDat.Rda")
 
 rnaseq <- read.csv("~/phd/sra_rnaseq_dates.csv")
 
@@ -8339,7 +8467,7 @@ rnaseq <- rnaseq[,1:6]
 
 rnaseq <- rnaseq %>% mutate(count = 1, group = "RNA-Seq experiments")
 
-save(rnaseq, file = "~/bin/r_git/R/r_files/rnaseq.Rda")
+# save(rnaseq, file = "~/bin/r_git/R/r_files/rnaseq.Rda")
 
 rnaseq <- rnaseq %>% separate(ReleaseDate, into = c("seq_rel_date", NA), sep = " ", remove = T, extra = 'drop')
 
@@ -8398,8 +8526,14 @@ smooth <- F
     }
   }
 
+  sequencing_numbers <- combinedDat
+  
+  # save(sequencing_numbers,file = "~/bin/r_git/R/r_files/sequencing_numbers.Rda")
+  
+  load("~/bin/r_git/R/r_files/sequencing_numbers.Rda")
+  
   p <- ggplot() +
-  geom_line(data = combinedDat %>% filter(group != "Phage Genomes", group != "Archaeal Virus Genomes"), aes(x= date_val, y = cumulative_prop, group = group, colour = group)) +
+  geom_line(data = sequencing_numbers %>% filter(group != "Phage Genomes", group != "Archaeal Virus Genomes"), aes(x= date_val, y = cumulative_prop, group = group, colour = group)) +
     geom_hline(yintercept = 1593)
 p
 
@@ -8407,11 +8541,125 @@ p
 ggsave(filename = "~/phd/thesis_figures/SVG/database_sequencing_counts.svg", plot = p, width = 8, height = 8)
 
   p <- ggplot() +
-  geom_line(data = combinedDat %>% filter(group %in% c("Phage Genomes", "Archaeal Virus Genomes")), aes(x= date_val, y = cumulative_prop, group = group, colour = group)) 
+  geom_line(data = sequencing_numbers %>% filter(group %in% c("Phage Genomes", "Archaeal Virus Genomes")), aes(x= date_val, y = cumulative_prop, group = group, colour = group)) 
 p
 ggsave(filename = "~/phd/thesis_figures/SVG/database_sequencing_counts_viruses.svg", plot = p, width = 8, height = 8)
 
+
+
+  p <- ggplot() +
+  geom_line(data = sequencing_numbers, aes(x= date_val, y = cumulative_prop, group = group, colour = group)) +
+    scale_y_continuous(trans = "log10")
+p
+
+
+ ggsave(filename = "~/phd/thesis_figures/SVG/database_sequencing_counts_log.svg", plot = p, width = 8, height = 8)
+
 ```
+
+```{r phage_classification_proportions, eval=F}
+dat <- data.frame(tool = c("CLARK", "blastx", "VirSorter", "VirSorter", "mimax", "VirFinder", "VirFinder", "IMG/VR", "Wish", "VirHostMatcher", "HostPhinder", "dion", "coabundance", "blastn", "tblastx", "crispr", "exact.match", "kmer", "codon", "kmer.3", "GC"),
+                  type = c("kmer", "similarity", "kmer", "kmer", "homologues", "kmer", "kmer", "CRISPR", "kmer", "kmer", "kmer", "CRISPR", "coabundance", "similarity", "similarity", "CRISPR", "similarity", "kmer", "kmer", "kmer", "GC"),
+                  classified.percent = c(0.96, 4.01, 19, 0.5, 67.7, 67, 6.0, 15.3, 40.1, 33, 74, 33.81, 15.98, 62.32, 46.83, 26.95, 50.37, 34.63, 15.24, 21.59, 15.24),
+                  archaea.included = c(T, T, F, F, F, T, T, T, F, T, F, F, F, F, F, F, F, F, F, F, F),
+                  data.source = c("metagenome", "metagenome", "complete.phage", "metagenome", "complete.phage", "complete.phage", "metagenome", "metagenome", "complete.phage", "complete.phage", "complete.phage", "complete.phage", "complete.phage", "complete.phage", "complete.phage", "complete.phage", "complete.phage", "complete.phage", "complete.phage", "complete.phage", "complete.phage"),
+                  self.reporting = c(F, F, F, F, T, T, F, F, T, T, T, T, T, T, T, T, T, T, T, T, T))
+
+
+dat <- dat %>% mutate(group = paste(self.reporting, data.source))
+
+
+dat_combined <- data.frame(tool = c("CLARK", "blastx", "VirSorter", "VirSorter", "mimax", "VirFinder", "VirFinder", "IMG/VR", "Wish", "VirHostMatcher", "HostPhinder", "CRISPR", "coabundance", "blastn", "tblastx", "CRISPR", "exact.match", "k-mer", "codon", "3-mer", "G+C"),
+                  type = c("kmer", "similarity", "kmer", "kmer", "similarity", "kmer", "kmer", "CRISPR", "kmer", "kmer", "kmer", "CRISPR", "coabundance", "similarity", "similarity", "CRISPR", "similarity", "kmer", "kmer", "kmer", "kmer"),
+                  classified.percent = c(0.96, 4.01, 19, 0.5, 67.7, 67, 6.0, 15.3, 40.1, 33, 74, 33.81, 15.98, 62.32, 46.83, 26.95, 50.37, 34.63, 15.24, 21.59, 15.24),
+                  archaea.included = c(T, T, F, F, F, T, T, T, F, T, F, F, F, F, F, F, F, F, F, F, F),
+                  data.source = c("metagenome", "metagenome", "complete.phage", "metagenome", "complete.phage", "complete.phage", "metagenome", "metagenome", "complete.phage", "complete.phage", "complete.phage", "complete.phage", "complete.phage", "complete.phage", "complete.phage", "complete.phage", "complete.phage", "complete.phage", "complete.phage", "complete.phage", "complete.phage"),
+                  self.reporting = c(F, F, F, F, T, T, F, F, T, T, T, T, T, T, T, T, T, T, T, T, T))
+
+
+dat_combined <- dat_combined %>% mutate(group = paste(self.reporting, data.source))
+
+p <- ggplot() +
+  geom_boxplot(data = dat, aes(x = type, y = classified.percent, fill = self.reporting, color = self.reporting), position = "dodge")
+p
+ggsave(filename = "~/phd/thesis_figures/SVG/phage_classification_by_self_reporting.svg", plot = p, width = 8, height = 8)
+
+
+p <- ggplot() +
+  geom_boxplot(data = dat, aes(x = type, y = classified.percent, fill = data.source, color = data.source), position = "dodge")
+
+
+ggsave(filename = "~/phd/thesis_figures/SVG/phage_classification_by_data_source.svg", plot = p, width = 8, height = 8)
+
+
+p <- ggplot() +
+  geom_boxplot(data = dat, aes(x = type, y = classified.percent, fill = group, color = group), position = "dodge")
+p
+
+p <- ggplot(data = dat_combined %>% filter(type != "coabundance"), aes(x = type, y = classified.percent, fill = group, color = group, label = tool)) +
+  geom_jitter(position = position_jitter(seed = 1))+
+geom_text(position = position_jitter(seed = 1))
+p
+
+
+p <- ggplot(data = dat %>% filter(type != "coabundance"), aes(x = type, y = classified.percent, fill = group, color = group, label = tool)) +
+  geom_jitter(position = position_jitter(seed = 1))+
+geom_text(position = position_jitter(seed = 1))
+p
+
+
+ggsave(filename = "~/phd/thesis_figures/SVG/phage_classification_2.svg", plot = p, width = 8, height = 8)
+
+```
+
+```{r viral_arcogs, eval=F}
+arcogs <- read_csv("~/Downloads/ar14.arCOG.csv", col_names = F)
+
+viral <- read.table("~/phd/PredVirusHost/update_march_2020/arcgos_viral.txt")
+
+viral <- viral %>% dplyr::rename(arcog = V1)
+arcogs <- arcogs %>% dplyr::rename(arcog = X7) %>% mutate_all(as.character)
+
+arcogs <- arcogs %>% full_join(viral)
+
+
+arcogs_viral <- arcogs %>% filter(V2 == "X")
+
+
+load(file = "~/bin/PredVirusHost//arVOG_arCOGs.Rda")
+load( file = "~/bin/PredVirusHost/arVOGs_pVOGs.Rda")
+load( file = "~/bin/PredVirusHost/arVOG_vogDB.Rda")
+
+head(arVOG_arCOGs)
+head(arVOG_pVOGs)
+head(arVOG_vogDB)
+
+arVOG_arCOG_small <- arVOG_arCOGs %>% dplyr::rename(arVOG = query.name) %>% select(arVOG, arCOG, pfam) %>% unique()
+
+arVOG_pVOGs_small <- arVOG_pVOGs %>% select(arVOG, pVOG) %>% unique()
+arVOG_vogDB_small <- arVOG_vogDB %>% select(arVOG, pVOG) %>% unique() %>% dplyr::rename(vogDB = pVOG)
+
+pVOGs_arCOGs <- arVOG_arCOG_small %>% full_join(arVOG_pVOGs_small) %>% 
+  full_join(arVOG_vogDB_small)
+
+head(arcogs)
+arcogs_small <- arcogs %>% select(arcog, V2, V4) %>% dplyr::rename(category = V2, descr = V4, arCOG = arcog) %>% unique()
+
+pVOGs_arCOGs <- pVOGs_arCOGs %>% left_join(arcogs_small)
+
+```
+
+
+```{r crispr_archaea, eval=F}
+load("~/bin/large_files/cas_arrays_genomes_refseq_83.Rda") 
+
+archaea <- cas_arrays_genomes_refseq_83 %>% filter(domainName == "Archaea")
+
+```
+
+
+
+
 
 
 # Scripts

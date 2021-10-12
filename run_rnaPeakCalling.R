@@ -76,7 +76,6 @@ gffDat  <- tryCatch({
   q(status=1)
 })
 
-
 plotDat  <- tryCatch({
   suppressWarnings(plotDat <- read.table(paste(filePath, "/", sraName, ".plot", sep = "")))
   plotDat
@@ -84,6 +83,8 @@ plotDat  <- tryCatch({
   cat(paste("Error: ", opt$file_path, "/", opt$sra, ".plot not found.\n", sep = ""))
   q(status=1)
 })
+
+
 
 total <- (sum(plotDat$V1) + sum(plotDat$V2))/1000000
 
