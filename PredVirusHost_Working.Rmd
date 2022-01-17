@@ -1,0 +1,1363 @@
+---
+  title: "Pred_Virus_Host"
+author: "Thomas Nicholson"
+date: "3/9/2020"
+output: html_document
+runtime: shiny
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+#library(comparativeSRA)
+library(ggplot2)
+library(igraph)
+library(reshape2)
+library(ROSE)
+library(RColorBrewer)
+library(viridis)
+library(zoo)
+library(genoPlotR)
+library(ape)
+```
+
+```{r functions}
+vog_occurence_matrix <- function(dat){
+  dat <- dat %>% group_by(model_1, model_2) %>% summarise(count = n()) %>% 
+    filter(!is.na(model_1), !is.na(model_2))
+  mat <- dcast( dat , model_1~model_2)
+  mat[is.na(mat)] <- 0
+  #mat <- as.matrix(mat)
+  rownames(mat) <- mat$model_1
+  mat <- mat[,colnames(mat) != "model_1"]
+  mat <- mat[,colnames(mat)!= ""]
+  mat <- mat[,!is.na(colnames(mat))]
+  mat$rowsum <- rowSums(mat, na.rm = T)
+  mat <- mat[mat$rowsum > 0,]
+  mat <- mat %>% select(-rowsum)
+  mat <- as.matrix(mat)
+  mat <- mat[,colnames(mat)!= ""]
+  mat <- mat[,colnames(mat)!= "NA"]
+  return(mat)
+}
+vog_melt <- function(mat){
+  melted_cormat <- melt(mat)
+  melted_cormat <- melted_cormat %>% mutate(value_2 = log10(value) + 3) %>% 
+    mutate(value_2 = ifelse(value == 0, 0, value_2)) %>% arrange(value)
+  var2 <- melted_cormat %>% filter(value > 0) %>% group_by(Var2) %>% summarise(count = length(unique(Var1))) %>% filter(Var2 != "")
+  melted_cormat <- melted_cormat %>% left_join(var2, by = "Var2") 
+  melted_cormat <- melted_cormat %>% arrange(-count)
+  melted_cormat$Var2 <- factor(melted_cormat$Var2, levels = unique(melted_cormat$Var2))
+  melted_cormat$Var1 <- factor(melted_cormat$Var1, levels = unique(melted_cormat$Var1))
+  return(melted_cormat)
+}
+vog_counts <- function(melted_cormat, other_total, threshold = 1){
+  arVOG_matched <- length(unique(melted_cormat$Var1))
+  arVOG_name <- melted_cormat$Var2[1]
+  other_matched <- length(unique(melted_cormat$Var2))
+  other_name <- melted_cormat$Var2[1]
+  arVOG_count <- as.data.frame(mat)
+  other_count <- as.data.frame(t(mat))
+  arVOG_count[arVOG_count != 0] <- 1
+  other_count[other_count != 0] <- 1
+  arVOG_count$rowsum <- rowSums(x = arVOG_count, na.rm = T)
+  other_count$rowsum <- rowSums(x = other_count, na.rm = T)
+  arVOG_count$names <- rownames(arVOG_count)
+  other_count$names <- rownames(other_count)
+  arVOG_count <- arVOG_count %>% select(names, rowsum)
+  other_count <- other_count %>% select(names, rowsum)
+  arVOG_count <- arVOG_count %>% group_by(rowsum) %>% summarise(count = n())
+  other_count <- other_count %>% group_by(rowsum) %>% summarise(count = n())
+  arVOG_1 <- arVOG_count$count[1]
+  other_1 <- other_count$count[1]
+  cat(paste("arVOGs: 781\nOther: ", other_total, "\narVOGs matched: ", arVOG_matched, "\nOther matched: ", other_matched, "\narVOGs with only one match: ", arVOG_1, 
+            "\nOther with only one match: ", other_1, sep = ""))
+  multiple_models <- melted_cormat %>% filter(count > threshold, value > 0) %>% select(Var1, count) %>% unique() %>% arrange(Var1)
+  return(multiple_models)
+}
+```
+
+```{r archaeal_proteins_and_hmms}
+file_path <- "~/PredVirusHost/update_march_2020/"
+proteins <- read.table(paste(file_path, "archaeal_virus_lookup.txt", sep = ""), sep = "\t", header = F, as.is = T, fill = T)
+head(proteins)
+colnames(proteins) <- c("protein_accession", "protein_description", "genome")
+hmms <- read.table(paste(file_path, "arVOG_protein_hmm_list.txt", sep = ""), sep = "\t", header = F, as.is = T)
+head(hmms)
+colnames(hmms) <- c("protein_accession", "hmm_accession")
+dat <- hmms %>% left_join(proteins, by = "protein_accession")
+dat <- dat %>% mutate(protein_description = ifelse(grepl("hypothetical", protein_description), "hypothetical protein", protein_description))
+dat <- dat %>% mutate(protein_description = ifelse(grepl("ORF", protein_description), "hypothetical protein", protein_description))
+dat <- dat %>% mutate(protein_description = ifelse(grepl("unknown", protein_description), "hypothetical protein", protein_description))
+proteinDescr <- dat %>% group_by(hmm_accession) %>% summarise(protein_descriptions = paste(unique(protein_description), collapse = ":"))
+dat <- dat %>% mutate(genome = str_replace_all(genome, "Virus_PhiCh1_complete_genome.", "Natrialba_phage_PhiCh1"))
+dat <- dat %>% mutate(genome = str_replace_all(genome, "TPA:", ""))
+genomes <- dat %>% group_by(hmm_accession) %>% summarise(genomes = paste(unique(genome), collapse = ":"))
+genera <- dat %>% separate(col = genome, into = c("genus", "other"), sep = "_", remove = F, extra = "merge") %>% group_by(hmm_accession) %>% summarise(genera = paste(unique(genus), collapse = ", "))
+counts <- dat %>% group_by(hmm_accession) %>% summarise(count = length(unique(protein_description)))
+summaryData <- proteinDescr %>% full_join(genomes, by = "hmm_accession") %>% full_join(counts, by = "hmm_accession") %>% full_join(genera, by = "hmm_accession")
+summaryData <- summaryData %>% mutate(protein_descriptions = ifelse(count > 1, str_replace(string = protein_descriptions, pattern = ", hypothetical protein,", replacement = ","), protein_descriptions)) %>% mutate(protein_descriptions = ifelse(count > 1, str_replace(string = protein_descriptions, pattern = ", hypothetical protein", replacement = ""), protein_descriptions))%>% mutate(protein_descriptions = ifelse(count > 1, str_replace(string = protein_descriptions, pattern = "hypothetical protein,", replacement = ""), protein_descriptions))
+summaryData <- summaryData %>% mutate(protein_descriptions = str_replace_all(protein_descriptions, ",", ":"))
+summaryData <- summaryData %>% mutate_all(as.character) %>% mutate_if(is.character, str_replace_all, pattern = ",", replacement =":")
+save(summaryData, file = "~/bin/PredVirusHost/archaeal_hmm_accessions_descriptions.Rda")
+write.csv(summaryData, file = "~/bin/PredVirusHost/archaeal_hmm_accessions_descriptions.csv", row.names = F, quote = F)
+```
+
+```{r phage_proteins_and_hmms}
+file_path <- "~/PredVirusHost/update_march_2020/"
+proteins <- read.table(paste(file_path, "phage_lookup.txt", sep = ""), sep = "\t", header = F, as.is = T, quote = "", comment.char = "")
+proteins <- proteins %>% mutate(V2 = str_replace_all(string = V2, pattern = "_\\[2", replacement = "__2")) %>% mutate(V2 = str_replace_all(string = V2, pattern = "\\]", ""))
+proteins <- proteins %>% separate(col = V2, into = c("protein_description", "genome"), sep = "_\\[", remove = T, extra = "merge")
+proteins[proteins == ""] <- "hypothetical protein"
+proteins[is.na(proteins)] <- "hypothetical protein"
+head(proteins)
+colnames(proteins) <- c("protein_accession", "protein_description", "genome")
+hmms <- read.table(paste(file_path, "baPOG_protein_hmm_list.txt", sep = ""), sep = "\t", header = F, as.is = T)
+head(hmms)
+colnames(hmms) <- c("protein_accession", "hmm_accession")
+dat <- hmms %>% left_join(proteins, by = "protein_accession")
+dat <- dat %>% mutate(protein_description = ifelse(grepl("hypothetical", protein_description), "hypothetical protein", protein_description))
+dat <- dat %>% mutate(protein_description = ifelse(grepl("ORF", protein_description), "hypothetical protein", protein_description))
+dat <- dat %>% mutate(protein_description = ifelse(grepl("unknown", protein_description), "hypothetical protein", protein_description))
+dat <- dat %>% filter(!is.na(protein_description))
+proteinDescr <- dat %>% group_by(hmm_accession) %>% summarise(protein_descriptions = paste(unique(protein_description), collapse = ", "))
+dat <- dat %>% mutate(genome = str_replace_all(genome, "Virus_PhiCh1_complete_genome.", "Natrialba_phage_PhiCh1"))
+dat <- dat %>% mutate(genome = str_replace_all(genome, "TPA:", ""))
+genomes <- dat %>% group_by(hmm_accession) %>% summarise(genomes = paste(unique(genome), collapse = ", "))
+genera <- dat %>% separate(col = genome, into = c("genus", "other"), sep = "_", remove = F, extra = "merge") %>% group_by(hmm_accession) %>% summarise(genera = paste(unique(genus), collapse = ", "))
+counts <- dat %>% group_by(hmm_accession) %>% summarise(count = length(unique(protein_description)))
+summaryData <- proteinDescr %>% full_join(genomes, by = "hmm_accession") %>% full_join(counts, by = "hmm_accession") %>% full_join(genera, by = "hmm_accession")
+summaryData <- summaryData %>% mutate(protein_descriptions = ifelse(count > 1, str_replace(string = protein_descriptions, pattern = ", hypothetical protein,", replacement = ","), protein_descriptions)) %>% mutate(protein_descriptions = ifelse(count > 1, str_replace(string = protein_descriptions, pattern = ", hypothetical protein", replacement = ""), protein_descriptions))%>% mutate(protein_descriptions = ifelse(count > 1, str_replace(string = protein_descriptions, pattern = "hypothetical protein,", replacement = ""), protein_descriptions))
+summaryData <- summaryData %>% mutate_all(as.character) %>% mutate_if(is.character, str_replace_all, pattern = ",", replacement =":")
+save(summaryData, file = "~/bin/PredVirusHost/phage_hmm_accessions_descriptions.Rda")
+write.csv(summaryData, file = "~/bin/PredVirusHost/phage_hmm_accessions_descriptions.csv", row.names = F, quote = F)
+```
+
+```{r eukaryotic_proteins_and_hmms}
+file_path <- "~/PredVirusHost/update_march_2020/"
+proteins <- read.table(paste(file_path, "eukaryotic_proteins_and_functions.txt", sep = ""), sep = "\t", header = F, as.is = T, quote = "", comment.char = "")
+proteins <- proteins %>% mutate(V2 = str_replace_all(string = V2, pattern = "_\\[2", replacement = "__2")) %>% mutate(V2 = str_replace_all(string = V2, pattern = "\\]", ""))
+proteins[proteins == ""] <- "hypothetical protein"
+proteins[is.na(proteins)] <- "hypothetical protein"
+head(proteins)
+colnames(proteins) <- c("protein_accession",  "genome", "protein_description")
+hmms <- read.table(paste(file_path, "euVOG_protein_hmm_list.txt", sep = ""), sep = "\t", header = F, as.is = T)
+head(hmms)
+colnames(hmms) <- c("protein_accession", "genome_2", "hmm_accession")
+dat <- hmms %>% left_join(proteins, by = "protein_accession")
+dat <- dat %>% mutate(protein_description = ifelse(grepl("hypothetical", protein_description), "hypothetical protein", protein_description))
+dat <- dat %>% mutate(protein_description = ifelse(grepl("ORF", protein_description), "hypothetical protein", protein_description))
+dat <- dat %>% mutate(protein_description = ifelse(grepl("unknown", protein_description), "hypothetical protein", protein_description))
+dat <- dat %>% filter(!is.na(protein_description))
+proteinDescr <- dat %>% group_by(hmm_accession) %>% summarise(protein_descriptions = paste(unique(protein_description), collapse = ", "))
+dat <- dat %>% mutate(genome = str_replace_all(genome, "Virus_PhiCh1_complete_genome.", "Natrialba_phage_PhiCh1"))
+dat <- dat %>% mutate(genome = str_replace_all(genome, "TPA:", ""))
+genomes <- dat %>% group_by(hmm_accession) %>% summarise(genomes = paste(unique(genome), collapse = ", "))
+genera <- dat %>% separate(col = genome, into = c("genus", "other"), sep = "_", remove = F, extra = "merge") %>% group_by(hmm_accession) %>% summarise(genera = paste(unique(genus), collapse = ", "))
+counts <- dat %>% group_by(hmm_accession) %>% summarise(count = length(unique(protein_description)))
+summaryData <- proteinDescr %>% full_join(genomes, by = "hmm_accession") %>% full_join(counts, by = "hmm_accession") %>% full_join(genera, by = "hmm_accession")
+summaryData <- summaryData %>% mutate(protein_descriptions = ifelse(count > 1, str_replace(string = protein_descriptions, pattern = ", hypothetical protein,", replacement = ","), protein_descriptions)) %>% mutate(protein_descriptions = ifelse(count > 1, str_replace(string = protein_descriptions, pattern = ", hypothetical protein", replacement = ""), protein_descriptions))%>% mutate(protein_descriptions = ifelse(count > 1, str_replace(string = protein_descriptions, pattern = "hypothetical protein,", replacement = ""), protein_descriptions))
+summaryData <- summaryData %>% mutate_all(as.character) %>% mutate_if(is.character, str_replace_all, pattern = ",", replacement =":")
+summaryData <- summaryData %>% select(-genera)
+save(summaryData, file = "~/bin/PredVirusHost/eukaryotic_hmm_accessions_descriptions.Rda")
+write.csv(summaryData, file = "~/bin/PredVirusHost/eukaryotic_hmm_accessions_descriptions.csv", row.names = F, quote = F)
+```
+
+```{r arCOGs}
+file_path <- "~/PredVirusHost/update_march_2020/"
+#####----------- import and setup ---------########
+allArVOGs <- read.table(paste(file_path, "arVOG_protein_hmm_list.txt", sep = ""))
+head(allArVOGs)
+colnames(allArVOGs) <- c("proteins", "arVOGs")
+allArVOGs <- allArVOGs %>% select(arVOGs) %>% unique()
+hmmColnames <- c("target.name", "query.name", "accession.2", "E.value", "score", "bias", "E.value.2", "score.2", "bias.2", "exp", "reg", "clu", "ov", "env", "dom", "rep", "inc")
+dat <- read.csv(paste(file_path, "ar14.arCOG.csv", sep = ""))
+colnames(dat) <- c("domain_id", "genome", "protein_id", "length", "start", "stop", "arCOG", "class", "other_1", "other_2")
+lookup <- read.table(paste(file_path, "ar14.arCOGdef19.tab", sep = ""), sep = "\t", fill = T, comment.char = "", quote = "", as.is = T)
+colnames(lookup) <- c("arCOG", "f_class", "gene", "annotation", "cluster", "pfam", "cdd", "tigrfam")
+res <- read.table(paste(file_path, "/arCOG_arVOG.tab", sep = ""), sep = "", fill = T, as.is = T)
+colnames(res) <- hmmColnames
+head(res$target.name)
+res <- res %>% separate(col = target.name, into = c("i1", "protein_id", "i2"), sep = "\\|", remove = F, extra = "merge")
+total <- nrow(res)
+pb <- txtProgressBar(min = 0, max = total, style = 3)
+for(i in 1:total){
+  setTxtProgressBar(pb, i, label=paste( round(i/total*100, 0), "% done"))
+  if(res$accession.2[i] != "-"){
+    res[1,7:20] <- res[i, 6:19]
+    res$accession.2[i] <- "-"
+  }
+}
+res <- res %>% mutate(protein_id = as.numeric(protein_id),
+                      score = as.numeric(score)) %>% 
+  filter(!is.na(protein_id))
+res %>% group_by(protein_id) %>% summarise(count = n()) %>% arrange(-count)
+res <- res %>% filter(as.numeric(E.value) < 1e-5) %>% group_by(protein_id) %>%  arrange(-score) %>% top_n(n = -1, wt = score) %>% top_n(n = 1, wt = E.value) %>% ungroup %>% mutate(protein_id = as.character(protein_id)) 
+dat$protein_id <- as.character(dat$protein_id)
+res %>% group_by(protein_id) %>% summarise(count = n()) %>% arrange(-count)
+head(res)
+head(lookup)
+head(dat)
+all <- res %>% full_join(dat, by = "protein_id") %>% full_join(lookup, by = "arCOG")
+all <- all %>% select(protein_id, arCOG, gene, query.name, E.value, genome, annotation, pfam, cdd, tigrfam)
+arVOG_arCOGs <- all %>% filter(!is.na(query.name))
+not_found <- all %>% filter(is.na(query.name))
+save(arVOG_arCOGs, file = "arVOG_arCOGs.Rda")
+#####----------- bipartitle graph ---------########
+load(file = "arVOG_arCOGs.Rda")
+arVOG_arCOGs <- arVOG_arCOGs %>% dplyr::rename(model_1 = query.name, model_2 = arCOG)
+mat <- vog_occurence_matrix(dat = arVOG_arCOGs)
+g <- graph.incidence(mat, weighted = T)
+g
+svg(filename="~/arVOG_arCOG_all.svg", 
+    width=100, 
+    height=100, 
+    pointsize=20)
+
+V(g)$color <- V(g)$type
+V(g)$color=gsub("FALSE","red",V(g)$color)
+V(g)$color=gsub("TRUE","blue",V(g)$color)
+plot(g, edge.color="gray30", vertex.size = 5)
+dev.off()
+arVOG_arCOG_mat <- mat
+save(arVOG_arCOG_mat, file ="~/bin/PredVirusHost/arVOG_arCOG_matrix.Rda")
+#####----------- Other ---------########
+load(file ="~/bin/PredVirusHost/arVOG_arCOG_matrix.Rda")
+mat <- arVOG_arCOG_mat
+melted_cormat <- vog_melt(mat)
+arCOG_multiple <- vog_counts(melted_cormat = melted_cormat, other_total = length(unique(dat$arCOG)))
+tmp <- melted_cormat %>% filter(count > 1, value > 0)
+p <- ggplot(data = tmp, aes(Var2, Var1, fill = value_2))+
+  geom_tile(color = "white")+
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", space = "Lab") +
+  theme_minimal()+ 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                   size = 12, hjust = 1))
+p
+ggsave("~/arCOG_arVOG_heatmap.svg", plot = p, device = "svg")
+```
+
+```{r pVOGs}
+file_path <- "~/PredVirusHost/update_march_2020/"
+#####----------- import and setup ---------########
+allArVOGs <- read.table(paste(file_path, "arVOG_protein_hmm_list.txt", sep = ""))
+head(allArVOGs)
+colnames(allArVOGs) <- c("protein_id", "arVOG")
+allArVOGs <- allArVOGs %>% unique()%>% mutate(type = "archeal")
+pVOGs <- read.table(paste(file_path, "pVOG_lookup.txt", sep = ""), sep = "\t", fill = T, quote = "", comment.char = "", as.is = T)
+head(pVOGs)
+colnames(pVOGs) <- c("pVOG", "other_1", "genome_id", "protein_id", "other_2", "gene_description")
+pVOG_descriptions <- read.table(paste(file_path, "pVOG_descriptions", sep = ""), sep = "\t", fill = T, quote = "", comment.char = "", as.is = T)
+head(pVOG_descriptions)
+colnames(pVOG_descriptions) <- c("pVOG", "genome_id", "genome_description", "other_2", "protein_id")
+pVOG_descriptions <- pVOG_descriptions %>% select(genome_id, genome_description) %>% unique()
+head(allArVOGs)
+arVOG_pVOGs <- allArVOGs %>% left_join(pVOGs, by = "protein_id") %>% left_join(pVOG_descriptions, by = "genome_id")
+tmp <- arVOG_pVOGs
+arVOG_pVOGs <- arVOG_pVOGs %>% filter(!is.na(pVOG))
+save(arVOG_pVOGs, file = "~/bin/PredVirusHost/arVOGs_pVOGs.Rda")
+#####----------- bipartitle graph ---------########
+load( file = "~/bin/PredVirusHost/arVOGs_pVOGs.Rda")
+arVOG_pVOGs <- arVOG_pVOGs %>% dplyr::rename(model_1 = arVOG, model_2 = pVOG)
+mat <- vog_occurence_matrix(dat = arVOG_pVOGs)
+g <- graph.incidence(mat, weighted = T)
+g
+svg(filename="~/arVOG_pVOG.svg", 
+    width=100, 
+    height=100, 
+    pointsize=20)
+V(g)$color <- V(g)$type
+V(g)$color=gsub("FALSE","red",V(g)$color)
+V(g)$color=gsub("TRUE","blue",V(g)$color)
+plot(g, edge.color="gray30", vertex.size = 5)
+dev.off()
+arVOG_pVOG_mat <- mat
+save(arVOG_pVOG_mat, file ="~/bin/PredVirusHost/arVOG_pVOG_matrix.Rda")
+#####----------- Other ---------########
+load(file ="~/bin/PredVirusHost/arVOG_pVOG_matrix.Rda")
+mat <- arVOG_pVOG_mat
+melted_cormat <- vog_melt(mat)
+vog_counts(melted_cormat = melted_cormat, other_total = length(unique(pVOGs$pVOG)))
+tmp <- melted_cormat %>% filter(count > 1, value > 0)
+p <- ggplot(data = tmp, aes(Var2, Var1, fill = value_2))+
+  geom_tile(color = "white")+
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", space = "Lab") +
+  theme_minimal()+ 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                   size = 12, hjust = 1))
+p
+ggsave("~/pVOG_arVOG_heatmap.svg", plot = p, device = "svg")
+```
+
+```{r VOGDB}
+file_path <- "~/PredVirusHost/update_march_2020/"
+#####----------- import and setup ---------########
+allArVOGs <- read.table(paste(file_path, "arVOG_protein_hmm_list.txt", sep = ""))
+head(allArVOGs)
+colnames(allArVOGs) <- c("protein_id", "arVOG")
+allArVOGs <- allArVOGs %>% unique()%>% mutate(type = "archeal")
+vogDB <- read.table(paste(file_path, "VOGDB_lookup.txt", sep = ""), sep = "\t", fill = T, quote = "", comment.char = "", as.is = T)
+head(vogDB)
+colnames(vogDB) <- c("other_1","pVOG", "other_2", "protein_id", "gene_description", "genome_description")
+arVOG_vogDB <- allArVOGs %>% left_join(vogDB, by = "protein_id")
+arVOG_vogDB <- arVOG_vogDB %>% filter(!is.na(pVOG))
+save(arVOG_vogDB, file = "~/bin/PredVirusHost/arVOG_vogDB.Rda")
+#####----------- bipartitle graph ---------########
+load( file = "~/bin/PredVirusHost/arVOG_vogDB.Rda")
+arVOG_vogDB <- arVOG_vogDB %>% dplyr::rename(model_1 = arVOG, model_2 = pVOG)
+mat <- vog_occurence_matrix(dat = arVOG_vogDB)
+g <- graph.incidence(mat, weighted = T)
+g
+svg(filename="~/arVOG_vogDB.svg", 
+    width=100, 
+    height=100, 
+    pointsize=20)
+V(g)$color <- V(g)$type
+V(g)$color=gsub("FALSE","red",V(g)$color)
+V(g)$color=gsub("TRUE","blue",V(g)$color)
+plot(g, edge.color="gray30", vertex.size = 5)
+dev.off()
+arVOG_vogDB_mat <- mat
+save(arVOG_vogDB_mat, file ="~/bin/PredVirusHost/arVOG_vogDB_matrix.Rda")
+#####----------- Other ---------########
+load(file ="~/bin/PredVirusHost/arVOG_vogDB_matrix.Rda")
+mat <- arVOG_vogDB_mat
+melted_cormat <- vog_melt(mat)
+vog_counts(melted_cormat = melted_cormat, other_total = length(unique(vogDB$pVOG)))
+tmp <- melted_cormat %>% filter(count > 1, value > 0)
+p <- ggplot(data = tmp, aes(Var2, Var1, fill = value_2))+
+  geom_tile(color = "white")+
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", space = "Lab") +
+  theme_minimal()+ 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                   size = 12, hjust = 1))
+p
+ggsave("~/VOGDB_arVOG_heatmap.svg", plot = p, device = "svg")
+```
+
+```{r baPOGs}
+file_path <- "~/PredVirusHost/update_march_2020/"
+#####----------- import and setup ---------########
+allArVOGs <- read.table(paste(file_path, "arVOG_protein_hmm_list.txt", sep = ""))
+head(allArVOGs)
+colnames(allArVOGs) <- c("protein_id", "arVOG")
+allArVOGs <- allArVOGs %>% select(arVOG) %>% unique()
+hmmColnames <- c("protein_id_bacterial", "accession.1", "arVOG", "accession.2", "E.value", "score", "bias", "E.value.2", "score.2", "bias.2", "exp", "reg", "clu", "ov", "env", "dom", "rep", "inc", "description")
+baPOGs <- read.table(paste(file_path, "baPOG_protein_hmm_list.txt", sep = ""))
+colnames(baPOGs) <- c("protein_id_bacterial", "baPOG")
+res <- read.table(paste(file_path, "/arVOG_baPOG.tab", sep = ""), sep = "", fill = T, as.is = T)
+colnames(res) <- hmmColnames
+head(res$protein_id_bacterial)
+res <- res %>% mutate(score = as.numeric(score)) %>% 
+  filter(!is.na(protein_id_bacterial))
+res %>% group_by(protein_id_bacterial) %>% summarise(count = n()) %>% arrange(-count)
+res <- res %>% filter(as.numeric(E.value) < 1e-5) %>% group_by(protein_id_bacterial) %>%  arrange(-score) %>% top_n(n = -1, wt = score) %>% top_n(n = 1, wt = E.value) %>% ungroup() 
+res %>% group_by(protein_id_bacterial) %>% summarise(count = n()) %>% arrange(-count)
+head(res)
+head(baPOGs)
+head(allArVOGs)
+all <- res %>% full_join(baPOGs, by = "protein_id_bacterial") 
+arVOG_bPOGs <- all %>% filter(!is.na(arVOG),
+                              !is.na(baPOG))
+not_found <- all %>% filter(is.na(query.name))
+save(arVOG_bPOGs, file = "arVOG_bPOGs.Rda")
+#####----------- bipartitle graph ---------########
+load(file = "arVOG_bPOGs.Rda")
+arVOG_bPOGs <- arVOG_bPOGs %>% dplyr::rename(model_1 = arVOG, model_2 = baPOG)
+mat <- vog_occurence_matrix(dat = arVOG_bPOGs)
+g <- graph.incidence(mat, weighted = T)
+g
+svg(filename="~/arVOG_bPOGs.svg", 
+    width=100, 
+    height=100, 
+    pointsize=20)
+
+V(g)$color <- V(g)$type
+V(g)$color=gsub("FALSE","red",V(g)$color)
+V(g)$color=gsub("TRUE","blue",V(g)$color)
+plot(g, edge.color="gray30", vertex.size = 5)
+dev.off()
+arVOG_baPOG_mat <- mat
+save(arVOG_baPOG_mat, file ="~/bin/PredVirusHost/arVOG_bPOGs_matrix.Rda")
+#####----------- Other ---------########
+load(file ="~/bin/PredVirusHost/arVOG_vogDB_matrix.Rda")
+mat <- arVOG_baPOG_mat
+melted_cormat <- vog_melt(mat)
+vog_counts(melted_cormat = melted_cormat, other_total = length(unique(baPOGs$baPOG)))
+tmp <- melted_cormat %>% filter(count > 1, value > 0)
+p <- ggplot(data = tmp, aes(Var2, Var1, fill = value_2))+
+  geom_tile(color = "white")+
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", space = "Lab") +
+  theme_minimal()+ 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                   size = 12, hjust = 1))
+p
+ggsave("~/bPOGs_arVOG_heatmap.svg", plot = p, device = "svg")
+```
+
+```{r multiple_models}
+load(file ="~/bin/PredVirusHost/arVOG_arCOG_matrix.Rda")
+melted_cormat <- vog_melt(arVOG_arCOG_mat)
+arCOG_multiple <- vog_counts(melted_cormat = melted_cormat, other_total = 0)
+load(file ="~/bin/PredVirusHost/arVOG_pVOG_matrix.Rda")
+melted_cormat <- vog_melt(arVOG_pVOG_mat)
+pVOG_multiple <- vog_counts(melted_cormat = melted_cormat, other_total = 0)
+load(file ="~/bin/PredVirusHost/arVOG_vogDB_matrix.Rda")
+melted_cormat <- vog_melt(arVOG_vogDB_mat)
+vogDB_multiple <- vog_counts(melted_cormat = melted_cormat, other_total = 0)
+load(file ="~/bin/PredVirusHost/arVOG_bPOGs_matrix.Rda")
+melted_cormat <- vog_melt(arVOG_baPOG_mat)
+baPG_multiple <- vog_counts(melted_cormat = melted_cormat, other_total = 0)
+arCOG_multiple <- arCOG_multiple %>% mutate(group = "arCOG") 
+pVOG_multiple <- pVOG_multiple %>% mutate(group = "pVOG") 
+vogDB_multiple <- vogDB_multiple %>% mutate(group = "vogDB") 
+baPG_multiple <- baPG_multiple %>% mutate(group = "baPOG") 
+mulitple <- arCOG_multiple %>% bind_rows(pVOG_multiple, vogDB_multiple, baPG_multiple) %>% select(Var1, group, count) %>% rename(model_1 = Var1, model_2 = group)
+multi_mat <- vog_occurence_matrix(dat = mulitple)
+g <- graph.incidence(multi_mat, weighted = T)
+g
+svg(filename="~/shared_arVOGs_vs_DBs.svg", 
+    width=100, 
+    height=100, 
+    pointsize=20)
+
+V(g)$color <- V(g)$type
+V(g)$color=gsub("FALSE","red",V(g)$color)
+V(g)$color=gsub("TRUE","blue",V(g)$color)
+plot(g, edge.color="gray30", vertex.size = 5)
+dev.off()
+```
+
+```{r all_models}
+load(file ="~/bin/PredVirusHost/arVOG_arCOG_matrix.Rda")
+melted_cormat_arCOG <- vog_melt(arVOG_arCOG_mat)
+arCOG_multiple <- vog_counts(melted_cormat = melted_cormat_arCOG, other_total = 0)
+load(file ="~/bin/PredVirusHost/arVOG_pVOG_matrix.Rda")
+melted_cormat_pVOG <- vog_melt(arVOG_pVOG_mat)
+pVOG_multiple <- vog_counts(melted_cormat = melted_cormat_pVOG, other_total = 0, threshold = 0)
+load(file ="~/bin/PredVirusHost/arVOG_vogDB_matrix.Rda")
+melted_cormat_vogDB <- vog_melt(arVOG_vogDB_mat)
+vogDB_multiple <- vog_counts(melted_cormat = melted_cormat_vogDB, other_total = 0, threshold = 0)
+load(file ="~/bin/PredVirusHost/arVOG_bPOGs_matrix.Rda")
+melted_cormat_baPOG <- vog_melt(arVOG_baPOG_mat)
+baPG_multiple <- vog_counts(melted_cormat = melted_cormat_baPOG, other_total = 0, threshold = 0)
+arCOG_multiple <- arCOG_multiple %>% mutate(group = "arCOG") 
+pVOG_multiple <- pVOG_multiple %>% mutate(group = "VOG") 
+vogDB_multiple <- vogDB_multiple %>% mutate(group = "VOG") 
+baPG_multiple <- baPG_multiple %>% mutate(group = "baPOG") 
+mulitple <- arCOG_multiple %>% bind_rows(pVOG_multiple, vogDB_multiple, baPG_multiple) %>% select(Var1, group, count) %>% rename(model_1 = Var1, model_2 = group)
+multi_mat <- vog_occurence_matrix(dat = mulitple)
+g <- graph.incidence(multi_mat, weighted = T)
+g
+brewer.pal(n = 16, name = "Dark2")
+n <- 8
+qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+col_vector = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+svg(filename="~/all_arVOGs_vs_DBs.svg", 
+    width=1000, 
+    height=1000, 
+    pointsize=200)
+
+
+V(g)$color <- ifelse(
+  multi_mat[V(g)[1:638], 2] > 0, ##baPOG exists
+  ifelse(multi_mat[V(g)[1:638], 3] > 0, ##vogDB exists
+         ifelse(multi_mat[V(g)[1:638], 3], ##pVOG exists
+                ifelse(multi_mat[V(g)[1:638], 1] > 0, ##arCOG exists
+                       3, ##all found 
+                       1 ##baPOG, vogDB, pVOG
+                ), ##pVOG missing
+                ifelse(multi_mat[V(g)[1:638], 1] > 0, ##arCOG exists
+                       3, ##baPOG, vogDB, arCOG
+                       1 ##baPOG, vogDB
+                       
+                )
+         ), ##vogDB missing
+         ifelse(multi_mat[V(g)[1:638], 3], ##pVOG exists
+                ifelse(multi_mat[V(g)[1:638], 1] > 0, ##arCOG exists
+                       3, ##baPOG, pVOG, arCOG 
+                       1 ##baPOG, pVOG
+                ), ##pVOG missing
+                ifelse(multi_mat[V(g)[1:638], 1] > 0, ##arCOG exists
+                       2, ##baPOG, arCOG 
+                       7 ##baPOG
+                       
+                )
+         )
+  ) ##baPOG missing
+  ,     ifelse(multi_mat[V(g)[1:638], 3] > 0, ##vogDB exists
+               ifelse(multi_mat[V(g)[1:638], 3], ##pVOG exists
+                      ifelse(multi_mat[V(g)[1:638], 1] > 0, ##arCOG exists
+                             5, ##vogDB, pVOG, arCOG
+                             4 ##vogDB, pVOG
+                      ), ##pVOG missing
+                      ifelse(multi_mat[V(g)[1:638], 1] > 0, ##arCOG exists
+                             5, ##vogDB, arCOG
+                             4 ##vogDB
+                             
+                      )
+               ), ##vogDB missing
+               ifelse(multi_mat[V(g)[1:638], 3], ##pVOG exists
+                      ifelse(multi_mat[V(g)[1:638], 1] > 0, ##arCOG exists
+                             5, ##pVOG, arCOG 
+                             4 ##pVOG
+                      ), ##pVOG missing
+                      ifelse(multi_mat[V(g)[1:638], 1] > 0, ##arCOG exists
+                             6, ##arCOG 
+                             8
+                             
+                      )
+               )
+  )
+)
+V(g)$color <- ifelse(V(g)$type == T, 9, V(g)$color)
+#col_vector <- plasma(n = 16)
+V(g)$color <- col_vector[as.numeric(V(g)$color)]
+
+# V(g)$color[1:10]
+
+#V(g)$color <- V(g)$type
+#V(g)$color <- col_vector[V(g)$color]
+#V(g)$color=gsub("FALSE","red",V(g)$color)
+#V(g)$color=gsub("TRUE","blue",V(g)$color)
+plot(g, edge.color="gray30", vertex.size = 5)
+dev.off()
+
+df <- data.frame(x = c("baPOG-VOG", "baPOG-arCOG", "baPOG-VOG-arCOG", "VOG", "VOG-arCOG", "arCOG", "baPOG", "Model_Nodes"), y = 10, color = col_vector[1:n])
+p <-ggplot() +
+  geom_bar(data = df, aes(x = x, y = y, fill = color), stat = "identity")
+p
+ggsave("~/colours.svg", plot = p, device = "svg")
+```
+
+```{r roc_curve}
+file_path <- "~/phd/old/pred_virus_host/update_march_2020/"
+eukaryoticRes <- read.table(file = paste(file_path, "/eukaryotic_simulation.txt", sep = ""), sep = "\t", header = T)
+archaealRes <- read.table(file = paste(file_path, "/archaeal_simulation.txt", sep = ""), sep = "\t", header = T)
+phagelRes <- read.table(file = paste(file_path, "/phage_simulation.txt", sep = ""), sep = "\t", header = T)
+## set max score
+archaeal <- archaealRes%>%mutate(max.score = ifelse(call == "archaeal", archaeal_score, ifelse(call == "phage", phage_score, eukaryotic_score)))%>% 
+  mutate(group = "archaeal")
+phage <- phagelRes%>%mutate(max.score = ifelse(call == "archaeal", archaeal_score, ifelse(call == "phage", phage_score, eukaryotic_score)))%>% 
+  mutate(group = "phage")
+eukaryotic <- eukaryoticRes%>%mutate(max.score = ifelse(call == "archaeal", archaeal_score, ifelse(call == "phage", phage_score, eukaryotic_score))) %>% 
+  mutate(group = "eukaryotic")
+all <- archaeal %>% bind_rows(phage) %>% bind_rows(eukaryotic)
+all[is.na(all)] <- 0
+rocData <- all %>% mutate(response = ifelse(group == "archaeal", 1, 0)) %>% 
+  filter(!is.na(response))
+
+svg(filename="~/archaeal_roc_curve.svg", 
+    width=15, 
+    height=15, 
+    pointsize=20)
+roc.curve(response = rocData$response, predicted = rocData$archaeal_score, 
+          main="ROC curve for Archaeal Score")
+dev.off()
+rocData <- all %>% mutate(response = ifelse(group == "phage", 1, 0)) %>% 
+  filter(!is.na(response))
+
+svg(filename="~/phage_roc_curve.svg", 
+    width=15, 
+    height=15, 
+    pointsize=20)
+roc.curve(response = rocData$response, predicted = rocData$phage_score, 
+          main="ROC curve for Archaeal Score")
+dev.off()
+rocData <- all %>% mutate(response = ifelse(group == "eukaryotic", 1, 0)) %>%
+  filter(!is.na(response))
+
+svg(filename="~/eukaryotic_roc_curve.svg", 
+    width=15, 
+    height=15, 
+    pointsize=20)
+roc.curve(response = rocData$response, predicted = rocData$eukaryotic_score, 
+          main="ROC curve for Archaeal Score")
+dev.off()
+```
+
+```{r discriminant_models}
+filePath <- "~/bin/PredVirusHost/predvirushost/"
+archaealModels <- read.table(paste(filePath, "/archaeal_model_scores.txt", sep = ""), sep = "\t", comment.char = "", quote = "", fill = T, as.is = T, header = T)
+phageModels <- read.table(paste(filePath, "/phage_model_scores.txt", sep = ""), sep = "\t", comment.char = "", quote = "", fill = T, as.is = T, header = T)
+eukaryoticModels <- read.table(paste(filePath, "/eukaryotic_model_scores.txt", sep = ""), sep = "\t", comment.char = "", quote = "", fill = T, as.is = T, header = T)
+```
+
+```{r sens_and_spec}
+file_path <- "~/phd/PredVirusHost//update_march_2020/"
+eukaryoticRes <- read.table(file = paste(file_path, "/eukaryotic_simulation.txt", sep = ""), sep = "\t", header = T)
+archaealRes <- read.table(file = paste(file_path, "/archaeal_simulation.txt", sep = ""), sep = "\t", header = T)
+phagelRes <- read.table(file = paste(file_path, "/phage_simulation.txt", sep = ""), sep = "\t", header = T)
+proteinSens <- data.frame(protein_count = 0, sensitivity = 0, count = 0)
+archaeal <- archaealRes%>%mutate(max.score = ifelse(call == "archaeal", archaeal_score, ifelse(call == "phage", phage_score, eukaryotic_score)))%>% 
+  mutate(group = "archaeal")
+phage <- phagelRes%>%mutate(max.score = ifelse(call == "archaeal", archaeal_score, ifelse(call == "phage", phage_score, eukaryotic_score)))%>% 
+  mutate(group = "phage")
+eukaryotic <- eukaryoticRes%>%mutate(max.score = ifelse(call == "archaeal", archaeal_score, ifelse(call == "phage", phage_score, eukaryotic_score))) %>% 
+  mutate(group = "eukaryotic")
+all <- archaeal %>% bind_rows(phage) %>% bind_rows(eukaryotic)
+all[is.na(all)] <- 0
+all <- all%>%
+  mutate(call = ifelse(archaeal_score >= phage_score,
+                       ifelse(archaeal_score >= eukaryotic_score,
+                              ifelse(archaeal_score > 60, "archaeal", "none"),
+                              ifelse(eukaryotic_score > 150, "eukaryotic", "none")),
+                       ifelse(phage_score >= eukaryotic_score, ifelse(phage_score > 110, "phage", "none"), ifelse(eukaryotic_score > 150, "eukaryotic", "none"))))
+proteinSens <- data.frame(protein_count = 0, sensitivity = 0, count = 0)
+proteinSpec <- data.frame(protein_count = 0, specificity = 0, count = 0)
+proteinAcc <- data.frame(protein_count = 0, accuracy = 0, count = 0)
+i <- 3
+for(i in 1:(max(all$protein_count, na.rm = T))){
+  print(i)
+  tmp <- all%>%filter(protein_count == i)
+  TN <- tmp %>% filter(group != "archaeal", call != "archaeal") %>% nrow() + tmp %>% filter(group != "phage", call != "phage") %>% nrow() + tmp %>% filter(group != "eukaryotic", call != "eukaryotic") %>% nrow()
+  FP <- tmp %>% filter(group != "archaeal", call == "archaeal") %>% nrow() + tmp %>% filter(group != "phage", call == "phage") %>% nrow() + tmp %>% filter(group != "eukaryotic", call == "eukaryotic") %>% nrow()
+  TP <- tmp %>% filter(group == "archaeal", call == "archaeal") %>% nrow()  + tmp %>% filter(group == "phage", call == "phage") %>% nrow() + tmp %>% filter(group == "eukaryotic", call == "eukaryotic") %>% nrow() 
+  FN <- tmp %>% filter(group == "archaeal", call != "archaeal") %>% nrow()  + tmp %>% filter(group == "phage", call != "phage") %>% nrow() + tmp %>% filter(group == "eukaryotic", call != "eukaryotic") %>% nrow() 
+  spec <- TN/(TN + FP) * 100
+  sens <- TP/(TP + FN) * 100
+  acc <- (TP + TN)/(TP + TN + FP + FN) * 100
+  proteinSens <- proteinSens%>%bind_rows(data.frame(protein_count = i, sensitivity = sens, count = nrow(tmp%>%filter(!is.na(call)))))
+  proteinSpec <- proteinSpec%>%bind_rows(data.frame(protein_count = i, specificity = spec, count = nrow(tmp%>%filter(!is.na(call)))))
+  proteinAcc <- proteinAcc%>%bind_rows(data.frame(protein_count = i, accuracy = acc, count = nrow(tmp%>%filter(!is.na(call)))))
+}
+proteinSens <- proteinSens%>%mutate(sensitivity = ifelse(is.na(sensitivity), 100, sensitivity))
+proteinSpec <- proteinSpec%>%mutate(specificity = ifelse(is.na(specificity), 100, specificity))
+proteinAcc <- proteinAcc%>%mutate(accuracy = ifelse(is.na(accuracy), 100, accuracy))
+p <- ggplot() +
+  geom_line(data = proteinSens, aes(x = protein_count, y = sensitivity, colour = "Sensitivity"), size = 1.5) +
+  geom_line(data = proteinSpec, aes(x = protein_count, y = specificity, colour = "Specificity"), size = 1.5) +
+  geom_vline(xintercept = 5) +
+  geom_hline(yintercept = 94) +
+  coord_cartesian(ylim = c(0, 105), xlim = c(0, 15)) +
+  labs(x = "Number of Proteins", y = "Percentage (Sensitivity and Specificity)") +
+  theme_bw()
+p
+ggsave("~/phd/PredVirusHost/figures/sensitivity_specificity_proteins.svg", plot = p, device = "svg")
+p <- ggplot() +
+  geom_line(data = proteinAcc, aes(x = protein_count, y = accuracy), size = 1.5) +
+  coord_cartesian(ylim = c(0, 105), xlim = c(0, 50)) +
+  labs(x = "Number of Proteins", y = "Percentage (Accuracy)") +
+  theme_bw()
+p
+all <- archaeal %>% bind_rows(phage) #%>% bind_rows(eukaryotic)
+all[is.na(all)] <- 0
+all <- all%>%
+  mutate(call = ifelse(archaeal_score >= phage_score,
+                       ifelse(archaeal_score >= eukaryotic_score,
+                              ifelse(archaeal_score > 60, "archaeal", "none"),
+                              ifelse(eukaryotic_score > 150, "eukaryotic", "none")),
+                       ifelse(phage_score >= eukaryotic_score, ifelse(phage_score > 110, "phage", "none"), ifelse(eukaryotic_score > 150, "eukaryotic", "none"))))
+scoreSens <- data.frame(score = 0, sensitivity = 0, count = 0)
+scoreSpec <- data.frame(score = 0, specificity = 0, count = 0)
+bin <- 10
+total <- round(2000/bin)
+i <- 13
+for(i in 1:total){
+  print(i*bin)
+  tmp <- all%>%filter(archaeal_score <= i*bin, archaeal_score > (i-1)*bin)
+  TN <- tmp %>% filter(group != "archaeal", call != "archaeal") %>% nrow() + tmp %>% filter(group != "phage", call != "phage") %>% nrow() + tmp %>% filter(group != "eukaryotic", call != "eukaryotic") %>% nrow()
+  FP <- tmp %>% filter(group != "archaeal", call == "archaeal") %>% nrow() + tmp %>% filter(group != "phage", call == "phage") %>% nrow() + tmp %>% filter(group != "eukaryotic", call == "eukaryotic") %>% nrow()
+  TP <- tmp %>% filter(group == "archaeal", call == "archaeal") %>% nrow()  + tmp %>% filter(group == "phage", call == "phage") %>% nrow() + tmp %>% filter(group == "eukaryotic", call == "eukaryotic") %>% nrow() 
+  FN <- tmp %>% filter(group == "archaeal", call != "archaeal") %>% nrow()  + tmp %>% filter(group == "phage", call != "phage") %>% nrow() + tmp %>% filter(group == "eukaryotic", call != "eukaryotic") %>% nrow() 
+  if(FP == 0 ){
+    spec <- 0
+  }else if(TN == 0){
+    spec <- 0
+  }else{
+    spec <- TN/(TN + FP) * 100
+  }
+  sens <- TP/(TP + FN) * 100
+  scoreSens <- scoreSens%>%bind_rows(data.frame(score = i*bin, sensitivity = sens, count = nrow(tmp%>%filter(!is.na(call)))))
+  scoreSpec <- scoreSpec%>%bind_rows(data.frame(score = i*bin, specificity = spec, count = nrow(tmp%>%filter(!is.na(call)))))
+}
+p <- ggplot() +
+  geom_histogram(data = all %>% filter(archaeal_score > 0), aes(x = archaeal_score, y = ..count../max(..count..)*100), fill='grey', binwidth = 10) +
+  
+  geom_line(data = scoreSens, aes(x = score, y = sensitivity, colour = "Sensitivity"), size = 1.5) +
+  geom_line(data = scoreSpec, aes(x = score, y = specificity, colour = "Specificity"), size = 1.5) +
+  geom_hline(yintercept = 95) +
+  coord_cartesian(ylim = c(0, 105), xlim = c(0, 300)) +
+  labs(x = "Score", y = "Percentage (Sensitivity and Specificity)") +
+  theme_bw()
+p
+ggsave("~/phd/PredVirusHost/figures//sensitivity_specificity_scores.svg", plot = p, device = "svg")
+all <- archaeal %>% bind_rows(phage) %>% bind_rows(eukaryotic)
+all[is.na(all)] <- 0
+all <- all%>%
+  mutate(call = ifelse(archaeal_score >= phage_score,
+                       ifelse(archaeal_score >= eukaryotic_score,
+                              ifelse(archaeal_score > 60, "archaeal", "none"),
+                              ifelse(eukaryotic_score > 150, "eukaryotic", "none")),
+                       ifelse(phage_score >= eukaryotic_score, ifelse(phage_score > 110, "phage", "none"), ifelse(eukaryotic_score > 150, "eukaryotic", "none"))))
+all <- all%>%
+  mutate(difference.percentage = ifelse(call == "archaeal",
+                                        ifelse(phage_score >= eukaryotic_score,
+                                               round((archaeal_score - phage_score)/archaeal_score*100, 2),
+                                               round((archaeal_score - eukaryotic_score)/archaeal_score*100, 2)
+                                        ),
+                                        ifelse(call == "phage",ifelse(archaeal_score >= eukaryotic_score,
+                                                                      round((phage_score - archaeal_score)/phage_score*100, 2),
+                                                                      round((phage_score - eukaryotic_score)/phage_score*100, 2)
+                                        ), ifelse(archaeal_score >= phage_score,
+                                                  round((eukaryotic_score - archaeal_score)/eukaryotic_score*100, 2),
+                                                  round((eukaryotic_score - phage_score)/eukaryotic_score*100, 2)
+                                        ))
+  ))
+all <- all %>% mutate(difference.percentage = ifelse(is.na(difference.percentage), 0, ifelse(is.infinite(difference.percentage), 100, difference.percentage)))
+all <- all %>% mutate(difference.percentage = abs(difference.percentage))
+diffSens <- data.frame(difference.percentage = 0, sensitivity = 0, count = 0)
+diffSpec <- data.frame(difference.percentage = 0, specificity = 0, count = 0)
+bin <- 5
+total <- 100/bin
+i <- 13
+for(i in 1:total){
+  print(i*bin)
+  tmp <- all%>%filter(difference.percentage <= i*bin, difference.percentage > (i-1)*bin)
+  TN <- tmp %>% filter(group != "archaeal", call != "archaeal") %>% nrow() + tmp %>% filter(group != "phage", call != "phage") %>% nrow() + tmp %>% filter(group != "eukaryotic", call != "eukaryotic") %>% nrow()
+  FP <- tmp %>% filter(group != "archaeal", call == "archaeal") %>% nrow() + tmp %>% filter(group != "phage", call == "phage") %>% nrow() + tmp %>% filter(group != "eukaryotic", call == "eukaryotic") %>% nrow()
+  TP <- tmp %>% filter(group == "archaeal", call == "archaeal") %>% nrow()  + tmp %>% filter(group == "phage", call == "phage") %>% nrow() + tmp %>% filter(group == "eukaryotic", call == "eukaryotic") %>% nrow() 
+  FN <- tmp %>% filter(group == "archaeal", call != "archaeal", call != "none") %>% nrow()  + tmp %>% filter(group == "phage", call != "phage", call != "none") %>% nrow() + tmp %>% filter(group == "eukaryotic", call != "eukaryotic", call != "none") %>% nrow() 
+  if(FP == 0 ){
+    spec <- 0
+  }else if(TN == 0){
+    spec <- 0
+  }else{
+    spec <- TN/(TN + FP) * 100
+  }
+  sens <- TP/(TP + FN) * 100
+  diffSens <- diffSens%>%bind_rows(data.frame(difference.percentage = i*bin, sensitivity = sens, count = nrow(tmp%>%filter(!is.na(call)))))
+  diffSpec <- diffSpec%>%bind_rows(data.frame(difference.percentage = i*bin, specificity = spec, count = nrow(tmp%>%filter(!is.na(call)))))
+}
+p <- ggplot() +
+  geom_histogram(data = all %>% filter(difference.percentage > 0), aes(x = difference.percentage, y = ..count../max(..count..)*100), fill='grey', binwidth = bin) +
+  
+  geom_line(data = diffSens, aes(x = difference.percentage, y = sensitivity, colour = "Sensitivity"), size = 1.5) +
+  geom_line(data = diffSpec, aes(x = difference.percentage, y = specificity, colour = "Specificity"), size = 1.5) +
+  coord_cartesian(ylim = c(0, 105), xlim = c(bin, 100)) +
+  labs(x = "Difference Percentage", y = "Percentage (Sensitivity and Specificity)") +
+  theme_bw()
+p
+ggsave("~/phd/old/pred_virus_host/update_march_2020/sensitivity_specificity_difference_percentage.svg", plot = p, device = "svg")
+```
+
+```{r metageomes}
+imgvr <- read.table("~/PredVirusHost/IMGVR/IMGVR.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+bovine <- read.table("~/DB/metagenomes/bovine/bovine.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+mgm4441095 <- read.table("~/DB/metagenomes/mgm4441095.3.350.genecalling.coding.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+mgm4441096 <- read.table("~/DB/metagenomes/mgm4441096.3.350.genecalling.coding.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+mgm4442583 <- read.table("~/DB/metagenomes/mgm4442583.3.350.genecalling.coding.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+mgm4449206 <- read.table("~/DB/metagenomes/mgm4449206.3.350.genecalling.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+mgm4522044 <- read.table("~/DB/metagenomes/mgm4522044.3.350.genecalling.coding_bovine_rumen.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+mgm4522044Cluster <- read.table("~/DB/metagenomes/mgm4522044.3.550.cluster.aa90.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+mgm4529716 <- read.table("~/DB/metagenomes/mgm4529716.3.350.genecalling.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+mgm4529719 <- read.table("~/DB/metagenomes/mgm4529719.3.350.genecalling.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+mgm4530143 <- read.table("~/DB/metagenomes/mgm4530143.3.350.genecalling.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+mgm4544453 <- read.table("~/DB/metagenomes/mgm4544453.3.350.genecalling.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+HG_ORFans <- read.table("~/DB/metagenomes/HG_ORFans.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+bovine <- bovine%>%mutate(genome = as.character(genome))
+mgm4441095 <- mgm4441095%>%mutate(genome = as.character(genome))
+mgm4441096 <- mgm4441096%>%mutate(genome = as.character(genome))
+HG_ORFans <- HG_ORFans%>%mutate(genome = as.character(genome))
+mgm4442583 <- mgm4442583%>%mutate(genome = as.character(genome))
+mgm4449206 <- mgm4449206%>%mutate(genome = as.character(genome))
+mgm4522044 <- mgm4522044%>%mutate(genome = as.character(genome))
+mgm4522044Cluster <- mgm4522044Cluster%>%mutate(genome = as.character(genome))
+mgm4529716 <- mgm4529716%>%mutate(genome = as.character(genome))
+mgm4529719 <- mgm4529719%>%mutate(genome = as.character(genome))
+mgm4530143 <- mgm4530143%>%mutate(genome = as.character(genome))
+mgm4544453 <- mgm4544453%>%mutate(genome = as.character(genome))
+metagenomes <- imgvr%>%
+  bind_rows(bovine)%>%
+  bind_rows(mgm4441095)%>%
+  bind_rows(mgm4441096)%>%
+  bind_rows(HG_ORFans)%>%
+  bind_rows(mgm4442583)%>%
+  bind_rows(mgm4449206)%>%
+  bind_rows(mgm4522044)%>%
+  bind_rows(mgm4522044Cluster)%>%
+  bind_rows(mgm4529716)%>%
+  bind_rows(mgm4529719)%>%
+  bind_rows(mgm4530143)%>%
+  bind_rows(mgm4544453)
+hotpools <-  mgm4441095%>%
+  bind_rows(mgm4441096)%>%
+  bind_rows(mgm4442583)%>%
+  bind_rows(mgm4449206)%>%
+  bind_rows(mgm4529716)%>%
+  bind_rows(mgm4529719)%>%
+  bind_rows(mgm4530143)%>%
+  bind_rows(mgm4544453)
+metagenomes <- metagenomes%>%
+  mutate(call = ifelse(archaeal_score >= phage_score,
+                       ifelse(archaeal_score >= eukaryotic_score,
+                              ifelse(archaeal_score > 60, "archaeal", "none"),
+                              ifelse(eukaryotic_score > 150, "eukaryotic", "none")),
+                       ifelse(phage_score >= eukaryotic_score, ifelse(phage_score > 110, "phage", "none"), ifelse(eukaryotic_score > 150, "eukaryotic", "none"))))
+metagenomes <- metagenomes%>%
+  mutate(difference.percentage = ifelse(call == "archaeal",
+                                        ifelse(phage_score >= eukaryotic_score,
+                                               round((archaeal_score - phage_score)/archaeal_score*100, 2),
+                                               round((archaeal_score - eukaryotic_score)/archaeal_score*100, 2)
+                                        ),
+                                        ifelse(call == "phage",ifelse(archaeal_score >= eukaryotic_score,
+                                                                      round((phage_score - archaeal_score)/phage_score*100, 2),
+                                                                      round((phage_score - eukaryotic_score)/phage_score*100, 2)
+                                        ), ifelse(archaeal_score >= phage_score,
+                                                  round((eukaryotic_score - archaeal_score)/eukaryotic_score*100, 2),
+                                                  round((eukaryotic_score - phage_score)/eukaryotic_score*100, 2)
+                                        ))
+  ))
+metagenomes <- metagenomes %>% mutate(difference.percentage = ifelse(is.na(difference.percentage), 0, ifelse(is.infinite(difference.percentage), 100, difference.percentage)))
+hotpools <- hotpools %>% mutate(difference.percentage = abs(difference.percentage))
+
+all <- all%>%
+  mutate(call = ifelse(archaeal_score >= phage_score,
+                       ifelse(archaeal_score >= eukaryotic_score,
+                              ifelse(archaeal_score > 60, "archaeal", "none"),
+                              ifelse(eukaryotic_score > 150, "eukaryotic", "none")),
+                       ifelse(phage_score >= eukaryotic_score, ifelse(phage_score > 110, "phage", "none"), ifelse(eukaryotic_score > 150, "eukaryotic", "none"))))
+hotpools <- hotpools%>%
+  mutate(difference.percentage = ifelse(call == "archaeal",
+                                        ifelse(phage_score >= eukaryotic_score,
+                                               round((archaeal_score - phage_score)/archaeal_score*100, 2),
+                                               round((archaeal_score - eukaryotic_score)/archaeal_score*100, 2)
+                                        ),
+                                        ifelse(call == "phage",ifelse(archaeal_score >= eukaryotic_score,
+                                                                      round((phage_score - archaeal_score)/phage_score*100, 2),
+                                                                      round((phage_score - eukaryotic_score)/phage_score*100, 2)
+                                        ), ifelse(archaeal_score >= phage_score,
+                                                  round((eukaryotic_score - archaeal_score)/eukaryotic_score*100, 2),
+                                                  round((eukaryotic_score - phage_score)/eukaryotic_score*100, 2)
+                                        ))
+  ))
+hotpools <- hotpools %>% mutate(difference.percentage = ifelse(is.na(difference.percentage), 0, ifelse(is.infinite(difference.percentage), 100, difference.percentage)))
+hotpools <- hotpools %>% mutate(difference.percentage = abs(difference.percentage))
+
+metagenomes$difference.percentage[metagenomes$call == "none"] <- 0                                               
+hotpools$difference.percentage[hotpools$call == "none"] <- 0                                               
+
+ggplot() +
+  geom_freqpoly(data = metagenomes, aes(x = protein.counts), binwidth = 1, colour = "red") +
+  geom_freqpoly(data = hotpools, aes(x = protein.counts), binwidth = 1, colour = "blue") +
+  xlim(c(0,20))
+metagenomes$group <- "Metagenomes"
+hotpools$group <- "Thermal"
+metagenomes$group[metagenomes$protein.counts >= 3] <- "3 or more"
+metagenomes$group[metagenomes$protein.counts < 3] <- "less than 3"
+hotpools$group[hotpools$protein.counts >= 3] <- "3 or more"
+hotpools$group[hotpools$protein.counts < 3] <- "less than 3"
+all <- metagenomes %>% bind_rows(hotpools)
+ggplot() + 
+  geom_bar(data = metagenomes, aes(x = call, y = ..count.., group = group, fill = group), position = "dodge")
+ggplot() + 
+  geom_bar(data = hotpools %>% filter(call != "none"), aes(x = call, y = ..count.., group = group, fill = group), position = "dodge")
+p <- ggplot() +
+  geom_bar(data = metagenomes, aes(x = call, y = ..count..))
+p
+ggsave("~/metagenomes_bargraph.svg", plot = p, device = "svg")
+p <-ggplot() +
+  geom_bar(data = hotpools %>% filter(call != "none"), aes(x = call, y = ..count..))
+p
+ggsave("~/thermal_bargraph.svg", plot = p, device = "svg")
+```
+
+```{r plot_genomes}
+gff <- read.table("~/bin/PredVirusHost/predvirushost_test_files/test_2.tmp.folder/Acidianus_bottle-shaped_virus_complete_genome.]_contig.gff", sep = "\t", fill = T, comment.char = "#", quote = "")
+colnames(gff) <- c("sequence", "source", "feature", "start", "end", "score", "strand", "phase", "atrribute")
+gff <- gff %>% separate(col = atrribute, into = c("call", "description"), remove = F, extra = "merge", sep = ":")
+gff <- gff %>% mutate(unique_names = paste(sequence, row_number(), sep = "_"))
+gff$call[is.na(gff$call)] <- "none"
+names1 <- gff$unique_names
+starts1 <- gff$start
+ends1 <- gff$end
+strands1 <- gff$strand
+gff <- gff %>% mutate(colours = ifelse(call == "archaeal", "blue", ifelse(call == "phage", "red", ifelse(call == "eukaryotic", "green", "black"))))
+cols1 <-gff$colours
+df1 <- data.frame(name=names1, start=starts1, end=ends1,
+                  strand=strands1, col="black", fill = cols1)
+dna_seg1 <- dna_seg(df1)
+is.dna_seg(dna_seg1)
+plot_gene_map(dna_segs=list(dna_seg1))
+```
+
+```{r extra}
+getwd()
+setwd("/Volumes/userdata/student_users/thomasnicholson/PredVirusHost/")
+#####
+##read in the hmm output ####
+aa <- read.table("arVOG_archaeal_test.txt")
+ap <- read.table("arVOG_phage_test.txt")
+ae <- read.table("arVOG_eukaryotic_test.txt")
+pa <- read.table("baPOG_archaeal_test.txt")
+pp <- read.table("baPOG_phage_test.txt")
+pe <- read.table("baPOG_eukaryotic_test.txt")
+ea <- read.table("euVOG_archaeal_test.txt")
+ep <- read.table("euVOG_phage_test.txt")
+ee <- read.table("euVOG_eukaryotic_test.txt")
+hmmColnames <- c("target.name", "accession", "query.name", "accession.2", "E.value", "score", "bias", "E.value.2", "score.2", "bias.2", "exp", "reg", "clu", "ov", "env", "dom", "rep", "inc", "description.of.target")
+colnames(aa) <- hmmColnames
+colnames(ae) <- hmmColnames
+colnames(ap) <- hmmColnames
+colnames(pa) <- hmmColnames
+colnames(pe) <- hmmColnames
+colnames(pp) <- hmmColnames
+colnames(ea) <- hmmColnames
+colnames(ep) <- hmmColnames
+colnames(ee) <- hmmColnames
+##get genome names matching to protein names ####
+archaeal_lookup <- read.table("~/DB/viral/archaeal_virus_lookup.txt", sep = "\t", header = F, comment.char = "", quote = "")
+phage_lookup <- read.table("~/DB/viral/phage_lookup.txt", sep = "\t", header = F, comment.char = "", quote = "")
+#>I dont think this is correct
+#eukaryotic_lookup <- read.table("~/DB/viral/eukaryotic_virus_proteinname_lookup.txt", sep = "\t", header = F, comment.char = "", quote = "")
+#>> this is probably the right one
+eukaryotic_lookup <- read.table("~/DB/viral/eukaryotic_lookup.txt", sep = "\t", header = F, comment.char = "", quote = "", fill = T)
+phage_lookup <- phage_lookup%>%
+  separate(col = V2, into = c("protein_description", "genome"), extra = "merge", remove = T, sep = "\\[")%>%
+  separate(col = genome, into = c("i1", "i2"), extra = "warn", remove = F, sep = "\\[")%>%
+  mutate(genome = ifelse(!is.na(i2), i2, genome))%>%
+  select(-i1, -i2)
+##get protein count for the test set ####
+archaealProteins <- read.table("~/PredVirusHost/archaeal_virus_test_protein_list.txt")
+phageProteins <- read.table("~/PredVirusHost/phage_test_protein_list.txt")
+eukaryoticProteins <- read.table("~/PredVirusHost/eukaryotic_virus_test_protein_list.txt")
+archaealProteins <- archaealProteins%>%mutate(test = T)%>%dplyr::rename(target.name = V1)
+phageProteins <- phageProteins%>%mutate(test = T)%>%dplyr::rename(target.name = V1)
+eukaryoticProteins <- eukaryoticProteins%>%mutate(test = T)%>%dplyr::rename(target.name = V1)
+archaeal_lookup <- archaeal_lookup%>%dplyr::rename(target.name = V1, genome = V3)%>%group_by(genome)%>%full_join(archaealProteins)%>%filter(!is.na(test))%>%mutate(protein.count.full = n())
+eukaryotic_lookup <- eukaryotic_lookup%>%dplyr::rename(target.name = V2, genome = V1)%>%group_by(genome)%>%full_join(eukaryoticProteins)%>%filter(!is.na(test))%>%mutate(protein.count.full = n())
+phage_lookup <- phage_lookup%>%dplyr::rename(target.name = V1)%>%group_by(genome)%>%group_by(genome)%>%full_join(phageProteins)%>%filter(!is.na(test))%>%mutate(protein.count.full = n())
+##get model scores ####
+archaealModels <- read.table("/Volumes/userdata/student_users/thomasnicholson/complete_packages/predvirushost/archaeal_model_scores.txt", sep = "\t", comment.char = "", quote = "", fill = T, as.is = T, header = T)
+phageModels <- read.table("/Volumes/userdata/student_users/thomasnicholson/complete_packages/predvirushost/phage_model_scores.txt", sep = "\t", comment.char = "", quote = "", fill = T, as.is = T, header = T)
+eukaryoticModels <- read.table("/Volumes/userdata/student_users/thomasnicholson/complete_packages/predvirushost/eukaryotic_model_scores.txt", sep = "\t", comment.char = "", quote = "", fill = T, as.is = T, header = T)
+##simulate small contigs ####
+##include the models scores
+archaealRes <- simulateSmallContigs(arVOGres = aa, baPOGres = pa, euVOGres = ea, lookup = archaeal_lookup, discriminant_models_only = F)
+table(archaealRes$call)
+archaealRes <- read.table("~/PredVirusHost/archaeal_simulation.txt", sep = "", header = T, as.is = T)
+archaealRes <- archaealRes%>%
+  mutate(phage_score = ifelse(is.na(phage_score), 0, phage_score))%>%
+  mutate(archaeal_score = ifelse(is.na(archaeal_score), 0, archaeal_score))%>%
+  mutate(eukaryotic_score = ifelse(is.na(eukaryotic_score), 0, eukaryotic_score))%>%mutate(call = ifelse(archaeal_score >= phage_score,
+                                                                                                         ifelse(archaeal_score >= eukaryotic_score,
+                                                                                                                ifelse(archaeal_score > 60, "archaeal", "none"),
+                                                                                                                ifelse(eukaryotic_score > 150, "eukaryotic", "none")),
+                                                                                                         ifelse(phage_score >= eukaryotic_score, ifelse(phage_score > 110, "phage", "none"), ifelse(eukaryotic_score > 150, "eukaryotic", "none"))))
+write.table(x = archaealRes, "~/PredVirusHost/archaeal_simulation_discriminant_only.txt", quote = F, row.names = F, sep = "\t")
+phageRes <- simulateSmallContigs(arVOGres = ap, baPOGres = pp, euVOGres = ep, lookup = phage_lookup, discriminant_models_only = T)
+table(phagelRes$call)
+phageRes <- read.table("~/PredVirusHost/phage_simulation.txt", sep = "", header = T, as.is = T)
+phageRes <- phageRes%>%
+  mutate(phage_score = ifelse(is.na(phage_score), 0, phage_score))%>%
+  mutate(archaeal_score = ifelse(is.na(archaeal_score), 0, archaeal_score))%>%
+  mutate(eukaryotic_score = ifelse(is.na(eukaryotic_score), 0, eukaryotic_score))%>%mutate(call = ifelse(archaeal_score >= phage_score,
+                                                                                                         ifelse(archaeal_score >= eukaryotic_score,
+                                                                                                                ifelse(archaeal_score > 60, "archaeal", "none"),
+                                                                                                                ifelse(eukaryotic_score > 150, "eukaryotic", "none")),
+                                                                                                         ifelse(phage_score >= eukaryotic_score, ifelse(phage_score > 110, "phage", "none"), ifelse(eukaryotic_score > 150, "eukaryotic", "none"))))
+write.table(x = phagelRes, "~/PredVirusHost/phage_simulation.txt", quote = F, row.names = F, sep = "\t")
+eukaryoticRes <- simulateSmallContigs(arVOGres = ae, baPOGres = pe, euVOGres = ee, lookup = eukaryotic_lookup, discriminant_models_only = T)
+table(eukaryoticRes$call)
+eukaryoticRes <- read.table("~/PredVirusHost/eukaryotic_simulation.txt", sep = " ", header = T, as.is = T, fill = T)
+eukaryoticRes <- eukaryoticRes%>%
+  mutate(phage_score = ifelse(is.na(phage_score), 0, phage_score))%>%
+  mutate(archaeal_score = ifelse(is.na(archaeal_score), 0, archaeal_score))%>%
+  mutate(eukaryotic_score = ifelse(is.na(eukaryotic_score), 0, eukaryotic_score))%>%mutate(call = ifelse(archaeal_score >= phage_score,
+                                                                                                         ifelse(archaeal_score >= eukaryotic_score,
+                                                                                                                ifelse(archaeal_score > 60, "archaeal", "none"),
+                                                                                                                ifelse(eukaryotic_score > 150, "eukaryotic", "none")),
+                                                                                                         ifelse(phage_score >= eukaryotic_score, ifelse(phage_score > 110, "phage", "none"), ifelse(eukaryotic_score > 150, "eukaryotic", "none"))))
+write.table(x = eukaryoticRes, "~/PredVirusHost/eukaryotic_simulation.txt", quote = F, row.names = F, sep = "\t")
+##roc curve ####
+eukaryoticRes <- read.table(file = "~/PredVirusHost/eukaryotic_simulation.txt", sep = "\t", header = T)
+archaealRes <- read.table(file = "~/PredVirusHost/archaeal_simulation.txt", sep = "\t", header = T)
+phagelRes <- read.table(file = "~/PredVirusHost/phage_simulation.txt", sep = "\t", header = T)
+## set max score
+archaeal <- archaealRes%>%mutate(max.score = ifelse(call == "archaeal", archaeal_score, ifelse(call == "phage", phage_score, eukaryotic_score)))%>% 
+  mutate(group = "archaeal")
+phage <- phagelRes%>%mutate(max.score = ifelse(call == "archaeal", archaeal_score, ifelse(call == "phage", phage_score, eukaryotic_score)))%>% 
+  mutate(group = "phage")
+eukaryotic <- eukaryoticRes%>%mutate(max.score = ifelse(call == "archaeal", archaeal_score, ifelse(call == "phage", phage_score, eukaryotic_score))) %>% 
+  mutate(group = "eukaryotic")
+df <- data.frame(score = seq(0,10000, 10),
+                 aTP = rep(NA, 1001), aFP = rep(NA, 1001),
+                 pTP = rep(NA, 1001), pFP = rep(NA, 1001),
+                 eTP = rep(NA, 1001), eFP = rep(NA, 1001),
+                 eaTP = rep(NA, 1001), eaFP = rep(NA, 1001))
+i <- 0
+##loop through scores
+##archaeal results
+for(i in 0:10000){
+  # printRemaining(i = i, length = 10000, increment = 5)
+  ##work on increments of 10
+  if( i %% 10 == 0 ){
+    ##keep results where the max score is above i
+    aLocal <- archaeal%>%filter(archaeal_score >= i)#%>%filter(max.score < i + 10)
+    pLocal <- phage%>%filter(archaeal_score >= i)#%>%filter(max.score < i + 100)
+    eLocal <- eukaryotic%>%filter(archaeal_score >= i)#%>%filter(max.score < i + 100)
+    ##calculate and store TP and FP for each host
+    df[(i/10 +1),2] <- nrow(aLocal)/nrow(archaeal)
+    df[(i/10 +1),3] <- (nrow(pLocal) + nrow(eLocal))/(nrow(phage) + nrow(eukaryotic))
+  }
+}
+##phage
+for(i in 0:10000){
+  # printRemaining(i = i, length = 10000, increment = 5)
+  ##work on increments of 10
+  if( i %% 10 == 0 ){
+    ##keep results where the max score is above i
+    aLocal <- archaeal%>%filter(phage_score >= i)#%>%filter(max.score < i + 10)
+    pLocal <- phage%>%filter(phage_score >= i)#%>%filter(max.score < i + 100)
+    eLocal <- eukaryotic%>%filter(phage_score >= i)#%>%filter(max.score < i + 100)
+    ##calculate and store TP and FP for each host
+    df[(i/10 +1),4] <- nrow(pLocal)/nrow(phage)
+    df[(i/10 +1),5] <- (nrow(aLocal) + nrow(eLocal))/(nrow(archaeal) + nrow(eukaryotic))
+  }
+}
+##eukaryotic
+for(i in 0:10000){
+  #printRemaining(i = i, length = 10000, increment = 5)
+  ##work on increments of 10
+  if( i %% 10 == 0 ){
+    ##keep results where the max score is above i
+    aLocal <- archaeal%>%filter(eukaryotic_score >= i)#%>%filter(max.score < i + 10)
+    pLocal <- phage%>%filter(eukaryotic_score >= i)#%>%filter(max.score < i + 100)
+    eLocal <- eukaryotic%>%filter(eukaryotic_score >= i)#%>%filter(max.score < i + 100)
+    ##calculate and store TP and FP for each host
+    df[(i/10 +1),6] <- nrow(eLocal)/nrow(eukaryotic)
+    df[(i/10 +1),7] <- (nrow(aLocal) + nrow(pLocal))/(nrow(archaeal) + nrow(phage))
+  }
+}
+##eukaryotic vs archaeal only
+for(i in 0:10000){
+  # printRemaining(i = i, length = 10000, increment = 5)
+  ##work on increments of 10
+  if( i %% 10 == 0 ){
+    ##keep results where the max score is above i
+    aLocal <- archaeal%>%filter(eukaryotic_score >= i)#%>%filter(max.score < i + 10)
+    eLocal <- eukaryotic%>%filter(eukaryotic_score >= i)#%>%filter(max.score < i + 100)
+    ##calculate and store TP and FP for each host
+    df[(i/10 +1),8] <- nrow(eLocal)/nrow(eukaryotic)
+    df[(i/10 +1),9] <- nrow(aLocal)/nrow(archaeal)
+  }
+}
+all <- archaeal %>% bind_rows(phage) %>% bind_rows(eukaryotic)
+rocData <- archaeal %>% mutate(response = ifelse(group == "Random Data", 0, ifelse(group == "Known SRA predicted", 1, NA))) %>% 
+  filter(!is.na(response))
+roc.curve(response = rocData$response, predicted = rocData$score_2, 
+          main="ROC curve for Read Depths Scores")
+##plot FP vs TP
+ggplot() +
+  geom_line(data = df, aes(x = pFP, y = pTP), colour = "Blue") +
+  geom_line(data = df, aes(x = aFP, y = aTP), colour = "Red") +
+  geom_line(data = df, aes(x = eFP, y = eTP), colour = "Green") +
+  geom_line(data = df, aes(x = eaFP, y = eaTP), colour = "Yellow") +
+  #  geom_vline(xintercept = 0.01) +
+  geom_vline(xintercept = 0.02) +
+  #  geom_vline(xintercept = 0.03) +
+  #  geom_vline(xintercept = 0.04) +
+  #  geom_vline(xintercept = 0.05) +
+  xlim(0,1) +
+  ylim(0,1)
+df2 <- df%>%mutate(x = ifelse(eaFP >= 0.02, 0.02, 0))
+## Results ####
+archaealTab <- archaealRes%>%group_by(call)%>%summarise(archaea = n())%>%filter(!is.na(call))
+phageTab <- phageRes%>%group_by(call)%>%summarise(phage = n())%>%filter(!is.na(call))
+eukaryoticTab <- eukaryoticRes%>%group_by(call)%>%summarise(eukarya = n())%>%filter(!is.na(call))
+combinedTab <- archaealTab%>%full_join(phageTab)%>%full_join(eukaryoticTab)
+rownames(combinedTab) <- combinedTab$call
+##This is specificity
+spec <- c(sum(combinedTab[2:4, 3:4], na.rm = T)/(sum(combinedTab[1,3:4], na.rm = T) + sum(combinedTab[2:4, 3:4], na.rm = T)),
+          sum(combinedTab[c(1,3,4), c(2,4)], na.rm = T)/(sum(combinedTab[2,c(2,4)], na.rm = T) + sum(combinedTab[c(1,3,4), c(2,4)], na.rm = T)),
+          sum(combinedTab[c(1,2,4), 2:3], na.rm = T)/(sum(combinedTab[3,2:3], na.rm = T) + sum(combinedTab[c(1,2,4), 2:3], na.rm = T)))
+##This is sensitivity
+sens <- c(archaealTab[archaealTab$call == "archaeal",2]/sum(archaealTab$archaea),
+          phageTab[phageTab$call == "phage",2]/sum(phageTab$phage),
+          eukaryoticTab[eukaryoticTab$call == "eukaryotic",2]/sum(eukaryoticTab$eukarya))
+tab <- data.frame(host = c("Archaeal Virus", "Bacteriophage", "Eukaryotic Virus"),
+                  sensitivity = t(as.data.frame(sens)),
+                  specificity = spec)
+tt <- tab%>%select(host, sensitivity)%>%mutate(Result = rep("Sensitivity", 3))%>%dplyr::rename(score = sensitivity)%>%bind_rows(
+  tab%>%select(host, specificity)%>%mutate(Result = rep("Specificity", 3))%>%dplyr::rename(score = specificity)
+)
+ggplot(data = tt, aes(x = host, y = score, fill = Result)) +
+  geom_col(position = "dodge")
+## Analysis of model specificity #####
+##archaeal
+aa <- read.table("arVOG_archaeal_train.txt")
+ap <- read.table("arVOG_phage_train.txt")
+ae <- read.table("arVOG_eukaryotic_train.txt")
+hmmColnames <- c("target.name", "accession", "query.name", "accession.2", "E.value", "score", "bias", "E.value.2", "score.2", "bias.2", "exp", "reg", "clu", "ov", "env", "dom", "rep", "inc", "description.of.target")
+colnames(aa) <- hmmColnames
+colnames(ae) <- hmmColnames
+colnames(ap) <- hmmColnames
+aa <- aa%>%filter(as.numeric(E.value) < 1e-5)
+ap <- ap%>%filter(as.numeric(E.value) < 1e-5)
+ae <- ae%>%filter(as.numeric(E.value) < 1e-5)
+aaSum <- aa%>%group_by(query.name)%>%summarise(archaeal_bit_score_mean = mean(score))
+apSum <- ap%>%group_by(query.name)%>%summarise(phage_bit_score_mean = mean(score))
+aeSum <- ae%>%group_by(query.name)%>%summarise(eukaryotic_bit_score_mean = mean(score))
+archaealModels <- aaSum%>%full_join(apSum)%>%full_join(aeSum)
+archaealModels <- archaealModels%>%
+  mutate(archaeal_bit_score_mean = ifelse(is.na(archaeal_bit_score_mean), 0, archaeal_bit_score_mean))%>%
+  mutate(phage_bit_score_mean = ifelse(is.na(phage_bit_score_mean), 0, phage_bit_score_mean))%>%
+  mutate(eukaryotic_bit_score_mean = ifelse(is.na(eukaryotic_bit_score_mean), 0, eukaryotic_bit_score_mean))%>%
+  mutate(score.percentage = ifelse(phage_bit_score_mean >= eukaryotic_bit_score_mean,
+                                   round((archaeal_bit_score_mean - phage_bit_score_mean)/archaeal_bit_score_mean, 2),
+                                   round((archaeal_bit_score_mean - eukaryotic_bit_score_mean)/archaeal_bit_score_mean, 2)))%>%
+  mutate(score.percentage = ifelse(score.percentage < 0, 0, score.percentage))
+write.table(archaealModels%>%select(query.name,score.percentage), "archaeal_model_scores.txt", quote = F, col.names = T, row.names = F, sep = "\t")
+##phage
+pa <- read.table("baPOG_archaeal_train.txt")
+pp <- read.table("baPOG_phage_train.txt")
+pe <- read.table("baPOG_eukaryotic_train.txt")
+hmmColnames <- c("target.name", "accession", "query.name", "accession.2", "E.value", "score", "bias", "E.value.2", "score.2", "bias.2", "exp", "reg", "clu", "ov", "env", "dom", "rep", "inc", "description.of.target")
+colnames(pa) <- hmmColnames
+colnames(pe) <- hmmColnames
+colnames(pp) <- hmmColnames
+pa <- pa%>%filter(as.numeric(E.value) < 1e-5)
+pp <- pp%>%filter(as.numeric(E.value) < 1e-5)
+pe <- pe%>%filter(as.numeric(E.value) < 1e-5)
+paSum <- pa%>%group_by(query.name)%>%summarise(archaeal_bit_score_mean = mean(score))
+ppSum <- pp%>%group_by(query.name)%>%summarise(phage_bit_score_mean = mean(score))
+peSum <- pe%>%group_by(query.name)%>%summarise(eukaryotic_bit_score_mean = mean(score))
+phageModels <- paSum%>%full_join(ppSum)%>%full_join(peSum)
+phageModels <- phageModels%>%
+  mutate(archaeal_bit_score_mean = ifelse(is.na(archaeal_bit_score_mean), 0, archaeal_bit_score_mean))%>%
+  mutate(phage_bit_score_mean = ifelse(is.na(phage_bit_score_mean), 0, phage_bit_score_mean))%>%
+  mutate(eukaryotic_bit_score_mean = ifelse(is.na(eukaryotic_bit_score_mean), 0, eukaryotic_bit_score_mean))%>%
+  mutate(score.percentage = ifelse(archaeal_bit_score_mean >= eukaryotic_bit_score_mean,
+                                   round((phage_bit_score_mean - archaeal_bit_score_mean)/phage_bit_score_mean, 2),
+                                   round((phage_bit_score_mean - eukaryotic_bit_score_mean)/phage_bit_score_mean, 2)))%>%
+  mutate(score.percentage = ifelse(score.percentage < 0, 0, score.percentage))
+write.table(phageModels%>%select(query.name,score.percentage), "phage_model_scores.txt", quote = F, col.names = T, row.names = F, sep = "\t")
+##eukaryotic
+ea <- read.table("euVOG_archaeal_train.txt")
+ep <- read.table("euVOG_phage_train.txt")
+ee <- read.table("euVOG_eukaryotic_train.txt")
+hmmColnames <- c("target.name", "accession", "query.name", "accession.2", "E.value", "score", "bias", "E.value.2", "score.2", "bias.2", "exp", "reg", "clu", "ov", "env", "dom", "rep", "inc", "description.of.target")
+colnames(ea) <- hmmColnames
+colnames(ee) <- hmmColnames
+colnames(ep) <- hmmColnames
+ea <- ea%>%filter(as.numeric(E.value) < 1e-5)
+ep <- ep%>%filter(as.numeric(E.value) < 1e-5)
+ee <- ee%>%filter(as.numeric(E.value) < 1e-5)
+eaSum <- ea%>%group_by(query.name)%>%summarise(archaeal_bit_score_mean = mean(score))
+epSum <- ep%>%group_by(query.name)%>%summarise(phage_bit_score_mean = mean(score))
+eeSum <- ee%>%group_by(query.name)%>%summarise(eukaryotic_bit_score_mean = mean(score))
+eukaryoticModels <- eaSum%>%full_join(epSum)%>%full_join(eeSum)
+eukaryoticModels <- eukaryoticModels%>%
+  mutate(archaeal_bit_score_mean = ifelse(is.na(archaeal_bit_score_mean), 0, archaeal_bit_score_mean))%>%
+  mutate(phage_bit_score_mean = ifelse(is.na(phage_bit_score_mean), 0, phage_bit_score_mean))%>%
+  mutate(eukaryotic_bit_score_mean = ifelse(is.na(eukaryotic_bit_score_mean), 0, eukaryotic_bit_score_mean))%>%
+  mutate(score.percentage = ifelse(phage_bit_score_mean >= archaeal_bit_score_mean,
+                                   round((eukaryotic_bit_score_mean - phage_bit_score_mean)/eukaryotic_bit_score_mean, 2),
+                                   round((eukaryotic_bit_score_mean - archaeal_bit_score_mean)/eukaryotic_bit_score_mean, 2)))%>%
+  mutate(score.percentage = ifelse(score.percentage < 0, 0, score.percentage))
+write.table(eukaryoticModels%>%select(query.name,score.percentage), "eukaryotic_model_scores.txt", quote = F, col.names = T, row.names = F, sep = "\t")
+##protein results#####
+proteinSens <- data.frame(protein_count = 0, sensitivity = 0, count = 0)
+tmpRes <- archaealRes#%>%mutate(protein_count = mround(protein_count, 5))%>%mutate(protein_count = ifelse(is.na(protein_count), 0, protein_count))
+i <- 20
+for(i in 1:(max(tmpRes$protein_count, na.rm = T))){
+  print(i)
+  tmp <- as.data.frame(tmpRes%>%filter(protein_count == i))#%>%filter(!is.na(call))
+  tmp2 <- as.data.frame(tmp%>%group_by(call)%>%summarise(count = n())%>%filter(!is.na(call)))
+  sens  <- (nrow(tmp) - sum(as.numeric(tmp2[tmp2$call != "archaeal", 2])))/nrow(tmp)*100
+  if(length(sens) == 1){
+    proteinSens <- proteinSens%>%bind_rows(data.frame(protein_count = i, sensitivity = sens, count = nrow(tmp%>%filter(!is.na(call)))))
+  }else(
+    proteinSens <- proteinSens%>%bind_rows(data.frame(protein_count = i, sensitivity = NA, count = nrow(tmp%>%filter(!is.na(call)))))
+  )
+}
+#proteinSens[3,2] <- 94.56237
+proteinSpec <- data.frame(protein_count = 0, specificity = 0, count = 0)
+tmpRes <- phageRes#%>%mutate(protein_count = mround(protein_count, 5))%>%mutate(protein_count = ifelse(is.na(protein_count), 0, protein_count))
+i <- 4
+for(i in 1:(max(tmpRes$protein_count, na.rm = T))){
+  print(i)
+  tmp <- as.data.frame(tmpRes%>%filter(protein_count == i))%>%filter(!is.na(call))
+  tmp2 <- as.data.frame(tmp%>%group_by(call)%>%summarise(count = n())%>%filter(!is.na(call)))
+  spec  <- (nrow(tmp) - as.numeric(tmp2[tmp2$call == "archaeal", 2]))/nrow(tmp)*100
+  if(length(spec) == 1){
+    proteinSpec <- proteinSpec%>%bind_rows(data.frame(protein_count = i, specificity = spec, count = nrow(tmp%>%filter(!is.na(call)))))
+  }else(
+    proteinSpec <- proteinSpec%>%bind_rows(data.frame(protein_count = i, specificity = NA, count = nrow(tmp%>%filter(!is.na(call)))))
+  )
+}
+proteinSens <- proteinSens%>%mutate(sensitivity = ifelse(is.na(sensitivity), 100, sensitivity))
+proteinSpec <- proteinSpec%>%mutate(specificity = ifelse(is.na(specificity), 100, specificity))
+ggplot() +
+  #geom_point(data = proteinSens, aes(x = protein_count, y = sensitivity, colour="Sensitivity")) +
+  geom_line(data = proteinSens, aes(x = protein_count, y = sensitivity, colour = "Sensitivity"), size = 1.5) +
+  #geom_point(data = proteinSpec, aes(x = protein_count, y = specificity, colour="Specificity")) +
+  geom_line(data = proteinSpec, aes(x = protein_count, y = specificity, colour = "Specificity"), size = 1.5) +
+  coord_cartesian(ylim = c(0, 105), xlim = c(0, 28)) +
+  labs(x = "Number of Proteins", y = "Percentage (Sensitivity and Specificity)") +
+  theme_bw()
+#####
+scoreSens <- data.frame(score = 0, sensitivity = 0, count = 0)
+tmpRes <- archaealRes%>%mutate(archaeal_score = mround(archaeal_score, 50))%>%mutate(archaeal_score = ifelse(is.na(archaeal_score), 0, archaeal_score))
+i <- 2
+for(i in 1:(max(tmpRes$archaeal_score)/50)){
+  print(i*50)
+  tmp <- as.data.frame(tmpRes%>%filter(archaeal_score == i*50))
+  tmp2 <- as.data.frame(tmp%>%group_by(call)%>%summarise(count = n())%>%filter(!is.na(call)))
+  sens  <- as.numeric(tmp2[tmp2$call == "archaeal", 2])/nrow(tmp)*100
+  if(length(sens) == 1){
+    scoreSens <- scoreSens%>%bind_rows(data.frame(score = i*50, sensitivity = sens, count = nrow(tmp)))
+  }else(
+    scoreSens <- scoreSens%>%bind_rows(data.frame(score = i*50, sensitivity = NA, count = nrow(tmp)))
+  )
+}
+scoreSpec <- data.frame(score = 0, specificity = 0, count = 0)
+tmpRes <- phageRes%>%mutate(phage_score = mround(phage_score, 10))%>%mutate(phage_score = ifelse(is.na(phage_score), 0, phage_score))
+i <- 3
+for(i in 1:(max(tmpRes$phage_score)/10)){
+  print(i*10)
+  tmp <- as.data.frame(tmpRes%>%filter(phage_score == i*10))
+  tmp2 <- as.data.frame(tmp%>%group_by(call)%>%summarise(count = n())%>%filter(!is.na(call)))
+  spec  <- (nrow(tmp) - as.numeric(tmp2[tmp2$call == "archaeal", 2]))/nrow(tmp)*100
+  if(length(spec) == 1){
+    scoreSpec <- scoreSpec%>%bind_rows(data.frame(score = i*10, specificity = spec, count = nrow(tmp)))
+  }else(
+    scoreSpec <- scoreSpec%>%bind_rows(data.frame(score = i*10, specificity = 100, count = nrow(tmp)))
+  )
+}
+ggplot() +
+  geom_histogram(data = archaealRes, aes(x = archaeal_score, y = ..count..), fill='grey', binwidth = 50) +
+  #geom_point(data = scoreSens, aes(x = score, y = sensitivity, colour="Sensitivity")) +
+  geom_line(data = scoreSens, aes(x = score, y = sensitivity, colour = "Sensitivity"), size = 1.5) +
+  #geom_point(data = scoreSpec, aes(x = score, y = specificity, colour="Specificity")) +
+  geom_line(data = scoreSpec, aes(x = score, y = specificity, colour = "Specificity"), size = 1.5) +
+  coord_cartesian(ylim = c(0, 105), xlim = c(0, 5000)) +
+  labs(x = "Score", y = "Percentage (Sensitivity and Specificity)") +
+  theme_bw()
+##Protein count data Metagenomes #####
+imgvr <- read.table("~/PredVirusHost/IMGVR/IMGVR.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+bovine <- read.table("~/DB/metagenomes/bovine/bovine.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+mgm4441095 <- read.table("~/DB/metagenomes/mgm4441095.3.350.genecalling.coding.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+mgm4441096 <- read.table("~/DB/metagenomes/mgm4441096.3.350.genecalling.coding.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+mgm4442583 <- read.table("~/DB/metagenomes/mgm4442583.3.350.genecalling.coding.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+mgm4449206 <- read.table("~/DB/metagenomes/mgm4449206.3.350.genecalling.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+mgm4522044 <- read.table("~/DB/metagenomes/mgm4522044.3.350.genecalling.coding_bovine_rumen.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+mgm4522044Cluster <- read.table("~/DB/metagenomes/mgm4522044.3.550.cluster.aa90.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+mgm4529716 <- read.table("~/DB/metagenomes/mgm4529716.3.350.genecalling.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+mgm4529719 <- read.table("~/DB/metagenomes/mgm4529719.3.350.genecalling.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+mgm4530143 <- read.table("~/DB/metagenomes/mgm4530143.3.350.genecalling.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+mgm4544453 <- read.table("~/DB/metagenomes/mgm4544453.3.350.genecalling.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+HG_ORFans <- read.table("~/DB/metagenomes/HG_ORFans.faa.tmp.folder/scores.txt", header = T, sep = "\t", fill = T, comment.char = "")
+bovine <- bovine%>%mutate(genome = as.character(genome))
+mgm4441095 <- mgm4441095%>%mutate(genome = as.character(genome))
+mgm4441096 <- mgm4441096%>%mutate(genome = as.character(genome))
+HG_ORFans <- HG_ORFans%>%mutate(genome = as.character(genome))
+mgm4442583 <- mgm4442583%>%mutate(genome = as.character(genome))
+mgm4449206 <- mgm4449206%>%mutate(genome = as.character(genome))
+mgm4522044 <- mgm4522044%>%mutate(genome = as.character(genome))
+mgm4522044Cluster <- mgm4522044Cluster%>%mutate(genome = as.character(genome))
+mgm4529716 <- mgm4529716%>%mutate(genome = as.character(genome))
+mgm4529719 <- mgm4529719%>%mutate(genome = as.character(genome))
+mgm4530143 <- mgm4530143%>%mutate(genome = as.character(genome))
+mgm4544453 <- mgm4544453%>%mutate(genome = as.character(genome))
+metagenomes <- imgvr%>%
+  bind_rows(bovine)%>%
+  bind_rows(mgm4441095)%>%
+  bind_rows(mgm4441096)%>%
+  bind_rows(HG_ORFans)%>%
+  bind_rows(mgm4442583)%>%
+  bind_rows(mgm4449206)%>%
+  bind_rows(mgm4522044)%>%
+  bind_rows(mgm4522044Cluster)%>%
+  bind_rows(mgm4529716)%>%
+  bind_rows(mgm4529719)%>%
+  bind_rows(mgm4530143)%>%
+  bind_rows(mgm4544453)
+hotpools <-  mgm4441095%>%
+  bind_rows(mgm4441096)%>%
+  bind_rows(mgm4442583)%>%
+  bind_rows(mgm4449206)%>%
+  bind_rows(mgm4529716)%>%
+  bind_rows(mgm4529719)%>%
+  bind_rows(mgm4530143)%>%
+  bind_rows(mgm4544453)
+dat <- data.frame(protein.count = c(1:2200), prop = rep(NA, 2200))
+i <- 2
+for(i in 1:2200){
+  printRemaining(i, 2200, increment = 10)
+  tmpMetagenomes <- metagenomes%>%
+    filter(protein.counts >= i)%>%
+    filter(protein.counts <= i + 2)
+  if(nrow(tmpIMGVR) > 0){
+    dat[i,2] <- 1- nrow(tmpMetagenomes%>%filter(call == "none"))/nrow(tmpMetagenomes)
+  }else{
+    dat[i,2] <- 0
+  }
+}
+ggplot(data = dat) +
+  geom_line( aes(x = protein.count, y = prop)) +
+  #  stat_smooth(aes(x = protein.count, y = prop), method = lm, formula = y ~ poly(x,3), se = FALSE) +
+  xlim(0, 50)
+metagenomes <- metagenomes%>%mutate(max.score = ifelse(call == "archaeal", archaeal_score, ifelse(call == "phage", phage_score, ifelse(call == "eukaryotic", eukaryotic_score, 0))))
+meanMetagenomes <- metagenomes%>%group_by(protein.counts)%>%summarise(mean = median(max.score))
+sdMetagenomes <- metagenomes%>%group_by(protein.counts)%>%summarise(sd = sd(max.score))
+countsMetagenomes <- metagenomes%>%group_by(protein.counts)%>%summarise(count = n())
+summaryMetagenomes <- meanMetagenomes%>%
+  full_join(sdMetagenomes, by = "protein.counts")%>%
+  full_join(countsMetagenomes, by = "protein.counts")
+TS <- zoo::zoo(summaryMetagenomes$mean)
+mean <- zoo::rollapply(TS, width = 5, by = 1, FUN = mean, align = "left")
+tmp1 <- as.data.frame(mean)
+df <- data.frame(mean = c(0,0,0,0))
+tmp1 <- tmp1%>%bind_rows(df)
+TS <- zoo::zoo(summaryMetagenomes$sd)
+sd <- zoo::rollapply(TS, width = 5, by = 1, FUN = mean, align = "left")
+tmp2 <- as.data.frame(sd)
+df <- data.frame(sd = c(0,0,0,0))
+tmp2 <- tmp2%>%bind_rows(df)
+summaryMetagenomes <- summaryMetagenomes%>%select(-mean, -sd)%>%bind_cols(tmp1, tmp2)
+summaryMetagenomes <- summaryMetagenomes%>%mutate(upper = mean + sd, lower = mean - sd)
+ggplot(data = summaryMetagenomes%>%filter(protein.counts <= 50)) +
+  geom_line(aes(x = protein.counts, y = mean)) +
+  geom_line(aes(x = protein.counts, y = upper)) +
+  geom_line(aes(x = protein.counts, y = lower))
+##Protein count data Simulation #####
+archaeal <- read.table("~/PredVirusHost/archaeal_simulation.txt", header = T, sep = "\t", fill = T, comment.char = "")
+phage <- read.table("~/PredVirusHost/phage_simulation.txt", header = T, sep = "\t", fill = T, comment.char = "")
+eukaryotic <- read.table("~/PredVirusHost/eukaryotic_simulation.txt", header = T, sep = "\t", fill = T, comment.char = "")
+archaeal <- archaeal%>%mutate(genome = as.character(genome))
+phage <- phage%>%mutate(genome = as.character(genome))
+eukaryotic <- eukaryotic%>%mutate(genome = as.character(genome))
+all <- archaeal%>%
+  bind_rows(phage)%>%
+  bind_rows(eukaryotic)
+dat <- data.frame(protein.count = c(1:50), prop = rep(NA, 50))
+i <- 2
+for(i in 1:50){
+  printRemaining(i, 50, increment = 10)
+  tmpAll <- all%>%
+    filter(protein_count >= i)%>%
+    filter(protein_count <= i + 2)
+  if(nrow(tmpIMGVR) > 0){
+    dat[i,2] <- 1- nrow(tmpAll%>%filter(call == "none"))/nrow(tmpAll)
+  }else{
+    dat[i,2] <- 0
+  }
+}
+ggplot(data = dat) +
+  geom_line( aes(x = protein.count, y = prop)) +
+  #  stat_smooth(aes(x = protein.count, y = prop), method = lm, formula = y ~ poly(x,3), se = FALSE) +
+  xlim(0, 50)
+all <- all%>%mutate(max.score = ifelse(call == "archaeal", archaeal_score, ifelse(call == "phage", phage_score, ifelse(call == "eukaryotic", eukaryotic_score, 0))))
+meanAll <- all%>%group_by(protein_count)%>%summarise(mean = median(max.score))
+sdAll <- all%>%group_by(protein_count)%>%summarise(sd = sd(max.score))
+countsAll <- all%>%group_by(protein_count)%>%summarise(count = n())
+summaryAll <- meanAll%>%
+  full_join(sdAll, by = "protein_count")%>%
+  full_join(countsAll, by = "protein_count")
+summaryAll <- summaryAll%>%mutate(upper = mean + sd, lower = mean - sd)
+ggplot(data = summaryAll%>%filter(protein_count <= 50)) +
+  geom_line(aes(x = protein_count, y = mean)) +
+  geom_line(aes(x = protein_count, y = upper)) +
+  geom_line(aes(x = protein_count, y = lower))
+```
