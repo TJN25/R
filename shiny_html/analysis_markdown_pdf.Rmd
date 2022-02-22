@@ -39,8 +39,8 @@ library(genoPlotR)
 library(drake)
 library(ape)
 # library(Biostrings)
-# library(ggtree)
-# library(treeio)
+library(ggtree)
+library(treeio)
 # library(geiger)
 library(ROSE)
 library(reshape2)
@@ -1293,7 +1293,26 @@ The phylip tree was downloaded from NCBI's [Taxonomy Browser](#https://www.ncbi.
 `mv phyliptree.phy ~/phd/RNASeq/genera_tree_predicted.phy`
 
 ```{r tree_viewer, echo=T, include=F, eval=F}
-  tree <- read.tree("~/phd/RNASeq/upsetr.tree")
+  tree <- read.tree("~/bin/R/r_files/upsetr.tree")
+
+  tbl_tree <- as_tibble(tree)
+  
+  to_drop <-  c("Azotobacter", "Marinobacter", "Pseudoalteromonas", "Agarivorans", "Vibrio", "Alishewanella",
+                "Aggregatibacter", "Mannheimia", "Actinobacillus", "Xenorhabdus", "Providencia", "Proteus",
+                "Pantoea", "Brenneria", "Lonsdalea", "Buchnera.", "Wigglesworthia", "Sodalis", "Dickeya",
+                "Citrobacter", "Plautiasymbiont", "Shewanella", "Moritella", "Moraxella", "Psychrobacter",
+                "Methylomonas", "Cycloclasticus", "Methylococcus", "Francisella", "Pseudoxanthomonas", 
+                "Candidatus")
+  
+
+  sub_tree <- drop.tip(tree, to_drop)
+
+p <- ggtree(sub_tree) + 
+  geom_tiplab(align = T) 
+
+p
+
+ggsave(filename = "~/Documents/Comparative RNA-Seq/upsetr_subset_tree.svg", plot = p, width = 8, height = 16)
 
 p <- ggtree(tree) + 
   geom_tiplab(align = T) 
