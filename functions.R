@@ -268,3 +268,48 @@ allScores <- function(dat, steps, target_column = 'max_dist'){
   }
   return(valuesDat)
 }
+
+#take input from the contigs and the coordinates and 
+#rearrange so that start < stop
+reformatContigPositionData <- function(dat){
+  colnames(dat) <- c("contig", "start", "stop", "srna")
+  dat <- dat  %>% select(contig, srna, start, stop) %>% mutate(strand = "+")
+  dat <- dat %>% mutate(start = as.numeric(start), stop = as.numeric(stop))
+  dat <- dat %>% mutate(tmpstart = ifelse(start < stop, start, stop),
+                        tmpend = ifelse(start > stop, start, stop))
+  return(dat)
+}
+
+#check for overlapping coordinates on the same contig for two given data sets
+getOverlapIDs <- function(queryDat, targetDat){
+  queryDat <- queryDat %>% arrange(start)
+  targetDat <- targetDat %>% arrange(start)
+  query <- GRanges(seqnames = queryDat$contig,
+                   ranges = IRanges(start = queryDat$tmpstart, end = queryDat$tmpend),
+                   strand = queryDat$strand, query_name = queryDat$srna)
+  
+  target <- GRanges(seqnames = targetDat$contig,
+                    ranges = IRanges(start = targetDat$tmpstart, end = targetDat$tmpend),
+                    strand = targetDat$strand, query_name = targetDat$srna)
+  
+  
+  lookup1NC <- data.frame(id1 = queryDat$srna, queryHits = c(1:length(queryDat$srna)))
+  lookup2PC <- data.frame(id2 = targetDat$srna, subjectHits = c(1:length(targetDat$srna)))
+  
+  tmp <- GenomicRanges::findOverlaps(query, target, type = 'any')
+  
+  tmp <- as.data.frame(tmp)
+  
+  tmp <- tmp %>% left_join(lookup1NC) %>% left_join(lookup2PC)
+  tmp <- tmp %>% mutate_all(as.character)
+  tmp <- tmp %>% filter(id1 != id2)
+  
+  smallDat <- tmp %>% select(id1, id2) %>% unique()
+  return(smallDat)
+}
+
+
+
+
+
+#

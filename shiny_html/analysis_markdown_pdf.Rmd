@@ -2208,7 +2208,7 @@ The phylip tool dnadist was used to create a distance matrix based on the SSU al
 
 The stockholm file was reformatted `esl-reformat phylip RF00177.stk > RF00177_rep_seqs_all.phylip` and this was used in dnadist as an input, with *RF00177_rep_seqs_all.dists* as the output. All settings used were defaults.
 
-The matrix that is made is not in an easily useable format:
+The matrix that is made is not in an easily usable format:
 
 -   `cat  RF00177_rep_seqs_all.dists | tr '\n' ' ' | sed 's/ N/\nN/g' > RF00177_rep_MATRIX_all.dists`
 
